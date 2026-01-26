@@ -193,6 +193,7 @@ public class NpcRagdollController : MonoBehaviour
     public void SetRagdollActive(bool active)
     {
         isRagdollActive = active;
+        if(isRagdollActive) SetLayerRecursively(gameObject, LayerMask.NameToLayer("Dead"));
         
         // Toggle animator
         if (animator != null)
@@ -225,12 +226,25 @@ public class NpcRagdollController : MonoBehaviour
             col.isTrigger = !active;
         }
         
+        
+        
         if (showDebugInfo)
         {
             Debug.Log($"[{gameObject.name}] Ragdoll {(active ? "ACTIVATED" : "DEACTIVATED")}");
         }
     }
 
+    
+    private void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
+    }
+    
+    
     /// <summary>
     /// Activates ragdoll with an impact force applied.
     /// Call this when the NPC dies.
