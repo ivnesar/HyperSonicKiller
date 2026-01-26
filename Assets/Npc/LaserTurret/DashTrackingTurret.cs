@@ -11,11 +11,11 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
     {
         Idle,
         Tracking,
-        Charging,
+        Charging,           // currently unused
         Firing,
         DelayedFire,
-        StunnedEmbedded,
-        StunnedResidual
+        StunnedEmbedded,    // sword is stuck → indefinite stun
+        StunnedResidual     // sword removed → temporary stun
     }
 
     private TurretState currentState = TurretState.Idle;
@@ -40,43 +40,69 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
     [Header("Health Settings")]
     [SerializeField] private int maxHP = 300;
     [SerializeField] private int meleeDamageReceived = 25;
-
-    private int currentHP;
-    
-    // Pending throw damage
-    private int pendingThrowDamage;
-    private bool hasPendingThrowDamage;
+    [SerializeField] private int thrownSwordDamageReceived = 50;
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Inspector Fields – Stun
+    #region Inspector Fields – Tracking & Aiming
     // ────────────────────────────────────────────────────────────────────────────────
 
-    [Header("Stun Settings")]
-    [SerializeField] private float residualStunDuration = 2f;
-    [SerializeField] private Color embeddedStunColor = Color.magenta;
-    [SerializeField] private Color stunnedColor = Color.gray;
-    [SerializeField] private Color chargingColor = Color.yellow;
-
-    private float residualStunTimer;
+    [Header("Tracking Settings")]
+    [SerializeField] private float rotationSpeedx1000 = 25f;
+    [SerializeField] private LayerMask obstructionMask;
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Inspector Fields – Laser
+    #region Inspector Fields – Laser Behavior
     // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("Laser Settings")]
+    [SerializeField] private float chargeTime = 3f;
     [SerializeField] private float laserDuration = 0.5f;
-    [SerializeField] private float laserStartWidth = 0.1f;
-    [SerializeField] private float laserEndWidth = 0.5f;
-    [SerializeField] private int laserDamage = 50;
-    [SerializeField] private LayerMask laserHitMask;
+    [SerializeField] private float laserStartWidth = 0.5f;
+    [SerializeField] private float laserEndWidth = 0.05f;
+    [SerializeField] private float delayAfterDashEnd = 0.5f;
+    [SerializeField] private int laserDamage = 25;
+    [SerializeField] private LayerMask damageableMask;
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Inspector Fields – Visuals & Feedback
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    [Header("Visual Settings")]
+    [SerializeField] private Color chargingColor = Color.yellow;
+    [SerializeField] private Color firingColor = Color.red;
+    [SerializeField] private Color stunnedColor = Color.blue;
+    [SerializeField] private Color embeddedStunColor = Color.cyan;
+    [SerializeField] private Material laserMaterial;
+
+    [Header("Stun Settings")]
+    [SerializeField] private float residualStunDuration = 3f;
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Runtime Variables
+    // ────────────────────────────────────────────────────────────────────────────────
 
     private LineRenderer lineRenderer;
+
+    private Vector3 targetPosition;
+    private Vector3 lastKnownDashPosition;
+
+    private float chargeProgress;
     private float firingProgress;
+    private float delayTimer;
+    private float residualStunTimer;
+
     private bool hasLineOfSight;
+    private bool swordEmbedded;
+
+    private int currentHP;
 
     #endregion
 
@@ -93,36 +119,86 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
     #region Unity Lifecycle
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private void Awake()
-    {
-        lineRenderer = GetComponent<LineRenderer>();
-        currentHP = maxHP;
-    }
-
     private void Start()
     {
-        if (player == null)
-        {
-            player = FindFirstObjectByType<FPSPlayerController>();
-        }
-        EnterIdle();
+        currentHP = maxHP;
+        lineRenderer = GetComponent<LineRenderer>();
+
+        SetupLineRenderer();
+        FindMissingReferences();
     }
 
     private void Update()
     {
+        if (player == null) return;
+
+        UpdateLineOfSight();
+        UpdateStateMachine();
         UpdateBarrelRotation();
-        UpdateState();
+    }
+
+    private void LateUpdate()
+    {
+        UpdateLaserVisuals();
     }
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region State Machine
+    #region Initialization & Setup
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private void UpdateState()
+    private void SetupLineRenderer()
     {
-        bool playerIsDashing = player != null && player.IsDashing();
+        lineRenderer.positionCount = 2;
+        lineRenderer.startWidth = laserStartWidth;
+        lineRenderer.endWidth = laserStartWidth;
+        lineRenderer.material = laserMaterial != null ? laserMaterial : new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = chargingColor;
+        lineRenderer.endColor = chargingColor;
+        lineRenderer.useWorldSpace = true;
+        lineRenderer.enabled = false;
+    }
+
+    private void FindMissingReferences()
+    {
+        if (player == null)
+        {
+            player = FindObjectOfType<FPSPlayerController>();
+            if (player == null) Debug.LogError("DashTrackingTurret: No player found in scene!");
+        }
+
+        if (barrelTransform == null)
+        {
+            barrelTransform = transform;
+            Debug.LogWarning("DashTrackingTurret: No barrel transform assigned → using self");
+        }
+
+        if (firePoint == null)
+            firePoint = barrelTransform;
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Core Logic – Line of Sight & State Machine
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    private void UpdateLineOfSight()
+    {
+        Vector3 direction = player.transform.position - firePoint.position;
+        float distance = direction.magnitude;
+
+        hasLineOfSight = !Physics.Raycast(
+            firePoint.position,
+            direction.normalized,
+            distance,
+            obstructionMask);
+    }
+
+    private void UpdateStateMachine()
+    {
+        bool playerIsDashing = player.GetCurrentState() == FPSPlayerController.PlayerState.Dashing;
 
         switch (currentState)
         {
@@ -133,16 +209,26 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
 
             case TurretState.Tracking:
                 if (!playerIsDashing)
+                    EnterDelayedFire();
+                else if (!hasLineOfSight)
                     EnterIdle();
-                else if (hasLineOfSight)
-                    EnterFiring();
+                else
+                {
+                    TrackPlayer();
+                    chargeProgress += Time.unscaledDeltaTime;
+
+                    if (chargeProgress >= chargeTime)
+                        EnterFiring();
+                }
                 break;
 
             case TurretState.DelayedFire:
-                if (!playerIsDashing)
-                    EnterIdle();
-                else if (playerIsDashing && hasLineOfSight)
+                delayTimer += Time.deltaTime;
+
+                if (delayTimer >= delayAfterDashEnd)
                     EnterFiring();
+                else if (playerIsDashing && hasLineOfSight)
+                    EnterTracking();
                 break;
 
             case TurretState.Firing:
@@ -158,6 +244,7 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
                 break;
 
             case TurretState.StunnedEmbedded:
+                // Visual pulsing
                 float pulse = Mathf.PingPong(Time.time * 3f, 1f);
                 Color col = Color.Lerp(embeddedStunColor, Color.white, pulse * 0.3f);
                 lineRenderer.startColor = lineRenderer.endColor = col;
@@ -172,46 +259,9 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
                 lineRenderer.startColor = lineRenderer.endColor = resCol;
 
                 if (residualStunTimer <= 0f)
-                {
-                    ApplyPendingThrowDamage();
-                    if (currentHP > 0)
-                        EnterIdle();
-                }
+                    EnterIdle();
                 break;
         }
-    }
-
-    private void EnterIdle()
-    {
-        currentState = TurretState.Idle;
-        lineRenderer.enabled = false;
-    }
-
-    private void EnterTracking()
-    {
-        currentState = TurretState.Tracking;
-        lineRenderer.enabled = true;
-    }
-
-    private void EnterFiring()
-    {
-        currentState = TurretState.Firing;
-        firingProgress = 0f;
-        lineRenderer.enabled = true;
-        FireLaser();
-    }
-
-    private void EnterStunnedEmbedded()
-    {
-        currentState = TurretState.StunnedEmbedded;
-        lineRenderer.enabled = true;
-        lineRenderer.startColor = lineRenderer.endColor = embeddedStunColor;
-    }
-
-    private void EnterStunnedResidual()
-    {
-        currentState = TurretState.StunnedResidual;
-        residualStunTimer = residualStunDuration;
     }
 
     #endregion
@@ -225,24 +275,118 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
         if (currentState is TurretState.Idle or TurretState.StunnedEmbedded or TurretState.StunnedResidual)
             return;
 
-        if (player == null || barrelTransform == null) return;
-
-        Vector3 targetPos = player.transform.position;
-        Vector3 direction = (targetPos - barrelTransform.position).normalized;
-
-        barrelTransform.rotation = Quaternion.LookRotation(direction);
-
-        hasLineOfSight = !Physics.Linecast(firePoint.position, targetPos, laserHitMask);
+        Quaternion targetRot = Quaternion.LookRotation(targetPosition - barrelTransform.position);
+        barrelTransform.rotation = Quaternion.RotateTowards(
+            barrelTransform.rotation,
+            targetRot,
+            rotationSpeedx1000 * 1000f * Time.deltaTime);
     }
+
+    private void TrackPlayer()
+    {
+        targetPosition = player.transform.position;
+        lastKnownDashPosition = targetPosition;
+    }
+
+    private void UpdateLaserVisuals()
+    {
+        if (!lineRenderer.enabled) return;
+        if (currentState is TurretState.Idle or TurretState.StunnedEmbedded or TurretState.StunnedResidual)
+            return;
+
+        lineRenderer.SetPosition(0, firePoint.position);
+
+        if (currentState == TurretState.Tracking)
+        {
+            Vector3 dir = (targetPosition - firePoint.position).normalized;
+            lineRenderer.SetPosition(1, firePoint.position + dir * 1000f);
+        }
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region State Transitions
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    private void EnterIdle()
+    {
+        currentState = TurretState.Idle;
+        chargeProgress = 0f;
+        firingProgress = 0f;
+        delayTimer = 0f;
+        lineRenderer.enabled = false;
+    }
+
+    private void EnterTracking()
+    {
+        currentState = TurretState.Tracking;
+        chargeProgress = 0f;
+        lineRenderer.enabled = true;
+        lineRenderer.startColor = lineRenderer.endColor = chargingColor;
+        lineRenderer.startWidth = lineRenderer.endWidth = laserStartWidth;
+    }
+
+    private void EnterDelayedFire()
+    {
+        currentState = TurretState.DelayedFire;
+        delayTimer = 0f;
+        targetPosition = lastKnownDashPosition;
+    }
+
+    private void EnterFiring()
+    {
+        currentState = TurretState.Firing;
+        firingProgress = 0f;
+
+        lineRenderer.enabled = true;
+        lineRenderer.startColor = lineRenderer.endColor = firingColor;
+
+        FireLaser();
+    }
+
+    private void EnterStunnedEmbedded()
+    {
+        currentState = TurretState.StunnedEmbedded;
+        swordEmbedded = true;
+
+        lineRenderer.enabled = true;
+        lineRenderer.startColor = lineRenderer.endColor = embeddedStunColor;
+        lineRenderer.startWidth = lineRenderer.endWidth = laserStartWidth * 0.7f;
+
+        // Visual feedback: short downward arc
+        lineRenderer.SetPosition(0, firePoint.position);
+        lineRenderer.SetPosition(1, firePoint.position + Vector3.down * 2f);
+    }
+
+    private void EnterStunnedResidual()
+    {
+        currentState = TurretState.StunnedResidual;
+        swordEmbedded = false;
+        residualStunTimer = residualStunDuration;
+
+        lineRenderer.enabled = true;
+        lineRenderer.startColor = lineRenderer.endColor = stunnedColor;
+        lineRenderer.startWidth = lineRenderer.endWidth = laserStartWidth * 0.5f;
+
+        lineRenderer.SetPosition(0, firePoint.position);
+        lineRenderer.SetPosition(1, firePoint.position + Vector3.down * 1.5f);
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Laser Firing Logic
+    // ────────────────────────────────────────────────────────────────────────────────
 
     private void FireLaser()
     {
-        if (firePoint == null || player == null) return;
+        Vector3 direction = (targetPosition - firePoint.position).normalized;
+        RaycastHit hit;
 
-        Vector3 direction = (player.transform.position - firePoint.position).normalized;
         Vector3 endPoint;
 
-        if (Physics.Raycast(firePoint.position, direction, out RaycastHit hit, 1000f, laserHitMask))
+        if (Physics.Raycast(firePoint.position, direction, out hit, Mathf.Infinity, damageableMask))
         {
             endPoint = hit.point;
 
@@ -272,13 +416,8 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
         if (currentHP <= 0) DestroyTurret();
     }
 
-    public void OnThrowStun(float duration, int damage, Vector3 swordDirection, Vector3 hitPoint)
+    public void OnThrowStun(float duration)
     {
-        // Store pending damage
-        pendingThrowDamage = damage;
-        hasPendingThrowDamage = true;
-        residualStunDuration = duration;
-        
         EnterStunnedEmbedded();
     }
 
@@ -288,18 +427,6 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
         {
             EnterStunnedResidual();
         }
-    }
-
-    private void ApplyPendingThrowDamage()
-    {
-        if (!hasPendingThrowDamage) return;
-        
-        hasPendingThrowDamage = false;
-        currentHP -= pendingThrowDamage;
-        
-        Debug.Log($"[DashTrackingTurret] Applied throw damage: {pendingThrowDamage}, HP: {currentHP}/{maxHP}");
-        
-        if (currentHP <= 0) DestroyTurret();
     }
 
     private void DestroyTurret()
@@ -327,8 +454,43 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
     {
         if (player == null) return;
 
+        // Line of sight
         Gizmos.color = hasLineOfSight ? Color.green : Color.red;
-        Gizmos.DrawLine(firePoint != null ? firePoint.position : transform.position, player.transform.position);
+        Gizmos.DrawLine(firePoint.position, player.transform.position);
+
+        // Target & last known position
+        if (currentState != TurretState.Idle && currentState != TurretState.StunnedEmbedded && currentState != TurretState.StunnedResidual)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(targetPosition, 0.3f);
+        }
+
+        if (currentState == TurretState.DelayedFire)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawWireSphere(lastKnownDashPosition, 0.5f);
+        }
+
+        // HP bar
+        if (Application.isPlaying)
+        {
+            Vector3 pos = transform.position + Vector3.up * 3f;
+            float pct = GetHPPercent();
+
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(pos - Vector3.right, pos + Vector3.right);
+
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(pos - Vector3.right, pos - Vector3.right + Vector3.right * 2f * pct);
+        }
+
+        // Stun indicator
+        if (Application.isPlaying && (currentState is TurretState.StunnedEmbedded or TurretState.StunnedResidual))
+        {
+            Vector3 indPos = transform.position + Vector3.up * 3.5f;
+            Gizmos.color = currentState == TurretState.StunnedEmbedded ? embeddedStunColor : stunnedColor;
+            Gizmos.DrawWireSphere(indPos, 0.3f);
+        }
     }
 
     #endregion

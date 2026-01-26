@@ -4,21 +4,36 @@ using System.Collections;
 public class MineNPC : MonoBehaviour, INpcInteraction
 {
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Inspector Fields
+    #region Inspector Fields – Detection & Timing
     // ────────────────────────────────────────────────────────────────────────────────
 
-    [Header("References")]
-    [SerializeField] private FPSPlayerController playerController;
-    [SerializeField] private MeshRenderer mineRenderer;
-    [SerializeField] private AudioSource audioSource;
-
-    [Header("Detection")]
+    [Header("Detection Settings")]
     [SerializeField] private float detectionRadius = 5f;
-    [SerializeField] private float dashCancelDelay = 0.2f;
+    [SerializeField] private float dashCancelDelay = 0.1f;          // Unscaled time
+    [SerializeField] private LayerMask playerLayer;
 
-    [Header("Colors")]
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Inspector Fields – Visual & Audio Feedback
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    [Header("Visual Feedback")]
+    [SerializeField] private GameObject visualIndicator;            // Optional: effect when armed
     [SerializeField] private Color normalColor = Color.yellow;
     [SerializeField] private Color armedColor = Color.red;
+    [SerializeField] private Renderer mineRenderer;
+
+    [Header("Audio (Optional)")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip armSound;
+    [SerializeField] private AudioClip disarmSound;
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Inspector Fields – Debug
+    // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("Debug")]
     [SerializeField] private bool showDebugGizmos = true;
@@ -26,21 +41,15 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Events
+    #region Runtime Variables
     // ────────────────────────────────────────────────────────────────────────────────
 
-    public delegate void DashMineDestroyedHandler();
-    public event DashMineDestroyedHandler OnDashMineDestroyed;
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Runtime State
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    private bool playerInRange;
-    private bool isDashDisabled;
+    private FPSPlayerController playerController;
+    private bool playerInRange = false;
+    private bool isDashDisabled = false;
     private Coroutine dashCancelCoroutine;
+    private float lastCheckTime;
+    private const float CHECK_INTERVAL = 0.1f;                      // Check interval for performance
 
     #endregion
 
@@ -50,17 +59,83 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     private void Start()
     {
-        if (playerController == null)
-        {
-            playerController = FindFirstObjectByType<FPSPlayerController>();
-        }
-        SetMineColor(normalColor);
+        FindPlayer();
+        SetupVisuals();
     }
 
     private void Update()
     {
         if (playerController == null) return;
 
+        // Throttle expensive checks
+        if (Time.unscaledTime - lastCheckTime < CHECK_INTERVAL) return;
+        lastCheckTime = Time.unscaledTime;
+
+        CheckPlayerProximity();
+    }
+
+    private void OnDestroy()
+    {
+        // Safety cleanup: re-enable dash if mine is destroyed
+        if (isDashDisabled && playerController != null)
+        {
+            playerController.EnableDash();
+        }
+    }
+
+    #endregion
+
+    
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Events
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    public delegate void DashMineDestroyedHandler();
+    public event DashMineDestroyedHandler OnDashMineDestroyed;
+
+    #endregion
+    
+    
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Player Detection Logic
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    private void FindPlayer()
+    {
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj == null)
+        {
+            Debug.LogError("MineNPC: No GameObject with 'Player' tag found!");
+            return;
+        }
+
+        playerController = playerObj.GetComponent<FPSPlayerController>();
+        if (playerController == null)
+        {
+            Debug.LogError("MineNPC: Player found but FPSPlayerController component missing!");
+        }
+    }
+
+    private void SetupVisuals()
+    {
+        if (mineRenderer == null)
+        {
+            mineRenderer = GetComponent<Renderer>();
+        }
+
+        if (mineRenderer != null)
+        {
+            SetMineColor(normalColor);
+        }
+
+        if (visualIndicator != null)
+        {
+            visualIndicator.SetActive(false);
+        }
+    }
+
+    private void CheckPlayerProximity()
+    {
         float distance = Vector3.Distance(transform.position, playerController.transform.position);
         bool wasInRange = playerInRange;
         playerInRange = distance <= detectionRadius;
@@ -73,56 +148,108 @@ public class MineNPC : MonoBehaviour, INpcInteraction
         {
             OnPlayerExitRange();
         }
+        else if (playerInRange)
+        {
+            CheckDashState();
+        }
     }
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Detection Logic
+    #region Range Enter / Exit Handlers
     // ────────────────────────────────────────────────────────────────────────────────
 
     private void OnPlayerEnterRange()
     {
-        SetMineColor(armedColor);
+        Debug.Log($"MineNPC: Player entered range (Distance: {Vector3.Distance(transform.position, playerController.transform.position):F2}m)");
 
-        if (playerController.IsDashing())
-        {
-            if (dashCancelCoroutine != null)
-                StopCoroutine(dashCancelCoroutine);
-
-            dashCancelCoroutine = StartCoroutine(DelayedDashCancel());
-        }
-        else
+        if (!isDashDisabled)
         {
             playerController.DisableDash();
             isDashDisabled = true;
+
+            SetMineColor(armedColor);
+            if (visualIndicator != null) visualIndicator.SetActive(true);
+            PlaySound(armSound);
+        }
+
+        if (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing)
+        {
+            StartDashCancelCountdown();
         }
     }
 
     private void OnPlayerExitRange()
     {
-        SetMineColor(normalColor);
+        Debug.Log("MineNPC: Player exited range");
+
+        if (isDashDisabled)
+        {
+            playerController.EnableDash();
+            isDashDisabled = false;
+
+            SetMineColor(normalColor);
+            if (visualIndicator != null) visualIndicator.SetActive(false);
+            PlaySound(disarmSound);
+        }
 
         if (dashCancelCoroutine != null)
         {
             StopCoroutine(dashCancelCoroutine);
             dashCancelCoroutine = null;
         }
+    }
 
-        if (isDashDisabled)
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Dash Cancellation Logic
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    private void CheckDashState()
+    {
+        if (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing)
         {
-            playerController.EnableDash();
-            isDashDisabled = false;
+            if (dashCancelCoroutine == null)
+            {
+                StartDashCancelCountdown();
+            }
+        }
+        else
+        {
+            if (dashCancelCoroutine != null)
+            {
+                StopCoroutine(dashCancelCoroutine);
+                dashCancelCoroutine = null;
+            }
         }
     }
 
-    private IEnumerator DelayedDashCancel()
+    private void StartDashCancelCountdown()
     {
-        yield return new WaitForSeconds(dashCancelDelay);
+        if (dashCancelCoroutine != null) return;
+        dashCancelCoroutine = StartCoroutine(DashCancelCoroutine());
+    }
 
-        if (playerInRange && playerController != null)
+    private IEnumerator DashCancelCoroutine()
+    {
+        Debug.Log($"MineNPC: Dash detected! Cancelling in {dashCancelDelay}s (unscaled)");
+
+        float elapsed = 0f;
+        while (elapsed < dashCancelDelay)
         {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (playerInRange &&
+            (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing ||
+             playerController.GetCurrentState() == FPSPlayerController.PlayerState.StuckToSurface))
+        {
+            Debug.Log("MineNPC: Cancelling player dash!");
             playerController.CancelDash(true);
+            // ← Here you can add feedback: particles, sound, screen shake, etc.
         }
 
         dashCancelCoroutine = null;
@@ -158,21 +285,21 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     public void OnMeeleDamage(int amount)
     {
-        DestroyThis();
+        DestoryThis();
     }
 
-    public void OnThrowStun(float duration, int damage, Vector3 swordDirection, Vector3 hitPoint)
+    public void OnThrowStun(float duration)
     {
-        // Mine is instantly destroyed by thrown sword - no delayed damage needed
-        DestroyThis();
+        DestoryThis();
     }
 
     public void OnSwordRemoved()
     {
-        // Nothing to do - mine is already destroyed
+        
     }
-
-    private void DestroyThis()
+    
+    
+    private void DestoryThis()
     {
         OnDashMineDestroyed?.Invoke();
         Destroy(gameObject);

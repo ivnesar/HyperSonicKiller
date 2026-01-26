@@ -41,7 +41,8 @@ public class SwordCombatSystem : MonoBehaviour
     [SerializeField] private float attackAngle = 30f;
     [SerializeField] private LayerMask enemyLayer;
     [SerializeField] private float attackCooldown = 0.5f;
-
+    [SerializeField] private int meleeDamage = 50;
+    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -291,7 +292,7 @@ public class SwordCombatSystem : MonoBehaviour
                 Debug.Log("col "+col.transform.name);
                 if (col.TryGetComponent<INpcInteraction>(out var target))
                 {
-                    target.OnMeeleDamage(500);
+                    target.OnMeeleDamage(meleeDamage);
                 }
             }
         }

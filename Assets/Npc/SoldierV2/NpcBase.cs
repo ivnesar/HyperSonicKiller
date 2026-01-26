@@ -6,8 +6,8 @@ using UnityEngine.AI;
 /// Handles shared functionality: movement, stunned state, health, sword interaction, and animation.
 /// Subclasses implement specific behavior via the state machine pattern.
 /// 
-/// UPDATED: Thrown sword damage is now applied AFTER the stun duration ends.
-/// This allows weak enemies to collapse while tough enemies survive.
+/// REFACTORED: Now includes animator control (previously NPCanimatorController).
+/// UPDATED: Integrated with NpcRagdollController for death ragdolls.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public abstract class NpcBase : MonoBehaviour, INpcInteraction
@@ -38,13 +38,9 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     [Header("Death Settings")]
     [Tooltip("If true, NPC will ragdoll on death. Requires NpcRagdollController component.")]
     [SerializeField] protected bool useRagdollOnDeath = true;
-
+    
     [Tooltip("Time before destroying the GameObject after death (set to -1 to never destroy)")]
     [SerializeField] protected float destroyDelay = 10f;
-
-    [Header("Sword Stun")]
-    [Tooltip("Base residual stun duration after sword removal (can be overridden by sword)")]
-    [SerializeField] protected float residualStunAfterSwordRemoval = 2f;
 
     [Header("Debug")]
     [SerializeField] protected bool showDebugInfo = true;
@@ -75,12 +71,10 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
     // Sword embedding
     protected bool hasSwordEmbedded;
-
-    // Pending throw damage (applied after stun ends)
-    protected int pendingThrowDamage;
-    protected Vector3 pendingImpactDirection;
-    protected Vector3 pendingHitPoint;
-    protected bool hasPendingThrowDamage;
+    
+    // Residual stun after sword removal
+    [Header("Sword Stun")]
+    [SerializeField] protected float residualStunAfterSwordRemoval = 2f;
 
     // State timer (shared utility for subclasses)
     protected float stateTimer;
@@ -107,6 +101,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         audioSource = GetComponent<AudioSource>();
         ragdollController = GetComponent<NpcRagdollController>();
 
+        // Add AudioSource if missing
         if (audioSource == null)
         {
             audioSource = gameObject.AddComponent<AudioSource>();
@@ -114,6 +109,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         currentHealth = maxHealth;
 
+        // Configure NavMeshAgent
         if (navAgent != null)
         {
             navAgent.speed = moveSpeed;
@@ -122,6 +118,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
             navAgent.autoBraking = true;
         }
 
+        // Warn if ragdoll is enabled but controller is missing
         if (useRagdollOnDeath && ragdollController == null)
         {
             Debug.LogWarning($"[{gameObject.name}] useRagdollOnDeath is true but NpcRagdollController component is missing!");
@@ -130,6 +127,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
     protected virtual void Start()
     {
+        // Auto-find player if not assigned
         if (playerTransform == null)
         {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -143,7 +141,9 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
             }
         }
 
+        // Register with NPC manager
         NpcManager.Instance?.RegisterNpc(this);
+
         OnStart();
     }
 
@@ -161,18 +161,11 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
                 UpdateAnimator();
                 return;
             }
-
+            
             // Sword removed - check residual stun timer
             if (Time.time >= stunEndTime)
             {
-                // Apply pending throw damage BEFORE ending stun
-                ApplyPendingThrowDamage();
-                
-                // Only end stun if still alive
-                if (!isDead)
-                {
-                    EndStun();
-                }
+                EndStun();
             }
             else
             {
@@ -182,8 +175,13 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
             }
         }
 
+        // Update visibility cache periodically
         UpdateVisibilityCache();
+
+        // Let subclass handle behavior
         UpdateBehavior();
+
+        // Update animator
         UpdateAnimator();
     }
 
@@ -198,12 +196,39 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     #region Abstract Methods - Subclass Implementation
     // ────────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Called once during Start. Use for subclass-specific initialization.
+    /// </summary>
     protected abstract void OnStart();
+
+    /// <summary>
+    /// Main behavior update. Called every frame when not stunned/dead.
+    /// </summary>
     protected abstract void UpdateBehavior();
+
+    /// <summary>
+    /// Called when stun ends. Subclass should transition to appropriate state.
+    /// </summary>
     protected abstract void OnStunEnd();
+    
+    /// <summary>
+    /// Called when stun starts. Subclass should transition to Stunned state.
+    /// </summary>
     protected abstract void OnStunStart();
+
+    /// <summary>
+    /// Returns the current state name for debugging purposes.
+    /// </summary>
     public abstract string GetCurrentStateName();
+
+    /// <summary>
+    /// Returns the NPC type identifier.
+    /// </summary>
     public abstract NpcType GetNpcType();
+
+    /// <summary>
+    /// Returns the current state as an integer for animator.
+    /// </summary>
     public abstract int GetStateID();
 
     #endregion
@@ -218,19 +243,19 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         currentHealth -= amount;
 
+        // Register impact for ragdoll
         if (playerTransform != null)
         {
             ragdollController?.RegisterMeleeImpact(playerTransform.position);
         }
 
+        // Trigger hit reaction
         animator?.SetTrigger("Hit");
         PlaySound(hitSound);
 
         if (currentHealth <= 0)
         {
-<<<<<<< HEAD
-=======
-            Die();
+            Die();  // ← Already calls death when lethal
         }
     }
 
@@ -267,57 +292,20 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         if (currentHealth <= 0)
         {
->>>>>>> parent of ee61753 (add player meele damage)
             Die();
-        }
-    }
-
-    /// <summary>
-    /// Called when thrown sword embeds. Damage is stored and applied after stun ends.
-    /// </summary>
-    public virtual void OnThrowStun(float duration, int damage, Vector3 swordDirection, Vector3 hitPoint)
-    {
-        if (isDead) return;
-
-        hasSwordEmbedded = true;
-
-        // Store pending damage - will be applied when stun ends
-        pendingThrowDamage = damage;
-        pendingImpactDirection = swordDirection;
-        pendingHitPoint = hitPoint;
-        hasPendingThrowDamage = true;
-        
-        // Store the duration for use when sword is removed
-        residualStunAfterSwordRemoval = duration;
-
-        // Enter stunned state - stays stunned indefinitely while sword is embedded
-        isStunned = true;
-        stunEndTime = float.MaxValue;
-
-        StopMovement();
-        animator?.SetBool("IsStunned", true);
-
-        OnStunStart();
-
-        if (showDebugInfo)
-        {
-            Debug.Log($"[{gameObject.name}] Sword embedded - stunned indefinitely (pending damage: {damage})");
         }
     }
 
     public virtual void OnSwordRemoved()
     {
         if (!hasSwordEmbedded) return;
-
+        
         hasSwordEmbedded = false;
-
-        // Start residual stun timer - damage will be applied when this expires
+        
+        // Start residual stun timer
         stunEndTime = Time.time + residualStunAfterSwordRemoval;
-
-        if (showDebugInfo)
-        {
-            Debug.Log($"[{gameObject.name}] Sword removed - residual stun for {residualStunAfterSwordRemoval}s, then {pendingThrowDamage} damage");
-        }
+        
+        Debug.Log($"[{gameObject.name}] Sword removed - residual stun for {residualStunAfterSwordRemoval}s");
     }
 
     /// <summary>
@@ -329,41 +317,12 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         currentHealth -= amount;
 
+        // Register with ragdoll controller
         ragdollController?.RegisterBulletImpact(bulletDirection, hitPoint);
 
+        // Trigger hit reaction
         animator?.SetTrigger("Hit");
         PlaySound(hitSound);
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Delayed Throw Damage System
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Applies the stored throw damage. Called when stun ends.
-    /// </summary>
-    protected virtual void ApplyPendingThrowDamage()
-    {
-        if (!hasPendingThrowDamage) return;
-
-        hasPendingThrowDamage = false;
-
-        currentHealth -= pendingThrowDamage;
-
-        // Register impact for ragdoll
-        ragdollController?.RegisterThrownSwordImpact(pendingImpactDirection, pendingHitPoint);
-
-        if (showDebugInfo)
-        {
-            Debug.Log($"[{gameObject.name}] Applied throw damage: {pendingThrowDamage}, health: {currentHealth}/{maxHealth}");
-        }
 
         if (currentHealth <= 0)
         {
@@ -384,7 +343,8 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         StopMovement();
         animator?.SetBool("IsStunned", true);
-
+        
+        // Let subclass transition to Stunned state
         OnStunStart();
     }
 
@@ -407,11 +367,17 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     #region State Timer Utilities
     // ────────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Sets the state timer to a duration.
+    /// </summary>
     protected void SetStateTimer(float duration)
     {
         stateTimer = duration;
     }
 
+    /// <summary>
+    /// Decrements state timer and returns true if expired.
+    /// </summary>
     protected bool UpdateStateTimer()
     {
         stateTimer -= Time.deltaTime;
@@ -424,6 +390,9 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     #region Movement Helpers - NavMesh Based
     // ────────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Moves the NPC toward a target position using NavMeshAgent.
+    /// </summary>
     protected void MoveToward(Vector3 targetPosition, float speedMultiplier = 1f)
     {
         if (navAgent == null || !navAgent.enabled || isStunned) return;
@@ -433,6 +402,9 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         navAgent.speed = moveSpeed * speedMultiplier;
     }
 
+    /// <summary>
+    /// Stops the NPC's movement.
+    /// </summary>
     protected void StopMovement()
     {
         if (navAgent == null || !navAgent.enabled) return;
@@ -441,20 +413,32 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         navAgent.ResetPath();
     }
 
+    /// <summary>
+    /// Checks if the NPC has reached its destination.
+    /// </summary>
     protected bool HasReachedDestination()
     {
         if (navAgent == null || !navAgent.enabled) return true;
-        if (navAgent.pathPending) return false;
 
-        return navAgent.remainingDistance <= navAgent.stoppingDistance;
+        if (!navAgent.pathPending && navAgent.remainingDistance <= navAgent.stoppingDistance)
+        {
+            if (!navAgent.hasPath || navAgent.velocity.sqrMagnitude < 0.01f)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
-    protected void FaceTarget(Vector3 targetPosition, float speedMultiplier = 1f)
+    /// <summary>
+    /// Smoothly rotates the NPC to face a target position.
+    /// </summary>
+    protected void RotateToward(Vector3 targetPosition, float speedMultiplier = 1f)
     {
-        Vector3 direction = (targetPosition - transform.position).normalized;
-        direction.y = 0;
+        Vector3 direction = (targetPosition - transform.position);
+        direction.y = 0f;
 
-        if (direction.sqrMagnitude > 0.001f)
+        if (direction.sqrMagnitude > 0.01f)
         {
             Quaternion targetRotation = Quaternion.LookRotation(direction);
             transform.rotation = Quaternion.Slerp(
@@ -465,39 +449,101 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         }
     }
 
+    /// <summary>
+    /// Instantly faces a target position.
+    /// </summary>
+    protected void FaceTarget(Vector3 targetPosition)
+    {
+        Vector3 direction = (targetPosition - transform.position);
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude > 0.01f)
+        {
+            transform.rotation = Quaternion.LookRotation(direction);
+        }
+    }
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Detection Helpers
+    #region Animator Integration
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Updates animator parameters. Called every frame.
+    /// </summary>
+    protected virtual void UpdateAnimator()
+    {
+        if (animator == null) return;
+
+        // Movement speed (smoothed)
+        float targetSpeed = 0f;
+        if (navAgent != null && navAgent.enabled)
+        {
+            targetSpeed = navAgent.velocity.magnitude / moveSpeed;
+        }
+
+        float smoothedSpeed = Mathf.SmoothDamp(
+            animator.GetFloat("MoveSpeed"),
+            targetSpeed,
+            ref currentSpeedVelocity,
+            SPEED_SMOOTH_TIME
+        );
+        animator.SetFloat("MoveSpeed", smoothedSpeed);
+
+        // State ID
+        animator.SetInteger("StateID", GetStateID());
+
+        // Status flags
+        animator.SetBool("IsStunned", isStunned);
+        animator.SetBool("IsDead", isDead);
+    }
+
+    /// <summary>
+    /// Plays a sound if available.
+    /// </summary>
+    protected void PlaySound(AudioClip clip)
+    {
+        if (clip != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Detection & Visibility
     // ────────────────────────────────────────────────────────────────────────────────
 
     protected void UpdateVisibilityCache()
     {
-        if (Time.time - lastVisibilityCheckTime < VISIBILITY_CHECK_INTERVAL) return;
-
-        lastVisibilityCheckTime = Time.time;
-        canSeePlayer = CheckLineOfSight();
+        if (Time.time - lastVisibilityCheckTime >= VISIBILITY_CHECK_INTERVAL)
+        {
+            canSeePlayer = CheckLineOfSightToPlayer();
+            lastVisibilityCheckTime = Time.time;
+        }
     }
 
-    protected bool CheckLineOfSight()
+    protected bool CheckLineOfSightToPlayer()
     {
         if (playerTransform == null) return false;
 
-        Vector3 toPlayer = playerTransform.position - transform.position;
+        Vector3 directionToPlayer = playerTransform.position - transform.position;
+        float distanceToPlayer = directionToPlayer.magnitude;
 
-        if (toPlayer.magnitude > detectionRange) return false;
+        if (distanceToPlayer > detectionRange) return false;
 
-        Vector3 directionToPlayer = toPlayer.normalized;
         float angle = Vector3.Angle(transform.forward, directionToPlayer);
-
         if (angle > fieldOfView * 0.5f) return false;
 
         Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
         Vector3 targetPosition = playerTransform.position + Vector3.up * 1f;
+        Vector3 rayDirection = (targetPosition - eyePosition).normalized;
 
-        if (Physics.Linecast(eyePosition, targetPosition, lineOfSightMask))
+        if (Physics.Raycast(eyePosition, rayDirection, out RaycastHit hit, distanceToPlayer, lineOfSightMask))
         {
-            return false;
+            return hit.transform == playerTransform || hit.transform.IsChildOf(playerTransform);
         }
 
         return true;
@@ -509,34 +555,89 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         return Vector3.Distance(transform.position, playerTransform.position);
     }
 
-    protected bool IsPlayerInRange(float range)
+    protected Vector3 GetDirectionToPlayer()
     {
-        return GetDistanceToPlayer() <= range;
+        if (playerTransform == null) return Vector3.zero;
+
+        Vector3 dir = playerTransform.position - transform.position;
+        dir.y = 0f;
+        return dir.normalized;
     }
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Death & Damage
+    #region Health & Death
     // ────────────────────────────────────────────────────────────────────────────────
 
     protected virtual void Die()
     {
-        if (isDead) return;
-
+        if (isDead) return; // Prevent multiple death calls
+        
         isDead = true;
         isStunned = false;
 
+        // Disable NavMeshAgent
         if (navAgent != null)
         {
             navAgent.isStopped = true;
             navAgent.enabled = false;
         }
 
+        // Handle ragdoll or animation death
         if (useRagdollOnDeath && ragdollController != null)
         {
+            // Activate ragdoll with accumulated impact
             ragdollController.ActivateRagdollWithAccumulatedImpact();
+            
+            // Disable animator (ragdoll controller does this, but just to be safe)
+            if (animator != null)
+            {
+                animator.enabled = false;
+            }
+        }
+        else
+        {
+            // Fall back to death animation
+            animator?.SetTrigger("Die");
+        }
 
+        // Destroy after delay (if not set to -1)
+        if (destroyDelay >= 0)
+        {
+            Destroy(gameObject, destroyDelay);
+        }
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[{gameObject.name}] Died!");
+        }
+    }
+
+    /// <summary>
+    /// Kills the NPC with a specific impact force and direction.
+    /// Useful for special death scenarios.
+    /// </summary>
+    public virtual void DieWithImpact(Vector3 impactDirection, float forceMagnitude, Vector3? impactPoint = null)
+    {
+        if (isDead) return;
+        
+        isDead = true;
+        isStunned = false;
+        currentHealth = 0;
+
+        // Disable NavMeshAgent
+        if (navAgent != null)
+        {
+            navAgent.isStopped = true;
+            navAgent.enabled = false;
+        }
+
+        // Activate ragdoll with specific impact
+        if (useRagdollOnDeath && ragdollController != null)
+        {
+            ragdollController.ActivateRagdollWithImpact(impactDirection, forceMagnitude, impactPoint);
+            
             if (animator != null)
             {
                 animator.enabled = false;
@@ -547,66 +648,17 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
             animator?.SetTrigger("Die");
         }
 
+        // Destroy after delay
         if (destroyDelay >= 0)
         {
             Destroy(gameObject, destroyDelay);
         }
-
-        if (showDebugInfo)
-        {
-            Debug.Log($"[{gameObject.name}] Died!");
-        }
     }
 
-    public virtual void DieWithImpact(Vector3 impactDirection, float forceMagnitude, Vector3? hitPoint = null)
-    {
-        if (isDead) return;
-
-        ragdollController?.RegisterCustomImpact(impactDirection, forceMagnitude, hitPoint);
-        Die();
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Animation
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    protected virtual void UpdateAnimator()
-    {
-        if (animator == null) return;
-
-        float targetSpeed = 0f;
-        if (navAgent != null && navAgent.enabled && !navAgent.isStopped)
-        {
-            targetSpeed = navAgent.velocity.magnitude / moveSpeed;
-        }
-
-        float smoothedSpeed = Mathf.SmoothDamp(
-            animator.GetFloat("MoveSpeed"),
-            targetSpeed,
-            ref currentSpeedVelocity,
-            SPEED_SMOOTH_TIME
-        );
-
-        animator.SetFloat("MoveSpeed", smoothedSpeed);
-        animator.SetBool("IsMoving", targetSpeed > 0.1f);
-        animator.SetInteger("StateID", GetStateID());
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Audio
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    protected void PlaySound(AudioClip clip)
-    {
-        if (audioSource != null && clip != null)
-        {
-            audioSource.PlayOneShot(clip);
-        }
-    }
+    public bool IsDead => isDead;
+    public bool IsStunned => isStunned;
+    public int CurrentHealth => currentHealth;
+    public int MaxHealth => maxHealth;
 
     #endregion
 
@@ -616,44 +668,51 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
     protected virtual void OnDrawGizmosSelected()
     {
-        // Detection range
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
-        // Field of view
+        Gizmos.color = Color.blue;
         Vector3 leftBoundary = Quaternion.Euler(0, -fieldOfView * 0.5f, 0) * transform.forward;
         Vector3 rightBoundary = Quaternion.Euler(0, fieldOfView * 0.5f, 0) * transform.forward;
+        Gizmos.DrawRay(transform.position + Vector3.up, leftBoundary * detectionRange);
+        Gizmos.DrawRay(transform.position + Vector3.up, rightBoundary * detectionRange);
 
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawRay(transform.position, leftBoundary * detectionRange);
-        Gizmos.DrawRay(transform.position, rightBoundary * detectionRange);
+        if (navAgent != null && navAgent.enabled && navAgent.hasPath)
+        {
+            Gizmos.color = Color.green;
+            Vector3[] corners = navAgent.path.corners;
+            for (int i = 0; i < corners.Length - 1; i++)
+            {
+                Gizmos.DrawLine(corners[i], corners[i + 1]);
+            }
+        }
     }
 
-    #endregion
+    protected virtual void OnGUI()
+    {
+        if (!showDebugInfo || Camera.main == null) return;
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Public Getters
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    public bool IsDead => isDead;
-    public bool IsStunned => isStunned;
-    public int CurrentHealth => currentHealth;
-    public int MaxHealth => maxHealth;
-    public float HealthPercent => (float)currentHealth / maxHealth;
+        Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2.5f);
+        if (screenPos.z > 0)
+        {
+            GUI.Label(
+                new Rect(screenPos.x - 50, Screen.height - screenPos.y, 100, 60),
+                $"{GetNpcType()}\n{GetCurrentStateName()}\nHP: {currentHealth}/{maxHealth}"
+            );
+        }
+    }
 
     #endregion
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
-#region Enums
+#region NPC Type Enum
 // ────────────────────────────────────────────────────────────────────────────────
 
 public enum NpcType
 {
     Soldier,
-    Defender,
-    Sniper,
-    Heavy
+    Defender
 }
 
 #endregion
