@@ -727,6 +727,7 @@ GameObject:
   - component: {fileID: 3767853563656458135}
   - component: {fileID: 1935823726076951774}
   - component: {fileID: 9195427862219244996}
+  - component: {fileID: 8585446149566900962}
   - component: {fileID: 3141529538732586769}
   m_Layer: 6
   m_Name: Npc_Bullet
@@ -819,6 +820,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   hitSound: {fileID: 0}
+  useRagdollOnDeath: 1
+  destroyDelay: 10
   showDebugInfo: 1
   residualStunAfterSwordRemoval: 2
   preferredShootingRange: 12
@@ -838,6 +841,30 @@ MonoBehaviour:
   muzzleFlash: {fileID: 7788846898744801054, guid: 03d8ae9170f22c341bc185835334f9c2, type: 3}
   repositionCheckInterval: 0.5
   currentState: 0
+--- !u!114 &8585446149566900962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbe2a735714d1bf4abfa9c1d59454343, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollController
+  totalMass: 70
+  ragdollDrag: 0.5
+  ragdollAngularDrag: 0.5
+  impactForceMultiplier: 1
+  maxImpactForce: 500
+  upwardForceBias: 0.3
+  meleeImpactForce: 300
+  thrownSwordImpactForce: 400
+  bulletImpactForce: 50
+  accumulateBulletImpacts: 1
+  mainRigidbody: {fileID: 0}
+  showDebugInfo: 1
 --- !u!136 &3141529538732586769
 CapsuleCollider:
   m_ObjectHideFlags: 0

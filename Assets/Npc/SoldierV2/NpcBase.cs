@@ -255,7 +255,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         if (currentHealth <= 0)
         {
-            Die();
+            Die();  // ← Already calls death when lethal
         }
     }
 
