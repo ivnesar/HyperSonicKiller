@@ -21,7 +21,7 @@ public class scrLocalGameManager : MonoBehaviour
     public FPSPlayerController AsmPlayer;
     public float TimeDialation = 1;
     
-    public List<NPCEnemyController> NpcBaseSoldiers = new List<NPCEnemyController>();
+
     public List<scrNpc_GenOne> NpcGenOnes = new List<scrNpc_GenOne>();
     public List<scrPlayerProjectile>  PlayerProjectiles = new List<scrPlayerProjectile>();
     
