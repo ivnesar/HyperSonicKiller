@@ -61,7 +61,8 @@ public class FPSPlayerController : MonoBehaviour
     #region Inspector Fields – Dash & Wall Stick
     // ────────────────────────────────────────────────────────────────────────────────
 
-    [Header("Dash Settings")]
+    [Header("Dash Settings")] 
+    [SerializeField] private int dashCharges = 3;
     [SerializeField] private float slowDown = 0.1f;
     [SerializeField] private float dashSpeed = 20f;
     [SerializeField] private float dashMaxDistance = 15f;
@@ -180,6 +181,7 @@ public class FPSPlayerController : MonoBehaviour
         Cursor.visible = false;
 
         SetState(PlayerState.Normal);
+        currentDashCharges = dashCharges;
     }
 
     void Update()
@@ -281,17 +283,23 @@ public class FPSPlayerController : MonoBehaviour
         switch (state)
         {
             case PlayerState.Normal:
+                currentDashCharges = dashCharges;
                 verticalVelocity = 0f;
                 break;
+            
             case PlayerState.Dashing:
                 Time.timeScale = slowDown;
                 break;
+            
             case PlayerState.StuckToSurface:
+                currentDashCharges = dashCharges;
                 stuckPosition = transform.position;
                 verticalVelocity = 0f;
                 break;
+            
             case PlayerState.Jumping:
                 break;
+            
             case PlayerState.Dead:
                 deathTime = Time.time;
                 movementDisabled = true;
@@ -559,10 +567,11 @@ public class FPSPlayerController : MonoBehaviour
     #region Dash System
     // ────────────────────────────────────────────────────────────────────────────────
 
+    public int currentDashCharges;
     private void HandleDashInput()
     {
         if (dashDisabled) return;
-
+        
         if (_input.GetActionState("Dash") == scrPlayerInputHandler.InputState.Press)
         {
             if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out RaycastHit hit, dashMaxDistance, dashSurfaceLayer))
@@ -600,6 +609,9 @@ public class FPSPlayerController : MonoBehaviour
 
     private void StartDash(Vector3 targetPoint, Vector3 normal)
     {
+        if (currentDashCharges <= 0) return;
+        currentDashCharges--;
+        
         dashStartPosition = transform.position;
         dashTargetPosition = targetPoint;
         dashDirection = (dashTargetPosition - dashStartPosition).normalized;

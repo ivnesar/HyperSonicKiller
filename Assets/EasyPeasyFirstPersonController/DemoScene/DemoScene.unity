@@ -3343,6 +3343,10 @@ PrefabInstance:
       value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 8585446149566900962, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: showDebugInfo
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8585446149566900962, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: maxImpactForce
       value: 100
       objectReference: {fileID: 0}

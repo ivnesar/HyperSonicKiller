@@ -95,7 +95,7 @@ public class NpcManager : MonoBehaviour
                 break;
         }
 
-        Debug.Log($"[NpcManager] Registered {npc.GetNpcType()}: {npc.gameObject.name}. Total NPCs: {allNpcs.Count}");
+        //Debug.Log($"[NpcManager] Registered {npc.GetNpcType()}: {npc.gameObject.name}. Total NPCs: {allNpcs.Count}");
     }
 
     public void UnregisterNpc(NpcBase npc)
@@ -114,7 +114,7 @@ public class NpcManager : MonoBehaviour
                 break;
         }
 
-        Debug.Log($"[NpcManager] Unregistered {npc.GetNpcType()}: {npc.gameObject.name}. Total NPCs: {allNpcs.Count}");
+        //Debug.Log($"[NpcManager] Unregistered {npc.GetNpcType()}: {npc.gameObject.name}. Total NPCs: {allNpcs.Count}");
     }
 
     #endregion
