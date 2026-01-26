@@ -47,6 +47,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::scrSword
   swordRadius: 0.15
   skinWidth: 0.05
+  throwDamage: 5000
 --- !u!1 &1544008328822107190
 GameObject:
   m_ObjectHideFlags: 0

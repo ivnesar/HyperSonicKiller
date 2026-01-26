@@ -10,6 +10,10 @@ public class scrThrownSword : MonoBehaviour
     [SerializeField] private float swordRadius = 0.15f;     // Effective thickness of sword for collision
     [SerializeField] private float skinWidth   = 0.05f;     // Buffer to prevent clipping through surfaces
 
+    [Header("Damage Settings")]
+    [Tooltip("Damage dealt AFTER stun duration ends")]
+    [SerializeField] private int throwDamage = 50;
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -40,6 +44,11 @@ public class scrThrownSword : MonoBehaviour
 
     // Track embedded enemy for notification on recall
     private INpcInteraction embeddedEnemy;
+    
+    // Damage tracking data - stored for when stun ends
+    private NpcBase embeddedNpc;              // Direct reference to NPC (so we can apply damage later)
+    private Vector3 storedImpactDirection;    // Direction sword was flying
+    private Vector3 storedHitPoint;           // Where sword hit the NPC
 
     #endregion
 
@@ -78,6 +87,7 @@ public class scrThrownSword : MonoBehaviour
         stuck = false;
         isReturning = false;
         embeddedEnemy = null;
+        embeddedNpc = null;
 
         flyDirection   = direction.normalized;
         flySpeed       = speed;
@@ -105,7 +115,15 @@ public class scrThrownSword : MonoBehaviour
         if (embeddedEnemy != null)
         {
             embeddedEnemy.OnSwordRemoved();
+            
+            // Schedule damage calculation for after stun ends
+            if (embeddedNpc != null)
+            {
+                ScheduleDamageAfterStun();
+            }
+            
             embeddedEnemy = null;
+            embeddedNpc = null;
         }
 
         isReturning = true;
@@ -143,6 +161,10 @@ public class scrThrownSword : MonoBehaviour
 
             // Face into the surface
             transform.forward = -hit.normal;
+
+            // Store impact data for later damage calculation
+            storedImpactDirection = flyDirection;
+            storedHitPoint = hit.point;
 
             StickToSurface(hit.transform);
             CheckEnemyHit(hit.collider.gameObject);
@@ -197,12 +219,52 @@ public class scrThrownSword : MonoBehaviour
         if (hitObject.TryGetComponent<INpcInteraction>(out var target))
         {
             recallUnlockTime = Time.unscaledTime + 1f;
-            embeddedEnemy = target; // Store reference for recall notification
-            target.OnThrowStun(3);
+            embeddedEnemy = target; // Store interface reference
             
-            Debug.Log($"Sword embedded in enemy: {hitObject.name}");
+            // Also store NpcBase reference for damage calculation
+            embeddedNpc = hitObject.GetComponent<NpcBase>();
+            
+            // Apply stun (NO damage yet!)
+            target.OnThrowStun(3);
         }
-        
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Delayed Damage System
+    // ────────────────────────────────────────────────────────────────────────────────
+
+
+    private void ScheduleDamageAfterStun()
+    {
+        if (embeddedNpc == null) return;
+        float stunDuration = embeddedNpc.GetResidualStunDuration();
+    
+        embeddedNpc.StartCoroutine(ApplyDamageAfterDelay(
+            embeddedNpc, 
+            storedImpactDirection, 
+            storedHitPoint, 
+            throwDamage, 
+            stunDuration
+            )
+        );
+    }
+
+
+    private System.Collections.IEnumerator ApplyDamageAfterDelay(
+        NpcBase targetNpc, 
+        Vector3 impactDir, 
+        Vector3 hitPoint, 
+        int damage,
+        float delay
+        )
+    {
+        yield return new WaitForSeconds(delay);
+        if (targetNpc != null && !targetNpc.IsDead)
+        {
+            targetNpc.OnThrowDamage(damage, impactDir, hitPoint);
+        }
     }
 
     #endregion

@@ -13,6 +13,7 @@ public interface INpcInteraction
 
     /// <summary>
     /// Called when the thrown sword embeds in this NPC, stunning them.
+    /// NOTE: This does NOT apply damage - damage comes later via OnThrowDamage.
     /// </summary>
     void OnThrowStun(float duration);
 
@@ -20,4 +21,10 @@ public interface INpcInteraction
     /// Called when the embedded sword is recalled/removed from the NPC.
     /// </summary>
     void OnSwordRemoved();
+
+    /// <summary>
+    /// Called when thrown sword damage should be applied (AFTER stun ends).
+    /// This is separate from OnThrowStun to allow delayed damage calculation.
+    /// </summary>
+    void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint);
 }

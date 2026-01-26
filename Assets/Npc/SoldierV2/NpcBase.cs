@@ -231,6 +231,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     /// </summary>
     public abstract int GetStateID();
 
+    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -361,6 +362,10 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         OnStunEnd();
     }
 
+    public float GetResidualStunDuration()
+    {
+        return residualStunAfterSwordRemoval;
+    }
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -563,7 +568,8 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         dir.y = 0f;
         return dir.normalized;
     }
-
+    
+    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────

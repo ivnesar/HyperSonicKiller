@@ -297,8 +297,13 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     {
         
     }
-    
-    
+
+    public void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
+    {
+        
+    }
+
+
     private void DestoryThis()
     {
         OnDashMineDestroyed?.Invoke();

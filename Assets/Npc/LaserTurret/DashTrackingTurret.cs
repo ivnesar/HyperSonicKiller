@@ -429,6 +429,11 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
         }
     }
 
+    public void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
+    {
+        
+    }
+
     private void DestroyTurret()
     {
         OnTurretDestroyed?.Invoke();
