@@ -86,7 +86,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00f78c4f6807b5c48b15ef120e70c1c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SwordCombatSystem
-  currentCombatState: 0
   heldSwordVisual: {fileID: 6913869377866838784}
   thrownSwordPrefab: {fileID: 6144421989652223553, guid: acd6f8762439e8548b084ca8bed56a7d, type: 3}
   cameraTransform: {fileID: 8366330103362317592}
@@ -97,7 +96,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 192
   attackCooldown: 0.5
-  meleeDamage: 5000
   maxBlockHP: 100
   blockRechargeRate: 10
   brokenStunDuration: 3
@@ -106,6 +104,7 @@ MonoBehaviour:
   throwableLayerMask:
     serializedVersion: 2
     m_Bits: 192
+  currentCombatState: 0
   currentBlockHP: 0
 --- !u!114 &3310673823978559165
 MonoBehaviour:
@@ -119,37 +118,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 297e1eaec788f564cb36fd89e2ee1129, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FPSPlayerController
-  currentState: 0
   HP: 100
   walkSpeed: 5
   runSpeed: 8
-  sprintInitialBoost: 12
-  sprintDecayCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  sprintDecayDuration: 1
-  sprintResetDelay: 1
   jumpForce: 8
   gravity: 20
   cameraTransform: {fileID: 0}
@@ -167,7 +138,7 @@ MonoBehaviour:
   dart: {fileID: 6522420486547754043, guid: f471d3bbfcceb6d4db0c79a4e7f904b5, type: 3}
   throwCooldown: 0.5
   throwSpeed: 50
-  deathCameraRotationSpeed: 30
+  currentState: 0
   playerCamera: {fileID: 0}
 --- !u!1 &4252055413702551478
 GameObject:

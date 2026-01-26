@@ -228,6 +228,46 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         if (currentHealth <= 0)
         {
+<<<<<<< HEAD
+=======
+            Die();
+        }
+    }
+
+    public virtual void OnThrowStun(float duration)
+    {
+        if (isDead) return;
+
+        hasSwordEmbedded = true;
+        
+        // Enter stunned state - will stay stunned indefinitely while sword is embedded
+        isStunned = true;
+        stunEndTime = float.MaxValue; // No timeout while embedded
+        
+        StopMovement();
+        animator?.SetBool("IsStunned", true);
+        
+        // Let subclass transition to Stunned state
+        OnStunStart();
+        
+        Debug.Log($"[{gameObject.name}] Sword embedded - stunned indefinitely");
+    }
+
+    /// <summary>
+    /// Called when thrown sword hits and should register impact for ragdoll.
+    /// </summary>
+    public virtual void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
+    {
+        if (isDead) return;
+
+        currentHealth -= amount;
+
+        // Register with ragdoll controller
+        ragdollController?.RegisterThrownSwordImpact(swordDirection, hitPoint);
+
+        if (currentHealth <= 0)
+        {
+>>>>>>> parent of ee61753 (add player meele damage)
             Die();
         }
     }
