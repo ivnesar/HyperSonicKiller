@@ -7,8 +7,15 @@ public class scrThrownSword : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("Collision Settings")]
-    [SerializeField] private float swordRadius = 0.15f;     // Effective thickness of sword for collision
-    [SerializeField] private float skinWidth   = 0.05f;     // Buffer to prevent clipping through surfaces
+    [SerializeField] private float swordRadius = 0.15f;
+    [SerializeField] private float skinWidth = 0.05f;
+
+    [Header("Throw Damage")]
+    [Tooltip("Damage applied to enemy after stun duration ends")]
+    [SerializeField] private int throwDamage = 80;
+    
+    [Tooltip("Duration of stun after sword is removed")]
+    [SerializeField] private float stunDuration = 2f;
 
     #endregion
 
@@ -29,13 +36,13 @@ public class scrThrownSword : MonoBehaviour
 
     private Transform returnTarget;
 
-    private float returnSpeed       = 40f;
-    private float recallUnlockTime  = 0f;
+    private float returnSpeed = 40f;
+    private float recallUnlockTime = 0f;
 
     // Projectile flight data
-    private bool    useUnscaledTime;
+    private bool useUnscaledTime;
     private Vector3 flyDirection;
-    private float   flySpeed;
+    private float flySpeed;
     private LayerMask hitMask;
 
     // Track embedded enemy for notification on recall
@@ -62,7 +69,6 @@ public class scrThrownSword : MonoBehaviour
 
         if (!stuck && !isReturning)
         {
-            Debug.Log("(!stuck && !isReturning)");
             HandleProjectileFlight();
         }
     }
@@ -79,10 +85,10 @@ public class scrThrownSword : MonoBehaviour
         isReturning = false;
         embeddedEnemy = null;
 
-        flyDirection   = direction.normalized;
-        flySpeed       = speed;
+        flyDirection = direction.normalized;
+        flySpeed = speed;
         useUnscaledTime = unscaledTime;
-        hitMask        = collisionLayerMask;
+        hitMask = collisionLayerMask;
 
         // Orient sword along flight path
         transform.forward = flyDirection;
@@ -91,10 +97,10 @@ public class scrThrownSword : MonoBehaviour
     public void InitializeStuck(Vector3 position, Vector3 normal, Transform targetParent)
     {
         transform.position = position;
-        transform.forward = -normal; // Point into the surface
+        transform.forward = -normal;
 
         StickToSurface(targetParent);
-        CheckEnemyHit(targetParent.gameObject);
+        CheckEnemyHit(targetParent.gameObject, position);
     }
 
     public void Recall(Transform target)
@@ -112,10 +118,8 @@ public class scrThrownSword : MonoBehaviour
         returnTarget = target;
         stuck = false;
 
-        // Detach from any surface
         transform.SetParent(null);
 
-        // Disable collider during return to prevent new hits
         if (col != null) col.enabled = false;
     }
 
@@ -138,18 +142,14 @@ public class scrThrownSword : MonoBehaviour
             stepDistance + skinWidth,
             hitMask))
         {
-            // Position sword center correctly relative to hit surface
             transform.position = hit.point + hit.normal * swordRadius;
-
-            // Face into the surface
             transform.forward = -hit.normal;
 
             StickToSurface(hit.transform);
-            CheckEnemyHit(hit.collider.gameObject);
+            CheckEnemyHit(hit.collider.gameObject, hit.point);
         }
         else
         {
-            // Free flight – no hit this frame
             transform.position += flyDirection * stepDistance;
         }
     }
@@ -169,7 +169,6 @@ public class scrThrownSword : MonoBehaviour
 
         transform.LookAt(returnTarget);
 
-        // Destroy when close enough to player/hand
         if (Vector3.Distance(transform.position, returnTarget.position) < 1.2f)
         {
             Destroy(gameObject);
@@ -187,22 +186,21 @@ public class scrThrownSword : MonoBehaviour
         stuck = true;
         transform.SetParent(surface);
 
-        // Re-enable collider if needed (visual/collision purposes)
         if (col != null) col.enabled = true;
     }
 
-    private void CheckEnemyHit(GameObject hitObject)
+    private void CheckEnemyHit(GameObject hitObject, Vector3 hitPoint)
     {
-        // Special case: DashTrackingTurret or any enemy with INpcInteraction
         if (hitObject.TryGetComponent<INpcInteraction>(out var target))
         {
             recallUnlockTime = Time.unscaledTime + 1f;
-            embeddedEnemy = target; // Store reference for recall notification
-            target.OnThrowStun(3);
+            embeddedEnemy = target;
             
-            Debug.Log($"Sword embedded in enemy: {hitObject.name}");
+            // Pass stun duration, damage amount, sword direction, and hit point
+            target.OnThrowStun(stunDuration, throwDamage, flyDirection, hitPoint);
+
+            Debug.Log($"Sword embedded in enemy: {hitObject.name} (pending damage: {throwDamage})");
         }
-        
     }
 
     #endregion
