@@ -323,6 +323,10 @@ public class FPSPlayerController : MonoBehaviour
 
         switch (newState)
         {
+            case PlayerState.Dashing:
+                lgm.TimeDialation = slowDown;  // Zeit verlangsamen
+                break;
+
             case PlayerState.Dead:
                 deathTime = Time.time;
                 verticalVelocity = 0f;
@@ -338,7 +342,15 @@ public class FPSPlayerController : MonoBehaviour
             case PlayerState.Normal:
                 if (oldState == PlayerState.Dashing || oldState == PlayerState.StuckToSurface)
                 {
+                    lgm.TimeDialation = 1.0f;  // Zeit zurücksetzen
                     verticalVelocity = 0f;
+                }
+                break;
+            
+            case PlayerState.Jumping:
+                if (oldState == PlayerState.Dashing || oldState == PlayerState.StuckToSurface)
+                {
+                    lgm.TimeDialation = 1.0f;  // Zeit zurücksetzen
                 }
                 break;
         }
