@@ -26,7 +26,7 @@ public class FPSPlayerController : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("Core Settings")]
-    public int HP = 100;
+    public int BlockHP = 130;
 
     #endregion
 
@@ -230,7 +230,7 @@ public class FPSPlayerController : MonoBehaviour
     {
         if (currentState == PlayerState.Dead)
         {
-            HP = restoreHP;
+            BlockHP = restoreHP;
             SetState(PlayerState.Normal);
         }
     }
@@ -530,11 +530,11 @@ public class FPSPlayerController : MonoBehaviour
         if (swordCombatSystem != null && swordCombatSystem.TryBlockDamage(damage))
             return;
 
-        HP -= damage;
+        BlockHP -= damage;
 
-        if (HP <= 0)
+        if (BlockHP <= 0)
         {
-            HP = 0;
+            BlockHP = 0;
             Die();
         }
     }
