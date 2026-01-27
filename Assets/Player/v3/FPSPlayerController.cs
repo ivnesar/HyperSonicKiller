@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController))]
@@ -27,6 +28,12 @@ public class FPSPlayerController : MonoBehaviour
 
     [Header("Core Settings")]
     public int BlockHP = 130;
+    [SerializeField] private int maxBlockHP = 130;
+
+    [Header("Damage System")]
+    [SerializeField] private int damageThreshold = 100;
+    [SerializeField] private float swordRecoveryTime = 2f;
+    [SerializeField] private bool showDamageDebugInfo = true;
 
     #endregion
 
@@ -116,6 +123,15 @@ public class FPSPlayerController : MonoBehaviour
     public delegate void PlayerDeathHandler();
     public event PlayerDeathHandler OnPlayerDeath;
 
+    public delegate void PlayerDamagedHandler(int damage, int currentHP, int maxHP);
+    public event PlayerDamagedHandler OnPlayerDamaged;
+
+    public delegate void SwordDisabledHandler(float recoveryTime);
+    public event SwordDisabledHandler OnSwordDisabled;
+
+    public delegate void SwordRecoveredHandler();
+    public event SwordRecoveredHandler OnSwordRecovered;
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -150,6 +166,11 @@ public class FPSPlayerController : MonoBehaviour
     private bool dashDisabled = false;
     private bool movementDisabled = false;
 
+    // Damage System
+    private int accumulatedDamage = 0;
+    private bool swordDisabled = false;
+    private Coroutine swordRecoveryCoroutine;
+
     #endregion
 
 
@@ -182,6 +203,8 @@ public class FPSPlayerController : MonoBehaviour
 
         SetState(PlayerState.Normal);
         currentDashCharges = dashCharges;
+        
+        maxBlockHP = BlockHP;
     }
 
     void Update()
@@ -223,6 +246,11 @@ public class FPSPlayerController : MonoBehaviour
         {
             SetState(PlayerState.Dead);
             OnPlayerDeath?.Invoke();
+            
+            if (showDamageDebugInfo)
+            {
+                Debug.Log("[Player] Died! BlockHP reached 0.");
+            }
         }
     }
 
@@ -231,7 +259,21 @@ public class FPSPlayerController : MonoBehaviour
         if (currentState == PlayerState.Dead)
         {
             BlockHP = restoreHP;
+            accumulatedDamage = 0;
+            swordDisabled = false;
+            
+            if (swordRecoveryCoroutine != null)
+            {
+                StopCoroutine(swordRecoveryCoroutine);
+                swordRecoveryCoroutine = null;
+            }
+            
             SetState(PlayerState.Normal);
+            
+            if (showDamageDebugInfo)
+            {
+                Debug.Log($"[Player] Revived! BlockHP restored to {BlockHP}.");
+            }
         }
     }
 
@@ -250,20 +292,24 @@ public class FPSPlayerController : MonoBehaviour
     }
 
     public bool CanDash()
-        => !dashDisabled && (currentState == PlayerState.Normal || currentState == PlayerState.Jumping);
+    {
+        if (dashDisabled) return false;
+        if (currentDashCharges <= 0) return false;
+        return true;
+    }
 
+    public bool CanUseSword() => !swordDisabled && currentState != PlayerState.Dead;
+    public int GetCurrentHP() => BlockHP;
+    public int GetMaxHP() => maxBlockHP;
+    public int GetAccumulatedDamage() => accumulatedDamage;
+    public bool IsSwordDisabled() => swordDisabled;
     public PlayerState GetCurrentState() => currentState;
-
-    public void DisableMovement() => movementDisabled = true;
-    public void EnableMovement()  => movementDisabled = false;
-
-    public void ForceState(PlayerState state) => SetState(state);
 
     #endregion
 
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region State Machine Core
+    #region State Machine
     // ────────────────────────────────────────────────────────────────────────────────
 
     private void SetState(PlayerState newState)
@@ -271,72 +317,39 @@ public class FPSPlayerController : MonoBehaviour
         if (currentState == newState) return;
 
         PlayerState oldState = currentState;
-        ExitState(currentState);
         currentState = newState;
-        EnterState(newState);
 
         OnPlayerStateChanged?.Invoke(oldState, newState);
-    }
 
-    private void EnterState(PlayerState state)
-    {
-        switch (state)
+        switch (newState)
         {
-            case PlayerState.Normal:
-                currentDashCharges = dashCharges;
-                verticalVelocity = 0f;
-                break;
-            
-            case PlayerState.Dashing:
-                Time.timeScale = slowDown;
-                break;
-            
-            case PlayerState.StuckToSurface:
-                currentDashCharges = dashCharges;
-                stuckPosition = transform.position;
-                verticalVelocity = 0f;
-                break;
-            
-            case PlayerState.Jumping:
-                break;
-            
             case PlayerState.Dead:
                 deathTime = Time.time;
-                movementDisabled = true;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                verticalVelocity = 0f;
+                moveDirection = Vector3.zero;
+                break;
+
+            case PlayerState.StuckToSurface:
+                stuckPosition = transform.position;
+                verticalVelocity = 0f;
+                moveDirection = Vector3.zero;
+                break;
+
+            case PlayerState.Normal:
+                if (oldState == PlayerState.Dashing || oldState == PlayerState.StuckToSurface)
+                {
+                    verticalVelocity = 0f;
+                }
                 break;
         }
     }
-
-    private void ExitState(PlayerState state)
-    {
-        switch (state)
-        {
-            case PlayerState.Dashing:
-                Time.timeScale = 1;
-                dashProgress = 0f;
-                break;
-            case PlayerState.Dead:
-                movementDisabled = false;
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-                break;
-        }
-    }
-
-    #endregion
-
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Update Methods
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private void UpdateNormalState()
     {
         HandleMovement();
         HandleJump();
         HandleDashInput();
+        ApplyGravity();
     }
 
     private void UpdateDashingState()
@@ -347,126 +360,129 @@ public class FPSPlayerController : MonoBehaviour
 
     private void UpdateStuckState()
     {
-        transform.position = stuckPosition;
         CheckUnstickInputs();
     }
 
     private void UpdateJumpingState()
     {
         HandleMovement();
-        ApplyGravity();
         HandleDashInput();
+        ApplyGravity();
 
-        if (controller.isGrounded && verticalVelocity <= 0f)
+        if (controller.isGrounded && verticalVelocity <= 0)
         {
             SetState(PlayerState.Normal);
+            currentDashCharges = dashCharges;
         }
     }
 
     private void UpdateDeadState()
     {
-        ApplyGravity();
-        float timeSinceDeath = Time.time - deathTime;
-        cameraTransform.Rotate(Vector3.forward * deathCameraRotationSpeed * Time.deltaTime);
+        float rotationAmount = deathCameraRotationSpeed * Time.deltaTime;
+        cameraTransform.Rotate(Vector3.forward, rotationAmount);
     }
 
     #endregion
 
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Core Movement & Physics
+    #region Movement & Physics
     // ────────────────────────────────────────────────────────────────────────────────
 
     private void HandleMovement()
     {
-        if (movementDisabled)
+        if (movementDisabled) return;
+
+        Vector2 input = _input.GetMoveInput();
+
+        bool isSprinting = input.magnitude > 0.1f && input.y > 0;
+
+        if (isSprinting && !isSprintingLastFrame)
         {
-            moveDirection = Vector3.zero;
-            return;
+            sprintStartTime = Time.time;
+            sprintHoldDuration = 0f;
+            sprintDecayActive = false;
         }
 
-        Vector2 moveInput = _input.GetMoveInput();
-        Vector3 forward = transform.forward * moveInput.y;
-        Vector3 right   = transform.right   * moveInput.x;
-        Vector3 movement = (forward + right).normalized;
+        if (isSprinting)
+        {
+            sprintHoldDuration = Time.time - sprintStartTime;
+        }
 
-        UpdateSprintState();
+        if (!isSprinting && isSprintingLastFrame)
+        {
+            sprintDecayActive = true;
+            sprintStartTime = Time.time;
+        }
 
-        float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? GetCurrentSprintSpeed() : walkSpeed;
-        moveDirection = movement * currentSpeed;
+        isSprintingLastFrame = isSprinting;
+
+        float targetSpeed = walkSpeed;
+        float speedBoost = 0f;
+
+        if (isSprinting)
+        {
+            targetSpeed = runSpeed;
+            speedBoost = sprintInitialBoost;
+        }
+        else if (sprintDecayActive)
+        {
+            float timeSinceRelease = Time.time - sprintStartTime;
+
+            if (timeSinceRelease < sprintResetDelay)
+            {
+                targetSpeed = runSpeed;
+                speedBoost = sprintInitialBoost;
+            }
+            else
+            {
+                float decayProgress = (timeSinceRelease - sprintResetDelay) / sprintDecayDuration;
+                decayProgress = Mathf.Clamp01(decayProgress);
+                speedBoost = sprintInitialBoost * sprintDecayCurve.Evaluate(1f - decayProgress);
+
+                if (decayProgress >= 1f)
+                {
+                    sprintDecayActive = false;
+                }
+            }
+        }
+
+        float finalSpeed = targetSpeed + speedBoost;
+
+        Vector3 forward = transform.forward;
+        Vector3 right = transform.right;
+
+        moveDirection = (forward * input.y + right * input.x).normalized * finalSpeed;
+        Vector3 move = moveDirection * Time.deltaTime * lgm.TimeDialation;
+
+        controller.Move(move);
     }
 
     private void HandleJump()
     {
-        if (controller.isGrounded)
+        if (_input.GetActionState("Jump") == scrPlayerInputHandler.InputState.Press)
         {
-            verticalVelocity = -1f;
-
-            if (_input.GetActionState("Jump") == scrPlayerInputHandler.InputState.Press)
+            if (controller.isGrounded)
             {
                 verticalVelocity = jumpForce;
                 SetState(PlayerState.Jumping);
             }
         }
-
-        moveDirection.y = verticalVelocity;
-        controller.Move(moveDirection * Time.deltaTime);
     }
 
     private void ApplyGravity()
     {
-        verticalVelocity -= gravity * Time.deltaTime;
-        moveDirection.y = verticalVelocity;
-        controller.Move(moveDirection * Time.deltaTime);
-    }
-
-    #endregion
-
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Sprint Logic
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    private void UpdateSprintState()
-    {
-        bool isSprinting = Input.GetKey(KeyCode.LeftShift);
-
-        if (isSprinting)
+        if (!controller.isGrounded)
         {
-            if (!isSprintingLastFrame)
-            {
-                if (!sprintDecayActive)
-                {
-                    sprintStartTime = Time.time;
-                    sprintHoldDuration = 0f;
-                }
-                else
-                {
-                    sprintStartTime = Time.time - sprintHoldDuration;
-                }
-            }
-            else
-            {
-                sprintHoldDuration = Time.time - sprintStartTime;
-
-                if (sprintHoldDuration >= sprintResetDelay)
-                    sprintDecayActive = false;
-            }
+            verticalVelocity -= gravity * Time.deltaTime * lgm.TimeDialation;
         }
-        else if (isSprintingLastFrame)
+        else if (verticalVelocity < 0)
         {
-            if (sprintHoldDuration < sprintResetDelay)
-                sprintDecayActive = true;
+            verticalVelocity = -2f;
         }
 
-        isSprintingLastFrame = isSprinting;
-    }
-
-    private float GetCurrentSprintSpeed()
-    {
-        float decayProgress = Mathf.Clamp01(sprintHoldDuration / sprintDecayDuration);
-        float curveValue = sprintDecayCurve.Evaluate(decayProgress);
-        return Mathf.Lerp(runSpeed, sprintInitialBoost, curveValue);
+        Vector3 verticalMove = new Vector3(0, verticalVelocity, 0) * Time.deltaTime * lgm.TimeDialation;
+        controller.Move(verticalMove);
     }
 
     #endregion
@@ -520,24 +536,111 @@ public class FPSPlayerController : MonoBehaviour
 
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Damage & Combat Integration
+    #region Damage System
     // ────────────────────────────────────────────────────────────────────────────────
 
     public void TakeDamage(int damage)
     {
         if (currentState == PlayerState.Dead) return;
 
+        // Check if sword can block the damage
         if (swordCombatSystem != null && swordCombatSystem.TryBlockDamage(damage))
+        {
+            if (showDamageDebugInfo)
+            {
+                Debug.Log($"[Player] Blocked {damage} damage with sword!");
+            }
             return;
+        }
 
+        // Apply damage to block HP
         BlockHP -= damage;
+        accumulatedDamage += damage;
 
+        if (showDamageDebugInfo)
+        {
+            Debug.Log($"[Player] Took {damage} damage! BlockHP: {BlockHP}/{maxBlockHP} | Accumulated: {accumulatedDamage}");
+        }
+
+        // Trigger damage event
+        OnPlayerDamaged?.Invoke(damage, BlockHP, maxBlockHP);
+
+        // Check if damage threshold reached
+        if (accumulatedDamage >= damageThreshold && !swordDisabled)
+        {
+            DisableSword();
+        }
+
+        // Check for death
         if (BlockHP <= 0)
         {
             BlockHP = 0;
             Die();
         }
     }
+
+    private void DisableSword()
+    {
+        swordDisabled = true;
+
+        if (showDamageDebugInfo)
+        {
+            Debug.Log($"[Player] Sword disabled! Accumulated damage: {accumulatedDamage}. Recovery in {swordRecoveryTime}s.");
+        }
+
+        // Notify sword combat system
+        if (swordCombatSystem != null)
+        {
+            swordCombatSystem.DisableSword();
+        }
+
+        // Trigger event
+        OnSwordDisabled?.Invoke(swordRecoveryTime);
+
+        // Start recovery coroutine
+        if (swordRecoveryCoroutine != null)
+        {
+            StopCoroutine(swordRecoveryCoroutine);
+        }
+        swordRecoveryCoroutine = StartCoroutine(SwordRecoveryRoutine());
+    }
+
+    private IEnumerator SwordRecoveryRoutine()
+    {
+        yield return new WaitForSeconds(swordRecoveryTime);
+
+        RecoverSword();
+    }
+
+    private void RecoverSword()
+    {
+        swordDisabled = false;
+        accumulatedDamage = 0;
+        BlockHP = maxBlockHP;
+
+        if (showDamageDebugInfo)
+        {
+            Debug.Log($"[Player] Sword recovered! BlockHP restored to {BlockHP}.");
+        }
+
+        // Notify sword combat system
+        if (swordCombatSystem != null)
+        {
+            swordCombatSystem.EnableSword();
+        }
+
+        // Trigger event
+        OnSwordRecovered?.Invoke();
+
+        swordRecoveryCoroutine = null;
+    }
+
+    #endregion
+
+
+    // ────────────────────────────────────────────────────────────────────────────────
+    #region Combat Integration
+    // ────────────────────────────────────────────────────────────────────────────────
 
     private void HandleCombatStateChange(SwordCombatSystem.CombatState newCombatState)
     {
@@ -568,6 +671,7 @@ public class FPSPlayerController : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────────────
 
     public int currentDashCharges;
+    
     private void HandleDashInput()
     {
         if (dashDisabled) return;
@@ -689,7 +793,7 @@ public class FPSPlayerController : MonoBehaviour
         }
         else if (_input.GetActionState("Dash") == scrPlayerInputHandler.InputState.Press)
         {
-            HandleDashInput(); // reuse same logic
+            HandleDashInput();
         }
     }
 
