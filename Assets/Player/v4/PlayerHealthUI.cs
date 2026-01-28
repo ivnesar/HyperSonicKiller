@@ -212,7 +212,7 @@ public class PlayerHealthUI : MonoBehaviour
         {
             PlayerCombat.CombatState.Blocking => "BLOCKING",
             PlayerCombat.CombatState.Stunned => "<color=red>STUNNED</color>",
-            PlayerCombat.CombatState.SwordThrown => "Sword Thrown",
+            PlayerCombat.CombatState.Disarmed => "Sword Thrown",
             PlayerCombat.CombatState.Attacking => "ATTACK",
             _ => ""
         };

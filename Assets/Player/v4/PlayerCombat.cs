@@ -2,8 +2,8 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Unified combat system: Attack, Block, and Sword Throw.
-/// Contains the SINGLE source of truth for Block HP (no duplication).
+/// Handles melee combat and blocking.
+/// Sword throw is handled separately by PlayerSwordThrow.
 /// Block HP acts as a shield - when broken, player is stunned briefly.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
@@ -18,8 +18,8 @@ public class PlayerCombat : MonoBehaviour
         Idle,
         Attacking,
         Blocking,
-        Stunned,      // Guard broken
-        SwordThrown   // Sword is not in hand
+        Stunned,        // Guard broken
+        Disarmed        // Sword is thrown (can't attack/block)
     }
 
     #endregion
@@ -35,8 +35,6 @@ public class PlayerCombat : MonoBehaviour
     public event Action OnGuardBroken;
     public event Action OnGuardRestored;
     public event Action<float, float> OnBlockHPChanged;  // (current, max)
-    public event Action OnSwordThrown;
-    public event Action OnSwordRecalled;
 
     #endregion
 
@@ -66,24 +64,11 @@ public class PlayerCombat : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Inspector - Throw Settings
-    // ════════════════════════════════════════════════════════════════════════
-
-    [Header("Sword Throw")]
-    [SerializeField] private GameObject heldSwordVisual;
-    [SerializeField] private GameObject thrownSwordPrefab;
-    [SerializeField] private Transform throwOrigin;
-    [SerializeField] private float throwForce = 40f;
-    [SerializeField] private float maxThrowDistance = 100f;
-    [SerializeField] private LayerMask throwableLayers = -1;
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
     #region Runtime State
     // ════════════════════════════════════════════════════════════════════════
 
     private PlayerCore core;
+    private PlayerSwordThrow swordThrow;
 
     // Combat state
     private CombatState currentState = CombatState.Idle;
@@ -91,11 +76,8 @@ public class PlayerCombat : MonoBehaviour
     private float lastDamageTime;
     private float stunEndTime;
 
-    // Block HP (THE single source of truth)
+    // Block HP
     private float currentBlockHP;
-
-    // Thrown sword reference
-    private GameObject currentThrownSword;
 
     #endregion
 
@@ -106,15 +88,17 @@ public class PlayerCombat : MonoBehaviour
     public CombatState CurrentState => currentState;
     public bool IsBlocking => currentState == CombatState.Blocking;
     public bool IsStunned => currentState == CombatState.Stunned;
-    public bool HasSword => currentState != CombatState.SwordThrown;
+    public bool IsDisarmed => currentState == CombatState.Disarmed;
+    public bool HasSword => swordThrow == null || swordThrow.HasSword;
 
     public float CurrentBlockHP => currentBlockHP;
     public float MaxBlockHP => maxBlockHP;
     public float BlockHPPercent => currentBlockHP / maxBlockHP;
 
-    public bool CanAttack => currentState == CombatState.Idle && Time.time >= lastAttackTime + attackCooldown;
-    public bool CanBlock => currentState == CombatState.Idle || currentState == CombatState.Blocking;
-    public bool CanThrow => currentState == CombatState.Idle;
+    public bool CanAttack => currentState == CombatState.Idle && 
+                             Time.time >= lastAttackTime + attackCooldown;
+    public bool CanBlock => currentState == CombatState.Idle || 
+                            currentState == CombatState.Blocking;
 
     #endregion
 
@@ -125,7 +109,27 @@ public class PlayerCombat : MonoBehaviour
     private void Awake()
     {
         core = GetComponent<PlayerCore>();
+        swordThrow = GetComponent<PlayerSwordThrow>();
         currentBlockHP = maxBlockHP;
+    }
+
+    private void Start()
+    {
+        // Subscribe to sword throw events
+        if (swordThrow != null)
+        {
+            swordThrow.OnSwordThrown += HandleSwordThrown;
+            swordThrow.OnSwordCaught += HandleSwordCaught;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (swordThrow != null)
+        {
+            swordThrow.OnSwordThrown -= HandleSwordThrown;
+            swordThrow.OnSwordCaught -= HandleSwordCaught;
+        }
     }
 
     private void Update()
@@ -159,12 +163,8 @@ public class PlayerCombat : MonoBehaviour
                 }
                 break;
 
-            case CombatState.SwordThrown:
-                // Recall sword
-                if (core.Input.GetActionDown("ThrowSword"))
-                {
-                    RecallSword();
-                }
+            case CombatState.Disarmed:
+                // Can't do anything, waiting for sword to return
                 break;
 
             case CombatState.Stunned:
@@ -178,18 +178,14 @@ public class PlayerCombat : MonoBehaviour
     {
         if (!core.CanAttack) return;
 
-        // Priority: Block > Attack > Throw
-        if (core.Input.GetAction("Block") && core.CanBlock)
+        // Priority: Block > Attack
+        if (core.Input.GetAction("Block") && core.CanBlock && HasSword)
         {
             SetState(CombatState.Blocking);
         }
-        else if (core.Input.GetActionDown("Attack") && CanAttack)
+        else if (core.Input.GetActionDown("Attack") && CanAttack && HasSword)
         {
             PerformMeleeAttack();
-        }
-        else if (core.Input.GetActionDown("ThrowSword") && CanThrow)
-        {
-            ThrowSword();
         }
     }
 
@@ -215,10 +211,14 @@ public class PlayerCombat : MonoBehaviour
 
             if (angle <= attackAngle)
             {
-                // Deal damage via interface
-                if (col.TryGetComponent<IDamageable>(out var target))
+                // Calculate hit point (closest point on collider)
+                Vector3 hitPoint = col.ClosestPoint(core.CameraTransform.position);
+                Vector3 hitDirection = core.CameraTransform.forward;
+
+                // Try IDamageable first
+                if (col.TryGetComponent<IDamageable>(out var damageable))
                 {
-                    target.TakeDamage(meleeDamage);
+                    damageable.TakeDamage(meleeDamage, hitPoint, hitDirection);
                 }
                 // Legacy support
                 else if (col.TryGetComponent<INpcInteraction>(out var npc))
@@ -296,9 +296,8 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleBlockRegeneration()
     {
-        // Only regen when not blocking, not stunned, and after delay
-        if (currentState == CombatState.Blocking) return;
-        if (currentState == CombatState.Stunned) return;
+        // Only regen when idle and after delay
+        if (currentState != CombatState.Idle) return;
         if (currentBlockHP >= maxBlockHP) return;
         if (Time.time < lastDamageTime + blockRegenDelay) return;
 
@@ -309,79 +308,26 @@ public class PlayerCombat : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Throw Logic
+    #region Sword Throw Event Handlers
     // ════════════════════════════════════════════════════════════════════════
 
-    private void ThrowSword()
+    private void HandleSwordThrown()
     {
-        SetState(CombatState.SwordThrown);
-        OnSwordThrown?.Invoke();
-
-        // Hide held sword
-        if (heldSwordVisual != null)
-            heldSwordVisual.SetActive(false);
-
-        // Spawn thrown sword
-        Vector3 spawnPos = throwOrigin != null ? throwOrigin.position : core.CameraTransform.position;
-        Quaternion spawnRot = core.CameraTransform.rotation;
-
-        currentThrownSword = Instantiate(thrownSwordPrefab, spawnPos, spawnRot);
-
-        // Initialize thrown sword (if it has the right component)
-        if (currentThrownSword.TryGetComponent<IThrownSword>(out var thrown))
+        // Can't be blocking when sword is thrown
+        if (currentState == CombatState.Blocking)
         {
-            thrown.Initialize(core.CameraTransform.forward, throwForce, maxThrowDistance, throwableLayers);
-            thrown.OnRecalled += HandleSwordReturned;
+            SetState(CombatState.Idle);
         }
-        else
-        {
-            // Fallback: just apply velocity
-            if (currentThrownSword.TryGetComponent<Rigidbody>(out var rb))
-            {
-                rb.linearVelocity = core.CameraTransform.forward * throwForce;
-            }
-        }
+
+        SetState(CombatState.Disarmed);
     }
 
-    private void RecallSword()
+    private void HandleSwordCaught()
     {
-        if (currentThrownSword == null)
+        if (currentState == CombatState.Disarmed)
         {
-            // Sword got destroyed somehow, just restore
-            HandleSwordReturned();
-            return;
+            SetState(CombatState.Idle);
         }
-
-        if (currentThrownSword.TryGetComponent<IThrownSword>(out var thrown))
-        {
-            thrown.Recall(throwOrigin != null ? throwOrigin : transform);
-        }
-        else
-        {
-            // Fallback: just destroy and restore
-            Destroy(currentThrownSword);
-            HandleSwordReturned();
-        }
-    }
-
-    private void HandleSwordReturned()
-    {
-        if (currentThrownSword != null)
-        {
-            if (currentThrownSword.TryGetComponent<IThrownSword>(out var thrown))
-            {
-                thrown.OnRecalled -= HandleSwordReturned;
-            }
-            Destroy(currentThrownSword);
-            currentThrownSword = null;
-        }
-
-        // Show held sword
-        if (heldSwordVisual != null)
-            heldSwordVisual.SetActive(true);
-
-        SetState(CombatState.Idle);
-        OnSwordRecalled?.Invoke();
     }
 
     #endregion
@@ -421,14 +367,8 @@ public class PlayerCombat : MonoBehaviour
         currentBlockHP = maxBlockHP;
         OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
 
-        if (currentThrownSword != null)
-        {
-            Destroy(currentThrownSword);
-            currentThrownSword = null;
-        }
-
-        if (heldSwordVisual != null)
-            heldSwordVisual.SetActive(true);
+        // Also reset sword throw if present
+        swordThrow?.ResetState();
 
         SetState(CombatState.Idle);
     }
@@ -446,6 +386,3 @@ public class PlayerCombat : MonoBehaviour
 
     #endregion
 }
-
-// NOTE: Interfaces (IThrownSword, IDamageable, INpcInteraction) are now defined in GameInterfaces.cs
-// to avoid duplicate definitions across the project.
