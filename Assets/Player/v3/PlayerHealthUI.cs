@@ -42,9 +42,9 @@ public class PlayerHealthUI : MonoBehaviour
         }
 
         // Subscribe to player events
-        player.OnPlayerDamaged += HandlePlayerDamaged;
-        player.OnSwordDisabled += HandleSwordDisabled;
-        player.OnSwordRecovered += HandleSwordRecovered;
+        //player.OnPlayerDamaged += HandlePlayerDamaged;
+        //player.OnSwordDisabled += HandleSwordDisabled;
+        //player.OnSwordRecovered += HandleSwordRecovered;
         player.OnPlayerDeath += HandlePlayerDeath;
 
         UpdateUI();
@@ -54,9 +54,9 @@ public class PlayerHealthUI : MonoBehaviour
     {
         if (player != null)
         {
-            player.OnPlayerDamaged -= HandlePlayerDamaged;
-            player.OnSwordDisabled -= HandleSwordDisabled;
-            player.OnSwordRecovered -= HandleSwordRecovered;
+            //player.OnPlayerDamaged -= HandlePlayerDamaged;
+            //player.OnSwordDisabled -= HandleSwordDisabled;
+            //player.OnSwordRecovered -= HandleSwordRecovered;
             player.OnPlayerDeath -= HandlePlayerDeath;
         }
     }
@@ -70,32 +70,32 @@ public class PlayerHealthUI : MonoBehaviour
     {
         if (player == null) return;
 
-        int currentHP = player.GetCurrentHP();
-        int maxHP = player.GetMaxHP();
-        int accumulatedDamage = player.GetAccumulatedDamage();
-        bool swordDisabled = player.IsSwordDisabled();
+        //int currentHP = player.GetCurrentHP();
+        //int maxHP = player.GetMaxHP();
+        //int accumulatedDamage = player.GetAccumulatedDamage();
+        //bool swordDisabled = player.IsSwordDisabled();
         int dashes = player.currentDashCharges;
 
         // Update health slider
         if (healthSlider != null)
         {
-            healthSlider.maxValue = maxHP;
-            healthSlider.value = currentHP;
+            //healthSlider.maxValue = maxHP;
+            //healthSlider.value = currentHP;
 
             // Color based on health percentage
-            float healthPercent = (float)currentHP / maxHP;
-            if (healthPercent > 0.6f)
-                healthSlider.fillRect.GetComponent<Image>().color = healthyColor;
-            else if (healthPercent > 0.3f)
-                healthSlider.fillRect.GetComponent<Image>().color = damagedColor;
-            else
-                healthSlider.fillRect.GetComponent<Image>().color = criticalColor;
+            // healthPercent = (float)currentHP / maxHP;
+            // if (healthPercent > 0.6f)
+            //     healthSlider.fillRect.GetComponent<Image>().color = healthyColor;
+            // else if (healthPercent > 0.3f)
+            //     healthSlider.fillRect.GetComponent<Image>().color = damagedColor;
+            // else
+            //     healthSlider.fillRect.GetComponent<Image>().color = criticalColor;
         }
 
         // Update health text
         if (healthText != null)
         {
-            healthText.text = $"HP: {currentHP} / {maxHP}";
+            //healthText.text = $"HP: {currentHP} / {maxHP}";
         }
         
         
@@ -112,31 +112,31 @@ public class PlayerHealthUI : MonoBehaviour
         
         
         // Update status text
-        if (statusText != null)
-        {
-            string status = "";
-            
-            if (player.IsDead())
-            {
-                status = "<color=red>DEAD</color>";
-            }
-            else if (swordDisabled)
-            {
-                status = "<color=red>SWORD DISABLED!</color>";
-            }
-            else
-            {
-                status = $"Damage Taken: {accumulatedDamage}";
-            }
-            
-            statusText.text = status;
-        }
-
-        // Update sword icon
-        if (swordStatusIcon != null)
-        {
-            swordStatusIcon.color = swordDisabled ? swordDisabledColor : swordEnabledColor;
-        }
+        // if (statusText != null)
+        // {
+        //     string status = "";
+        //     
+        //     if (player.IsDead())
+        //     {
+        //         status = "<color=red>DEAD</color>";
+        //     }
+        //     else if (swordDisabled)
+        //     {
+        //         status = "<color=red>SWORD DISABLED!</color>";
+        //     }
+        //     else
+        //     {
+        //         status = $"Damage Taken: {accumulatedDamage}";
+        //     }
+        //     
+        //     statusText.text = status;
+        // }
+        //
+        // // Update sword icon
+        // if (swordStatusIcon != null)
+        // {
+        //     swordStatusIcon.color = swordDisabled ? swordDisabledColor : swordEnabledColor;
+        // }
     }
 
     private void HandlePlayerDamaged(int damage, int currentHP, int maxHP)

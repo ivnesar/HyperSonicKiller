@@ -188,7 +188,6 @@ public class SoldierBullet : MonoBehaviour
             Destroy(impact, 2f);
         }
 
-        Debug.Log("hit: " +  hit.transform.name);
         // Destroy the bullet
         DestroyBullet();
     }

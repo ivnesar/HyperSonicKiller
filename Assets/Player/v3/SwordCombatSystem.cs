@@ -13,8 +13,7 @@ public class SwordCombatSystem : MonoBehaviour
         Blocking,
         Broken,
         Thrown,
-        Attacking,
-        Disabled
+        Attacking
     }
 
     [HideInInspector] public CombatState currentCombatState;
@@ -83,7 +82,6 @@ public class SwordCombatSystem : MonoBehaviour
 
     private scrPlayerInputHandler input;
     private scrThrownSword currentThrownInstance;
-    private FPSPlayerController playerController;
 
     #endregion
 
@@ -103,7 +101,6 @@ public class SwordCombatSystem : MonoBehaviour
     private float stunTimer;
     private float lastAttackTime;
     private float lastThrowActionTime;
-    private bool swordDisabled = false;
 
     #endregion
 
@@ -114,8 +111,6 @@ public class SwordCombatSystem : MonoBehaviour
     private void Start()
     {
         input = GetComponent<scrPlayerInputHandler>();
-        playerController = GetComponent<FPSPlayerController>();
-        
         currentBlockHP = maxBlockHP;
         currentCombatState = CombatState.Idle;
 
@@ -146,22 +141,10 @@ public class SwordCombatSystem : MonoBehaviour
     }
 
     public bool CanAttack()
-    {
-        if (swordDisabled) return false;
-        return currentCombatState == CombatState.Idle && Time.time - lastAttackTime >= attackCooldown;
-    }
+        => currentCombatState == CombatState.Idle && Time.time - lastAttackTime >= attackCooldown;
 
     public bool CanBlock()
-    {
-        if (swordDisabled) return false;
-        return currentCombatState == CombatState.Idle || currentCombatState == CombatState.Blocking;
-    }
-
-    public bool CanThrow()
-    {
-        if (swordDisabled) return false;
-        return currentCombatState == CombatState.Idle;
-    }
+        => currentCombatState == CombatState.Idle || currentCombatState == CombatState.Blocking;
 
     public void ForceGuardBreak()
     {
@@ -191,37 +174,6 @@ public class SwordCombatSystem : MonoBehaviour
         return true;
     }
 
-    public void DisableSword()
-    {
-        swordDisabled = true;
-        
-        // Force recall sword if thrown
-        if (currentCombatState == CombatState.Thrown)
-        {
-            RecallSword();
-        }
-        
-        // Exit blocking state
-        if (currentCombatState == CombatState.Blocking)
-        {
-            EnterState(CombatState.Idle);
-        }
-        
-        EnterState(CombatState.Disabled);
-    }
-
-    public void EnableSword()
-    {
-        swordDisabled = false;
-        
-        if (currentCombatState == CombatState.Disabled)
-        {
-            EnterState(CombatState.Idle);
-        }
-    }
-
-    public bool IsSwordDisabled() => swordDisabled;
-
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -239,7 +191,7 @@ public class SwordCombatSystem : MonoBehaviour
 
     private void UpdateSwordVisual(CombatState state)
     {
-        bool shouldShow = state != CombatState.Thrown && state != CombatState.Disabled;
+        bool shouldShow = state != CombatState.Thrown;
         if (heldSwordVisual != null)
             heldSwordVisual.SetActive(shouldShow);
     }
@@ -259,7 +211,7 @@ public class SwordCombatSystem : MonoBehaviour
                 break;
 
             case CombatState.Blocking:
-                if (input.GetActionState("Block") != scrPlayerInputHandler.InputState.Hold || swordDisabled)
+                if (input.GetActionState("Block") != scrPlayerInputHandler.InputState.Hold)
                     EnterState(CombatState.Idle);
                 break;
 
@@ -279,17 +231,11 @@ public class SwordCombatSystem : MonoBehaviour
             case CombatState.Attacking:
                 // Usually transient – handled inside PerformMeleeAttack
                 break;
-                
-            case CombatState.Disabled:
-                // Sword is disabled, no actions allowed
-                break;
         }
     }
 
     private void HandleIdleState()
     {
-        if (swordDisabled) return;
-        
         if (input.GetActionState("Attack") == scrPlayerInputHandler.InputState.Press)
         {
             if (Time.time - lastAttackTime >= attackCooldown)
@@ -343,7 +289,7 @@ public class SwordCombatSystem : MonoBehaviour
 
             if (angle <= attackAngle)
             {
-                Debug.Log("col " + col.transform.name);
+                Debug.Log("col "+col.transform.name);
                 if (col.TryGetComponent<INpcInteraction>(out var target))
                 {
                     target.OnMeeleDamage(meleeDamage);

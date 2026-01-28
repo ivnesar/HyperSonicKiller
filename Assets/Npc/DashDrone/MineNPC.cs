@@ -79,7 +79,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
         // Safety cleanup: re-enable dash if mine is destroyed
         if (isDashDisabled && playerController != null)
         {
-            playerController.EnableDash();
+            playerController.DisableDash(true);
         }
     }
 
@@ -166,7 +166,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
         if (!isDashDisabled)
         {
-            playerController.DisableDash();
+            playerController.DisableDash(true);
             isDashDisabled = true;
 
             SetMineColor(armedColor);
@@ -186,7 +186,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
         if (isDashDisabled)
         {
-            playerController.EnableDash();
+            playerController.DisableDash(true);
             isDashDisabled = false;
 
             SetMineColor(normalColor);
@@ -329,7 +329,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
         enabled = false;
         if (isDashDisabled && playerController != null)
         {
-            playerController.EnableDash();
+            playerController.DisableDash(true);
             isDashDisabled = false;
         }
         SetMineColor(Color.gray);
