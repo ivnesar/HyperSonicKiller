@@ -104,6 +104,8 @@ public class FPSPlayerController : MonoBehaviour
     private SwordCombatSystem swordCombatSystem;
     private scrLocalGameManager lgm;
 
+    private PlayerHealthSystem healthSystem;
+    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -116,6 +118,8 @@ public class FPSPlayerController : MonoBehaviour
     public delegate void PlayerDeathHandler();
     public event PlayerDeathHandler OnPlayerDeath;
 
+    
+    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -185,6 +189,14 @@ public class FPSPlayerController : MonoBehaviour
 
         SetState(PlayerState.Normal);
         currentDashCharges = dashCharges;
+        
+        healthSystem = GetComponent<PlayerHealthSystem>();
+        if (healthSystem != null)
+        {
+            healthSystem.OnDeath += Die;
+            healthSystem.OnShieldBroken += OnShieldBroken;
+            healthSystem.OnShieldRestored += OnShieldRestored;
+        }
     }
 
     void Update()
@@ -210,6 +222,13 @@ public class FPSPlayerController : MonoBehaviour
         if (swordCombatSystem != null)
         {
             swordCombatSystem.OnCombatStateChanged -= HandleCombatStateChange;
+        }
+        
+        if (healthSystem != null)
+        {
+            healthSystem.OnDeath -= Die;
+            healthSystem.OnShieldBroken -= OnShieldBroken;
+            healthSystem.OnShieldRestored -= OnShieldRestored;
         }
     }
 
@@ -550,16 +569,11 @@ public class FPSPlayerController : MonoBehaviour
     public void TakeDamage(int damage)
     {
         if (currentState == PlayerState.Dead) return;
-
-        if (swordCombatSystem != null && swordCombatSystem.TryBlockDamage(damage))
-            return;
-
-        BlockHP -= damage;
-
-        if (BlockHP <= 0)
+    
+        // Delegiere an das Health System
+        if (healthSystem != null)
         {
-            BlockHP = 0;
-            Die();
+            healthSystem.TakeDamage(damage);
         }
     }
 
@@ -584,6 +598,18 @@ public class FPSPlayerController : MonoBehaviour
         }
     }
 
+    private void OnShieldBroken()
+    {
+        // Optional: Visuelle/Audio Feedback
+        Debug.Log("Shield broken!");
+    }
+    
+    private void OnShieldRestored()
+    {
+        // Optional: Visuelle/Audio Feedback
+        Debug.Log("Shield restored!");
+    }
+    
     #endregion
 
 

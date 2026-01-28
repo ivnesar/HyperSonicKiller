@@ -12,7 +12,7 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private FPSPlayerController player;
     
     [Header("UI Elements")]
-    [SerializeField] private Slider healthSlider;
+    [SerializeField] private TextMeshProUGUI blockText;
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private TextMeshProUGUI statusText;
     [SerializeField] private TextMeshProUGUI dashText;
@@ -41,10 +41,13 @@ public class PlayerHealthUI : MonoBehaviour
             return;
         }
 
-        // Subscribe to player events
-        //player.OnPlayerDamaged += HandlePlayerDamaged;
-        //player.OnSwordDisabled += HandleSwordDisabled;
-        //player.OnSwordRecovered += HandleSwordRecovered;
+        PlayerHealthSystem health = player.GetComponent<PlayerHealthSystem>();
+        
+        health.OnHealthChanged += UpdateHealthBar;
+        health.OnShieldChanged += UpdateShieldBar;
+        //health.OnShieldBroken += ShowShieldBrokenEffect;
+        //health.OnShieldRestored += HideShieldBrokenEffect;
+        //health.OnDeath += ShowGameOverScreen;
         player.OnPlayerDeath += HandlePlayerDeath;
 
         UpdateUI();
@@ -77,8 +80,8 @@ public class PlayerHealthUI : MonoBehaviour
         int dashes = player.currentDashCharges;
 
         // Update health slider
-        if (healthSlider != null)
-        {
+        //if (healthSlider != null)
+        //{
             //healthSlider.maxValue = maxHP;
             //healthSlider.value = currentHP;
 
@@ -90,13 +93,10 @@ public class PlayerHealthUI : MonoBehaviour
             //     healthSlider.fillRect.GetComponent<Image>().color = damagedColor;
             // else
             //     healthSlider.fillRect.GetComponent<Image>().color = criticalColor;
-        }
+        //}
 
         // Update health text
-        if (healthText != null)
-        {
-            //healthText.text = $"HP: {currentHP} / {maxHP}";
-        }
+        
         
         
         if (dashText != null)
@@ -160,5 +160,16 @@ public class PlayerHealthUI : MonoBehaviour
     {
         Debug.Log("[PlayerHealthUI] Player died!");
         UpdateUI();
+    }
+    
+    
+    void UpdateHealthBar(float current, float max)
+    {
+        healthText.text = "HP" + current / max;
+    }
+
+    void UpdateShieldBar(float current, float max)
+    {
+        blockText.text = "Block" + current / max;
     }
 }
