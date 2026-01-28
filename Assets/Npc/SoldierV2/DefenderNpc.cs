@@ -8,6 +8,7 @@ using UnityEngine;
 /// 4. Counters with a melee attack if block is successful
 /// 
 /// REFACTORED: Uses NpcBase shared utilities for state timing and audio.
+/// UPDATED: Compatible with new PlayerCore system.
 /// </summary>
 public class DefenderNpc : NpcBase
 {
@@ -70,6 +71,9 @@ public class DefenderNpc : NpcBase
     private bool wasAttackBlocked;
     private bool wasPerfectBlock;
 
+    // ADDED: Cache for PlayerCore reference
+    private PlayerCore playerCore;
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -78,6 +82,12 @@ public class DefenderNpc : NpcBase
 
     protected override void OnStart()
     {
+        // ADDED: Cache PlayerCore reference
+        if (playerTransform != null)
+        {
+            playerCore = playerTransform.GetComponent<PlayerCore>();
+        }
+
         FindSoldierToProtect();
         TransitionToState(protectedSoldier != null ? DefenderState.MovingToProtect : DefenderState.Idle);
     }
@@ -126,7 +136,7 @@ public class DefenderNpc : NpcBase
             TransitionToState(DefenderState.Idle);
         }
     }
-    
+
     protected override void OnStunStart()
     {
         TransitionToState(DefenderState.Stunned);
@@ -417,10 +427,20 @@ public class DefenderNpc : NpcBase
         float angle = Vector3.Angle(transform.forward, GetDirectionToPlayer());
         if (angle > 45f) return;
 
-        var playerController = playerTransform.GetComponent<FPSPlayerController>();
-        if (playerController != null)
+        // UPDATED: Use PlayerCore instead of FPSPlayerController
+        if (playerCore != null)
         {
-            playerController.TakeDamage(counterDamage);
+            playerCore.TakeDamage(counterDamage);
+        }
+        else
+        {
+            // Fallback: Try to get component if not cached
+            var pc = playerTransform.GetComponent<PlayerCore>();
+            if (pc != null)
+            {
+                pc.TakeDamage(counterDamage);
+                playerCore = pc; // Cache for future use
+            }
         }
     }
 

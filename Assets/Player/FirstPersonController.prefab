@@ -422,10 +422,13 @@ GameObject:
   - component: {fileID: 2083849052892089141}
   - component: {fileID: 1564705603721853480}
   - component: {fileID: 6345547572121294194}
-  - component: {fileID: 3310673823978559165}
-  - component: {fileID: 7071012243489702213}
-  - component: {fileID: 3679770919235036541}
-  - component: {fileID: 2751237116988248899}
+  - component: {fileID: 6552793720517183731}
+  - component: {fileID: 6409869773086982550}
+  - component: {fileID: 6516431572162398611}
+  - component: {fileID: 4511031296643993828}
+  - component: {fileID: 8462264894812746746}
+  - component: {fileID: 6295242138573287136}
+  - component: {fileID: 7005038953154893743}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -499,7 +502,7 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 1, z: 0}
---- !u!114 &3310673823978559165
+--- !u!114 &6552793720517183731
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -508,28 +511,51 @@ MonoBehaviour:
   m_GameObject: {fileID: 3935032124739193074}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 297e1eaec788f564cb36fd89e2ee1129, type: 3}
+  m_Script: {fileID: 11500000, guid: 03e9eb3b943e5a84686c94b080d9085a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FPSPlayerController
-  currentState: 0
-  BlockHP: 130
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInputHandler
+--- !u!114 &6409869773086982550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bbb3f5cea00f0e47be308e310431348, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCore
+  CurrentState: 0
+--- !u!114 &6516431572162398611
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bd062eabc87a77408a93d75548a81f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   walkSpeed: 5
   runSpeed: 8
-  sprintInitialBoost: 12
+  sprintInitialBoost: 16
   sprintDecayCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
       value: 1
-      inSlope: 0
-      outSlope: 0
+      inSlope: -8.195918
+      outSlope: -8.195918
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
-      outWeight: 0
+      outWeight: 0.046480745
     - serializedVersion: 3
-      time: 1
+      time: 0.3
       value: 0
       inSlope: 0
       outSlope: 0
@@ -541,29 +567,33 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   sprintDecayDuration: 1
-  sprintResetDelay: 1
+  sprintResetDelay: 0.3
   jumpForce: 8
   gravity: 20
-  cameraTransform: {fileID: 0}
-  lookSensitivity: 2
-  maxLookAngle: 80
-  dashCharges: 3
-  slowDown: 0.1
-  dashSpeed: 20
+--- !u!114 &4511031296643993828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 348fffb6243982541adad8be7518fcbf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
+  maxDashCharges: 3
+  dashSpeed: 40
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
-    m_Bits: 136
-  wallStickDistance: 1
+    m_Bits: 128
+  dashTimeScale: 0.01
   dashCancelUpwardForce: 10
   dashCancelDownwardForce: 15
-  dart: {fileID: 6522420486547754043, guid: f471d3bbfcceb6d4db0c79a4e7f904b5, type: 3}
-  throwCooldown: 0.5
-  throwSpeed: 50
-  deathCameraRotationSpeed: 30
-  playerCamera: {fileID: 0}
-  currentDashCharges: 0
---- !u!114 &7071012243489702213
+  wallStickCheckDistance: 1
+  wallStickOffset: 0.5
+--- !u!114 &8462264894812746746
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -572,31 +602,44 @@ MonoBehaviour:
   m_GameObject: {fileID: 3935032124739193074}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 00f78c4f6807b5c48b15ef120e70c1c3, type: 3}
+  m_Script: {fileID: 11500000, guid: 03e4781cd8c64ff4487b0ac62d65bca3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SwordCombatSystem
-  currentCombatState: 0
-  heldSwordVisual: {fileID: 6913869377866838784}
-  thrownSwordPrefab: {fileID: 6144421989652223553, guid: acd6f8762439e8548b084ca8bed56a7d, type: 3}
-  cameraTransform: {fileID: 8366330103362317592}
-  throwOrigin: {fileID: 1354474955978296525}
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerLook
+  sensitivity: 2
+  maxVerticalAngle: 80
+  deathRotationSpeed: 30
+--- !u!114 &6295242138573287136
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56eb2a256fbda8b43bde9ca9bc325344, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCombat
   attackRange: 3
   attackAngle: 30
+  meleeDamage: 50
+  attackCooldown: 0.5
   enemyLayer:
     serializedVersion: 2
     m_Bits: 192
-  attackCooldown: 0.5
-  meleeDamage: 5000
   maxBlockHP: 100
-  blockRechargeRate: 10
-  brokenStunDuration: 3
+  blockRegenDelay: 1
+  blockRegenRate: 30
+  guardBreakStunDuration: 2
+  heldSwordVisual: {fileID: 6913869377866838784}
+  thrownSwordPrefab: {fileID: 1149659536443028137, guid: acd6f8762439e8548b084ca8bed56a7d, type: 3}
+  throwOrigin: {fileID: 1354474955978296525}
   throwForce: 40
-  maxThrowDistance: 100
-  throwableLayerMask:
+  maxThrowDistance: 999
+  throwableLayers:
     serializedVersion: 2
     m_Bits: 192
-  currentBlockHP: 0
---- !u!114 &3679770919235036541
+--- !u!114 &7005038953154893743
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -605,28 +648,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 3935032124739193074}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dad2d14a7f0709e429c151d93a077ebc, type: 3}
+  m_Script: {fileID: 11500000, guid: 20989d60f05863548b7d9e4548385432, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealthSystem
-  maxBaseHP: 100
-  maxShieldHP: 100
-  shieldRegenDelay: 1
-  shieldRegenDuration: 1
-  shieldBrokenCooldown: 2
-  currentBaseHP: 0
-  currentShieldHP: 0
---- !u!114 &2751237116988248899
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3935032124739193074}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9efcfa7bfb6c1dd4384ffba5446a8e7b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::scrPlayerInputHandler
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  maxHP: 100
+  currentHP: 0
 --- !u!1 &4042422906420918628
 GameObject:
   m_ObjectHideFlags: 0
@@ -883,7 +909,7 @@ GameObject:
   - component: {fileID: 1968273038181798106}
   - component: {fileID: 258549574029261370}
   - component: {fileID: 2501423875834993551}
-  - component: {fileID: 6578668767568460717}
+  - component: {fileID: 8573516870063930426}
   m_Layer: 5
   m_Name: UI_player
   m_TagString: Untagged
@@ -979,7 +1005,7 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &6578668767568460717
+--- !u!114 &8573516870063930426
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -988,21 +1014,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 6218121031402995240}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9396b3a9b18729042a6481648df3ae74, type: 3}
+  m_Script: {fileID: 11500000, guid: e6d7465806e2d2f43a3e6ea627ec3813, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealthUI
   player: {fileID: 0}
-  blockText: {fileID: 5761569921484980704}
+  healthSlider: {fileID: 0}
   healthText: {fileID: 1751528774551470326}
-  statusText: {fileID: 1941186016742857616}
-  dashText: {fileID: 6525867015821722448}
-  playerState: {fileID: 103366151935321421}
-  swordStatusIcon: {fileID: 0}
-  healthyColor: {r: 0, g: 1, b: 0, a: 1}
-  damagedColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  criticalColor: {r: 1, g: 0, b: 0, a: 1}
-  swordEnabledColor: {r: 1, g: 1, b: 1, a: 1}
-  swordDisabledColor: {r: 1, g: 0, b: 0, a: 1}
+  healthFill: {fileID: 0}
+  blockSlider: {fileID: 0}
+  blockText: {fileID: 5761569921484980704}
+  blockFill: {fileID: 0}
+  statusText: {fileID: 103366151935321421}
+  dashChargesText: {fileID: 6525867015821722448}
+  healthyColor: {r: 0.2, g: 0.8, b: 0.2, a: 1}
+  damagedColor: {r: 0.9, g: 0.7, b: 0.1, a: 1}
+  criticalColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
+  blockFullColor: {r: 0.3, g: 0.6, b: 0.9, a: 1}
+  blockLowColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
 --- !u!1 &6875547569957842842
 GameObject:
   m_ObjectHideFlags: 0

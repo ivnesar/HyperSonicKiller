@@ -27,7 +27,8 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
     // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("References")]
-    [SerializeField] private FPSPlayerController player;
+    // UPDATED: Using PlayerCore instead of FPSPlayerController
+    [SerializeField] private PlayerCore player;
     [SerializeField] private Transform barrelTransform;
     [SerializeField] private Transform firePoint;
 
@@ -162,9 +163,10 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
 
     private void FindMissingReferences()
     {
+        // UPDATED: Find PlayerCore instead of FPSPlayerController
         if (player == null)
         {
-            player = FindObjectOfType<FPSPlayerController>();
+            player = FindFirstObjectByType<PlayerCore>();
             if (player == null) Debug.LogError("DashTrackingTurret: No player found in scene!");
         }
 
@@ -198,7 +200,8 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
 
     private void UpdateStateMachine()
     {
-        bool playerIsDashing = player.GetCurrentState() == FPSPlayerController.PlayerState.Dashing;
+        // UPDATED: Check player state using PlayerCore
+        bool playerIsDashing = player.CurrentState == PlayerCore.PlayerState.Dashing;
 
         switch (currentState)
         {
@@ -244,7 +247,7 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
                 break;
 
             case TurretState.StunnedEmbedded:
-                // Visual pulsing
+                // Visual feedback: pulsing color
                 float pulse = Mathf.PingPong(Time.time * 3f, 1f);
                 Color col = Color.Lerp(embeddedStunColor, Color.white, pulse * 0.3f);
                 lineRenderer.startColor = lineRenderer.endColor = col;
@@ -253,7 +256,6 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
             case TurretState.StunnedResidual:
                 residualStunTimer -= Time.deltaTime;
 
-                float progress = residualStunTimer / residualStunDuration;
                 float resPulse = Mathf.PingPong(Time.time * 2f, 1f);
                 Color resCol = Color.Lerp(stunnedColor, chargingColor, resPulse * 0.5f);
                 lineRenderer.startColor = lineRenderer.endColor = resCol;
@@ -390,7 +392,8 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
         {
             endPoint = hit.point;
 
-            if (hit.collider.TryGetComponent<FPSPlayerController>(out var hitPlayer))
+            // UPDATED: Use PlayerCore for damage
+            if (hit.collider.TryGetComponent<PlayerCore>(out var hitPlayer))
             {
                 hitPlayer.TakeDamage(laserDamage);
             }
@@ -431,7 +434,7 @@ public class DashTrackingTurret : MonoBehaviour, INpcInteraction
 
     public void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
     {
-        
+        // Turret doesn't take throw damage
     }
 
     private void DestroyTurret()

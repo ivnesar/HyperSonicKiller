@@ -18,11 +18,10 @@ public class scrLocalGameManager : MonoBehaviour
         }
     }
 
-    public FPSPlayerController AsmPlayer;
+    //public FPSPlayerController AsmPlayer;
     public float TimeDialation = 1;
     
-
-    public List<scrNpc_GenOne> NpcGenOnes = new List<scrNpc_GenOne>();
+    
     public List<scrPlayerProjectile>  PlayerProjectiles = new List<scrPlayerProjectile>();
     
     public float meleeRange = 1.5f; // Distance for melee interaction

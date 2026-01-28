@@ -44,12 +44,13 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     #region Runtime Variables
     // ────────────────────────────────────────────────────────────────────────────────
 
-    private FPSPlayerController playerController;
+    // UPDATED: Using PlayerCore instead of FPSPlayerController
+    private PlayerCore playerCore;
     private bool playerInRange = false;
     private bool isDashDisabled = false;
     private Coroutine dashCancelCoroutine;
     private float lastCheckTime;
-    private const float CHECK_INTERVAL = 0.1f;                      // Check interval for performance
+    private const float CHECK_INTERVAL = 0.1f;
 
     #endregion
 
@@ -65,7 +66,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     private void Update()
     {
-        if (playerController == null) return;
+        if (playerCore == null) return;
 
         // Throttle expensive checks
         if (Time.unscaledTime - lastCheckTime < CHECK_INTERVAL) return;
@@ -77,15 +78,14 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     private void OnDestroy()
     {
         // Safety cleanup: re-enable dash if mine is destroyed
-        if (isDashDisabled && playerController != null)
+        if (isDashDisabled && playerCore != null && playerCore.Dash != null)
         {
-            playerController.DisableDash(true);
+            playerCore.Dash.SetDashEnabled(true);
         }
     }
 
     #endregion
 
-    
     // ────────────────────────────────────────────────────────────────────────────────
     #region Events
     // ────────────────────────────────────────────────────────────────────────────────
@@ -94,8 +94,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     public event DashMineDestroyedHandler OnDashMineDestroyed;
 
     #endregion
-    
-    
+
     // ────────────────────────────────────────────────────────────────────────────────
     #region Player Detection Logic
     // ────────────────────────────────────────────────────────────────────────────────
@@ -109,10 +108,11 @@ public class MineNPC : MonoBehaviour, INpcInteraction
             return;
         }
 
-        playerController = playerObj.GetComponent<FPSPlayerController>();
-        if (playerController == null)
+        // UPDATED: Get PlayerCore instead of FPSPlayerController
+        playerCore = playerObj.GetComponent<PlayerCore>();
+        if (playerCore == null)
         {
-            Debug.LogError("MineNPC: Player found but FPSPlayerController component missing!");
+            Debug.LogError("MineNPC: Player found but PlayerCore component missing!");
         }
     }
 
@@ -136,7 +136,7 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     private void CheckPlayerProximity()
     {
-        float distance = Vector3.Distance(transform.position, playerController.transform.position);
+        float distance = Vector3.Distance(transform.position, playerCore.transform.position);
         bool wasInRange = playerInRange;
         playerInRange = distance <= detectionRadius;
 
@@ -162,11 +162,11 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     private void OnPlayerEnterRange()
     {
-        Debug.Log($"MineNPC: Player entered range (Distance: {Vector3.Distance(transform.position, playerController.transform.position):F2}m)");
+        Debug.Log($"MineNPC: Player entered range (Distance: {Vector3.Distance(transform.position, playerCore.transform.position):F2}m)");
 
-        if (!isDashDisabled)
+        if (!isDashDisabled && playerCore.Dash != null)
         {
-            playerController.DisableDash(true);
+            playerCore.Dash.SetDashEnabled(false);
             isDashDisabled = true;
 
             SetMineColor(armedColor);
@@ -174,7 +174,8 @@ public class MineNPC : MonoBehaviour, INpcInteraction
             PlaySound(armSound);
         }
 
-        if (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing)
+        // UPDATED: Check for Dashing state using PlayerCore
+        if (playerCore.CurrentState == PlayerCore.PlayerState.Dashing)
         {
             StartDashCancelCountdown();
         }
@@ -184,9 +185,9 @@ public class MineNPC : MonoBehaviour, INpcInteraction
     {
         Debug.Log("MineNPC: Player exited range");
 
-        if (isDashDisabled)
+        if (isDashDisabled && playerCore.Dash != null)
         {
-            playerController.DisableDash(true);
+            playerCore.Dash.SetDashEnabled(true);
             isDashDisabled = false;
 
             SetMineColor(normalColor);
@@ -209,7 +210,8 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     private void CheckDashState()
     {
-        if (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing)
+        // UPDATED: Check using PlayerCore state
+        if (playerCore.CurrentState == PlayerCore.PlayerState.Dashing)
         {
             if (dashCancelCoroutine == null)
             {
@@ -243,13 +245,14 @@ public class MineNPC : MonoBehaviour, INpcInteraction
             yield return null;
         }
 
+        // UPDATED: Check states using PlayerCore
         if (playerInRange &&
-            (playerController.GetCurrentState() == FPSPlayerController.PlayerState.Dashing ||
-             playerController.GetCurrentState() == FPSPlayerController.PlayerState.StuckToSurface))
+            (playerCore.CurrentState == PlayerCore.PlayerState.Dashing ||
+             playerCore.CurrentState == PlayerCore.PlayerState.StuckToSurface))
         {
             Debug.Log("MineNPC: Cancelling player dash!");
-            playerController.CancelDash(true);
-            // ← Here you can add feedback: particles, sound, screen shake, etc.
+            // UPDATED: Use Dash subsystem to cancel
+            playerCore.Dash?.ForceCancelDash();
         }
 
         dashCancelCoroutine = null;
@@ -285,26 +288,25 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     public void OnMeeleDamage(int amount)
     {
-        DestoryThis();
+        DestroyThis();
     }
 
     public void OnThrowStun(float duration)
     {
-        DestoryThis();
+        DestroyThis();
     }
 
     public void OnSwordRemoved()
     {
-        
+        // Mine doesn't care about sword removal
     }
 
     public void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
     {
-        
+        // Mine doesn't take throw damage
     }
 
-
-    private void DestoryThis()
+    private void DestroyThis()
     {
         OnDashMineDestroyed?.Invoke();
         Destroy(gameObject);
@@ -318,18 +320,18 @@ public class MineNPC : MonoBehaviour, INpcInteraction
 
     public void TriggerMine()
     {
-        if (playerController != null && playerInRange)
+        if (playerCore != null && playerInRange)
         {
-            playerController.CancelDash(true);
+            playerCore.Dash?.ForceCancelDash();
         }
     }
 
     public void DisableMine()
     {
         enabled = false;
-        if (isDashDisabled && playerController != null)
+        if (isDashDisabled && playerCore != null && playerCore.Dash != null)
         {
-            playerController.DisableDash(true);
+            playerCore.Dash.SetDashEnabled(true);
             isDashDisabled = false;
         }
         SetMineColor(Color.gray);
@@ -354,10 +356,10 @@ public class MineNPC : MonoBehaviour, INpcInteraction
         Gizmos.color = playerInRange ? armedColor : normalColor;
         Gizmos.DrawWireSphere(transform.position, detectionRadius);
 
-        if (playerInRange && playerController != null)
+        if (playerInRange && playerCore != null)
         {
             Gizmos.color = Color.red;
-            Gizmos.DrawLine(transform.position, playerController.transform.position);
+            Gizmos.DrawLine(transform.position, playerCore.transform.position);
         }
     }
 

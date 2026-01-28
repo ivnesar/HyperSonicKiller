@@ -7,6 +7,8 @@ using UnityEngine;
 /// 
 /// SIMPLIFIED VERSION: No Rigidbody, no bullet system dependency.
 /// Just instantiate and initialize, bullet handles everything itself.
+/// 
+/// UPDATED: Compatible with new PlayerCore system.
 /// </summary>
 public class SoldierBullet : MonoBehaviour
 {
@@ -18,15 +20,15 @@ public class SoldierBullet : MonoBehaviour
     [SerializeField] private float bulletSpeed = 50f;
     [SerializeField] private float maxLifetime = 5f;
     [SerializeField] private float bulletRadius = 0.05f;
-    
+
     [Header("Simulation")]
     [SerializeField] private int maxSegmentsPerFrame = 10;
     [SerializeField] private float segmentLength = 1f;
-    
+
     [Header("Visual")]
     [SerializeField] private GameObject impactEffectPrefab;
     [SerializeField] private TrailRenderer trailRenderer;
-    
+
     [Header("Debug")]
     [SerializeField] private bool showDebugRays = true;
     [SerializeField] private Color bulletDebugColor = Color.red;
@@ -43,7 +45,7 @@ public class SoldierBullet : MonoBehaviour
     private LayerMask hitMask;
     private float lifetime;
     private bool isInitialized;
-    
+
     private scrLocalGameManager lgm;
 
     #endregion
@@ -63,7 +65,7 @@ public class SoldierBullet : MonoBehaviour
 
         // Age the bullet
         lifetime += Time.deltaTime;
-        
+
         // Destroy if too old
         if (lifetime >= maxLifetime)
         {
@@ -116,18 +118,18 @@ public class SoldierBullet : MonoBehaviour
         // Calculate how far the bullet should travel this frame based on time dilation
         float timeScale = (lgm != null) ? lgm.TimeDialation : 1f;
         float travelDistance = bulletSpeed * Time.deltaTime * timeScale;
-        
+
         // Break travel distance into segments for accurate collision detection
         int segmentCount = Mathf.CeilToInt(travelDistance / segmentLength);
         segmentCount = Mathf.Min(segmentCount, maxSegmentsPerFrame);
         float segmentDist = travelDistance / segmentCount;
 
         Vector3 currentPosition = transform.position;
-        
+
         for (int i = 0; i < segmentCount; i++)
         {
             Vector3 nextPosition = currentPosition + direction * segmentDist;
-            
+
             // Use SphereCast for more reliable hits
             if (Physics.SphereCast(
                 currentPosition,
@@ -139,22 +141,22 @@ public class SoldierBullet : MonoBehaviour
             {
                 // Hit something!
                 HandleBulletImpact(hit);
-                
+
                 // Debug visualization
                 if (showDebugRays)
                 {
                     Debug.DrawLine(transform.position, hit.point, bulletDebugColor, 1f);
                 }
-                
+
                 return; // Bullet is destroyed after impact
             }
-            
+
             currentPosition = nextPosition;
         }
 
         // Bullet didn't hit anything this frame - update position
         transform.position = currentPosition;
-        
+
         // Debug visualization
         if (showDebugRays)
         {
@@ -170,13 +172,14 @@ public class SoldierBullet : MonoBehaviour
 
     private void HandleBulletImpact(RaycastHit hit)
     {
-        // Try to damage player
+        // UPDATED: Try to damage player using PlayerCore
         if (hit.transform.CompareTag("Player"))
         {
-            var playerController = hit.transform.GetComponent<FPSPlayerController>();
-            if (playerController != null)
+            // Try PlayerCore first (new system)
+            var playerCore = hit.transform.GetComponent<PlayerCore>();
+            if (playerCore != null)
             {
-                playerController.TakeDamage(damage);
+                playerCore.TakeDamage(damage);
                 Debug.Log($"[SoldierBullet] Hit player for {damage} damage!");
             }
         }
