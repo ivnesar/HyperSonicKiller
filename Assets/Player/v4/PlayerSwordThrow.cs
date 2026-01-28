@@ -37,9 +37,11 @@ public class PlayerSwordThrow : MonoBehaviour
     [SerializeField] private Transform throwOrigin;
 
     [Header("Throw Settings")]
+    [SerializeField] float postRemovalStunDuration = 1f;
     [SerializeField] private float throwSpeed = 300f;
     [SerializeField] private float returnSpeed = 900f;
     [SerializeField] private float catchDistance = 1.2f;
+    [SerializeField] private float recallDelay = 1f;
     [SerializeField] private LayerMask throwLayerMask = -1;
 
     [Header("Input")]
@@ -54,6 +56,14 @@ public class PlayerSwordThrow : MonoBehaviour
     private PlayerCore core;
     private ThrownSword activeSword;
     private bool hasSword = true;
+
+    // Recall delay after hit
+    private float lastHitTime = -999f;
+    
+
+    // Debug visualization
+    private Vector3 debugTargetPoint;
+    private bool debugHasTarget;
 
     #endregion
 
@@ -114,8 +124,11 @@ public class PlayerSwordThrow : MonoBehaviour
         }
         else
         {
-            // Player doesn't have sword -> recall it
-            RecallSword();
+            // Player doesn't have sword -> recall it (only if delay has passed)
+            if (CanRecall())
+            {
+                RecallSword();
+            }
         }
     }
 
@@ -126,6 +139,13 @@ public class PlayerSwordThrow : MonoBehaviour
         if (core.CurrentState == PlayerCore.PlayerState.Dashing) return false;
 
         return true;
+    }
+
+    private bool CanRecall()
+    {
+        // Must wait 1 second after sword hits something before recall
+        float timeSinceHit = Time.time - lastHitTime;
+        return timeSinceHit >= recallDelay;
     }
 
     #endregion
@@ -146,7 +166,7 @@ public class PlayerSwordThrow : MonoBehaviour
 
         // Determine spawn position and direction
         Vector3 spawnPos = GetThrowOrigin();
-        Vector3 throwDir = core.CameraTransform.forward;
+        Vector3 throwDir = GetThrowDirection();
 
         // Spawn thrown sword
         activeSword = Instantiate(thrownSwordPrefab, spawnPos, Quaternion.LookRotation(throwDir));
@@ -156,7 +176,7 @@ public class PlayerSwordThrow : MonoBehaviour
         activeSword.OnHitTarget += HandleSwordHit;
 
         // Initialize and launch
-        activeSword.Initialize(throwDir, throwSpeed, returnSpeed, throwLayerMask);
+        activeSword.Initialize(throwDir,throwSpeed,returnSpeed,postRemovalStunDuration,throwLayerMask);
 
         OnSwordThrown?.Invoke();
     }
@@ -170,6 +190,36 @@ public class PlayerSwordThrow : MonoBehaviour
 
         // Fallback: slightly in front of camera
         return core.CameraTransform.position + core.CameraTransform.forward * 0.5f;
+    }
+
+    private Vector3 GetThrowDirection()
+    {
+        // Cast ray from camera center (crosshair position) forward
+        Ray ray = new Ray(core.CameraTransform.position, core.CameraTransform.forward);
+        
+        Vector3 targetPoint;
+
+        // Check if ray hits something
+        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, throwLayerMask))
+        {
+            // Ray hit something - aim at that point
+            targetPoint = hit.point;
+        }
+        else
+        {
+            // Ray didn't hit anything - aim at a far point in that direction
+            targetPoint = ray.GetPoint(1000f);
+        }
+
+        // Store for gizmo visualization
+        debugTargetPoint = targetPoint;
+        debugHasTarget = true;
+
+        // Calculate direction from throw origin to target point
+        Vector3 throwOriginPos = GetThrowOrigin();
+        Vector3 direction = (targetPoint - throwOriginPos).normalized;
+
+        return direction;
     }
 
     #endregion
@@ -217,6 +267,9 @@ public class PlayerSwordThrow : MonoBehaviour
 
     private void HandleSwordHit(GameObject target)
     {
+        // Record hit time for recall delay
+        lastHitTime = Time.time;
+        
         OnSwordHitTarget?.Invoke(target);
     }
 
@@ -257,6 +310,28 @@ public class PlayerSwordThrow : MonoBehaviour
     public void ResetState()
     {
         ForceRecall();
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Debug Visualization
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void OnDrawGizmos()
+    {
+        if (!debugHasTarget) return;
+
+        // Draw sphere at target point
+        Gizmos.color = Color.red;
+        Gizmos.DrawSphere(debugTargetPoint, 0.2f);
+
+        // Draw line from throw origin to target point
+        if (throwOrigin != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(throwOrigin.position, debugTargetPoint);
+        }
     }
 
     #endregion

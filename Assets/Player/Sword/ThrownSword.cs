@@ -28,8 +28,7 @@ public class ThrownSword : MonoBehaviour
     [SerializeField] private int maxSegmentsPerFrame = 4;
 
     [Header("Stun Settings")]
-    [Tooltip("How long the enemy stays stunned AFTER sword is removed")]
-    [SerializeField] private float postRemovalStunDuration = 2f;
+    
 
     [Header("Visuals")]
     [SerializeField] private TrailRenderer trail;
@@ -46,6 +45,7 @@ public class ThrownSword : MonoBehaviour
     private bool isReturning;
 
     // Flight parameters (set on Initialize)
+    private float postRemovalStunDuration;
     private Vector3 flyDirection;
     private float flySpeed;
     private float returnSpeed;
@@ -98,11 +98,12 @@ public class ThrownSword : MonoBehaviour
     /// <summary>
     /// Initialize and launch the sword as a projectile.
     /// </summary>
-    public void Initialize(Vector3 direction, float speed, float recallSpeed, LayerMask collisionMask)
+    public void Initialize(Vector3 direction, float speed, float recallSpeed, float stunDuration, LayerMask collisionMask)
     {
         flyDirection = direction.normalized;
         flySpeed = speed;
         returnSpeed = recallSpeed;
+        postRemovalStunDuration = stunDuration;
         hitMask = collisionMask;
 
         isFlying = true;
