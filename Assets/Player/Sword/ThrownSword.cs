@@ -198,7 +198,7 @@ public class ThrownSword : MonoBehaviour
             out RaycastHit hit,
             distance,
             hitMask,
-            QueryTriggerInteraction.Ignore))
+            QueryTriggerInteraction.Collide))
         {
             // Position at hit point
             transform.position = hit.point + hit.normal * swordRadius;
