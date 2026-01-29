@@ -5,6 +5,8 @@ using System;
 /// Handles melee combat and automatic blocking.
 /// Block is passive - player automatically blocks incoming damage as long as BlockHP > 0.
 /// When BlockHP is depleted, guard breaks and player is stunned.
+/// 
+/// UPDATED: Migrated from INpcInteraction to IEnemy interface.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerCombat : MonoBehaviour
@@ -208,19 +210,20 @@ public class PlayerCombat : MonoBehaviour
 
             if (angle <= attackAngle)
             {
+                Debug.Log("meele: "+col.transform.name);
                 // Calculate hit point (closest point on collider)
                 Vector3 hitPoint = col.ClosestPoint(core.CameraTransform.position);
                 Vector3 hitDirection = core.CameraTransform.forward;
 
-                // Try IDamageable first
-                if (col.TryGetComponent<IDamageable>(out var damageable))
+                // Try IEnemy first (new unified interface)
+                if (col.TryGetComponent<IEnemy>(out var enemy))
+                {
+                    enemy.OnMeleeDamage(meleeDamage);
+                }
+                // Fallback to IDamageable for non-enemy destructibles
+                else if (col.TryGetComponent<IDamageable>(out var damageable))
                 {
                     damageable.TakeDamage(meleeDamage, hitPoint, hitDirection);
-                }
-                // Legacy support
-                else if (col.TryGetComponent<INpcInteraction>(out var npc))
-                {
-                    npc.OnMeeleDamage(meleeDamage);
                 }
             }
         }

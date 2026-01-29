@@ -4,6 +4,8 @@ using System;
 /// <summary>
 /// Thrown sword projectile that flies like an arrow and sticks to surfaces.
 /// Uses segmented spherecasting for reliable collision detection at high speeds.
+/// 
+/// UPDATED: Migrated to IEnemy interface for sword embedding mechanics.
 /// </summary>
 public class ThrownSword : MonoBehaviour
 {
@@ -26,9 +28,6 @@ public class ThrownSword : MonoBehaviour
     [Header("Collision")]
     [SerializeField] private float swordRadius = 0.1f;
     [SerializeField] private int maxSegmentsPerFrame = 4;
-
-    [Header("Stun Settings")]
-    
 
     [Header("Visuals")]
     [SerializeField] private TrailRenderer trail;
@@ -55,8 +54,8 @@ public class ThrownSword : MonoBehaviour
     private Transform returnTarget;
     private float catchDistance = 1f;
 
-    // Enemy tracking
-    private IStunnable stunnedTarget;
+    // Enemy tracking - now uses IEnemy for full sword interaction
+    private IEnemy embeddedEnemy;
     private GameObject hitObject;
 
     #endregion
@@ -110,7 +109,7 @@ public class ThrownSword : MonoBehaviour
         isStuck = false;
         isReturning = false;
 
-        stunnedTarget = null;
+        embeddedEnemy = null;
         hitObject = null;
 
         // Orient sword to fly forward
@@ -140,11 +139,11 @@ public class ThrownSword : MonoBehaviour
         // Detach from any parent (was stuck to something)
         transform.SetParent(null);
 
-        // Apply post-removal stun to enemy
-        if (stunnedTarget != null)
+        // Notify embedded enemy that sword is being removed
+        if (embeddedEnemy != null)
         {
-            stunnedTarget.ApplyStun(postRemovalStunDuration);
-            stunnedTarget = null;
+            embeddedEnemy.OnSwordRemoved();
+            embeddedEnemy = null;
         }
 
         // Re-enable trail for return flight
@@ -289,16 +288,25 @@ public class ThrownSword : MonoBehaviour
         hitObject = target;
         OnHitTarget?.Invoke(target);
 
-        // Check for stunnable enemy
-        // We search up the hierarchy in case we hit a child collider
-        IStunnable stunnable = target.GetComponentInParent<IStunnable>();
+        // Check for IEnemy (full sword interaction support)
+        // Search up the hierarchy in case we hit a child collider
+        IEnemy enemy = target.GetComponentInParent<IEnemy>();
 
-        if (stunnable != null)
+        if (enemy != null)
         {
-            // Stun for a very long time (effectively infinite while stuck)
-            // The actual stun duration resets when recalled (postRemovalStunDuration)
-            stunnable.ApplyStun(999f);
-            stunnedTarget = stunnable;
+            // Notify enemy that sword is embedded - this handles the indefinite stun
+            enemy.OnSwordEmbedded();
+            embeddedEnemy = enemy;
+        }
+        else
+        {
+            // Fallback: check for basic IStunnable (for non-enemy stunnables)
+            IStunnable stunnable = target.GetComponentInParent<IStunnable>();
+            if (stunnable != null)
+            {
+                // Apply long stun (effectively infinite while stuck)
+                stunnable.ApplyStun(999f);
+            }
         }
     }
 

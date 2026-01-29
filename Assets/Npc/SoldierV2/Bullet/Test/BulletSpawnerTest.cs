@@ -18,8 +18,6 @@ public class BulletSpawnerTest : MonoBehaviour
     [SerializeField] private int bulletDamage = 10;
     [SerializeField] private LayerMask hitMask = -1; // Welche Layer getroffen werden können
     
-    [Header("Debug")]
-    [SerializeField] private bool showDebugInfo = true;
     
     private float nextShootTime;
     private bool isShooting;
@@ -68,10 +66,6 @@ public class BulletSpawnerTest : MonoBehaviour
             // Bullet in Forward-Richtung schießen
             bullet.Initialize(transform.forward, bulletDamage, transform, hitMask);
             
-            if (showDebugInfo)
-            {
-                Debug.Log($"[BulletSpawnerTest] Bullet geschossen! Richtung: {transform.forward}");
-            }
         }
         else
         {
@@ -88,10 +82,6 @@ public class BulletSpawnerTest : MonoBehaviour
         isShooting = true;
         nextShootTime = Time.time; // Sofort beim Start schießen
         
-        if (showDebugInfo)
-        {
-            Debug.Log("[BulletSpawnerTest] Schießen gestartet!");
-        }
     }
 
     /// <summary>
@@ -101,10 +91,6 @@ public class BulletSpawnerTest : MonoBehaviour
     {
         isShooting = false;
         
-        if (showDebugInfo)
-        {
-            Debug.Log("[BulletSpawnerTest] Schießen gestoppt!");
-        }
     }
 
     // Visualisierung im Editor

@@ -8,9 +8,10 @@ using UnityEngine.AI;
 /// 
 /// REFACTORED: Now includes animator control (previously NPCanimatorController).
 /// UPDATED: Integrated with NpcRagdollController for death ragdolls.
+/// UPDATED: Migrated from INpcInteraction to IEnemy interface.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
-public abstract class NpcBase : MonoBehaviour, INpcInteraction
+public abstract class NpcBase : MonoBehaviour, IEnemy
 {
     // ────────────────────────────────────────────────────────────────────────────────
     #region Inspector Fields - Shared
@@ -231,18 +232,78 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     /// </summary>
     public abstract int GetStateID();
 
-    
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region INpcInteraction Implementation
+    #region IEnemy Implementation
     // ────────────────────────────────────────────────────────────────────────────────
 
-    public virtual void OnMeeleDamage(int amount)
+    // IDamageable properties
+    public int CurrentHealth => currentHealth;
+    public int MaxHealth => maxHealth;
+    public bool IsDead => isDead;
+
+    // IStunnable properties
+    public bool IsStunned => isStunned;
+    public float RemainingStunTime => isStunned ? Mathf.Max(0f, stunEndTime - Time.time) : 0f;
+
+    // IEnemy property
+    public Transform Transform => transform;
+
+    /// <summary>
+    /// IDamageable: Simple damage without position info.
+    /// </summary>
+    public virtual void TakeDamage(float damage)
+    {
+        TakeDamage(damage, transform.position, Vector3.zero);
+    }
+
+    /// <summary>
+    /// IDamageable: Generic damage method with hit info.
+    /// </summary>
+    public virtual void TakeDamage(float damage, Vector3 hitPoint, Vector3 hitDirection)
     {
         if (isDead) return;
 
-        currentHealth -= amount;
+        currentHealth -= Mathf.RoundToInt(damage);
+
+        // Register impact for ragdoll
+        ragdollController?.RegisterMeleeImpact(hitPoint);
+
+        // Trigger hit reaction
+        animator?.SetTrigger("Hit");
+        PlaySound(hitSound);
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    /// <summary>
+    /// IStunnable: Apply stun effect.
+    /// </summary>
+    public virtual void ApplyStun(float duration)
+    {
+        if (isDead) return;
+
+        isStunned = true;
+        stunEndTime = Time.time + duration;
+
+        StopMovement();
+        animator?.SetBool("IsStunned", true);
+        
+        OnStunStart();
+    }
+
+    /// <summary>
+    /// IEnemy: Called when hit by melee attack.
+    /// </summary>
+    public virtual void OnMeleeDamage(int damage)
+    {
+        if (isDead) return;
+
+        currentHealth -= damage;
 
         // Register impact for ragdoll
         if (playerTransform != null)
@@ -256,11 +317,32 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
 
         if (currentHealth <= 0)
         {
-            Die();  // ← Already calls death when lethal
+            Die();
         }
     }
 
-    public virtual void OnThrowStun(float duration)
+    /// <summary>
+    /// IEnemy: Called when hit by thrown sword.
+    /// </summary>
+    public virtual void OnThrownSwordHit(int damage, Vector3 swordDirection, Vector3 hitPoint)
+    {
+        if (isDead) return;
+
+        currentHealth -= damage;
+
+        // Register with ragdoll controller
+        ragdollController?.RegisterThrownSwordImpact(swordDirection, hitPoint);
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    /// <summary>
+    /// IEnemy: Called when sword embeds into this enemy.
+    /// </summary>
+    public virtual void OnSwordEmbedded()
     {
         if (isDead) return;
 
@@ -280,23 +362,8 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     }
 
     /// <summary>
-    /// Called when thrown sword hits and should register impact for ragdoll.
+    /// IEnemy: Called when embedded sword is removed.
     /// </summary>
-    public virtual void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint)
-    {
-        if (isDead) return;
-
-        currentHealth -= amount;
-
-        // Register with ragdoll controller
-        ragdollController?.RegisterThrownSwordImpact(swordDirection, hitPoint);
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-
     public virtual void OnSwordRemoved()
     {
         if (!hasSwordEmbedded) return;
@@ -310,13 +377,13 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     }
 
     /// <summary>
-    /// Called when NPC is hit by a bullet.
+    /// IEnemy: Called when hit by bullet.
     /// </summary>
-    public virtual void OnBulletDamage(int amount, Vector3 bulletDirection, Vector3 hitPoint)
+    public virtual void OnBulletDamage(int damage, Vector3 bulletDirection, Vector3 hitPoint)
     {
         if (isDead) return;
 
-        currentHealth -= amount;
+        currentHealth -= damage;
 
         // Register with ragdoll controller
         ragdollController?.RegisterBulletImpact(bulletDirection, hitPoint);
@@ -334,20 +401,8 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
-    #region Stun System
+    #region Stun System (Internal)
     // ────────────────────────────────────────────────────────────────────────────────
-
-    protected void ApplyStun(float duration)
-    {
-        isStunned = true;
-        stunEndTime = Time.time + duration;
-
-        StopMovement();
-        animator?.SetBool("IsStunned", true);
-        
-        // Let subclass transition to Stunned state
-        OnStunStart();
-    }
 
     protected void EndStun()
     {
@@ -366,6 +421,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
     {
         return residualStunAfterSwordRemoval;
     }
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -568,8 +624,7 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
         dir.y = 0f;
         return dir.normalized;
     }
-    
-    
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -660,11 +715,6 @@ public abstract class NpcBase : MonoBehaviour, INpcInteraction
             Destroy(gameObject, destroyDelay);
         }
     }
-
-    public bool IsDead => isDead;
-    public bool IsStunned => isStunned;
-    public int CurrentHealth => currentHealth;
-    public int MaxHealth => maxHealth;
 
     #endregion
 

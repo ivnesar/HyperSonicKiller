@@ -46,18 +46,14 @@ public class SoldierBullet : MonoBehaviour
     private float lifetime;
     private bool isInitialized;
 
-    private scrLocalGameManager lgm;
+
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────────────
     #region Unity Lifecycle
     // ────────────────────────────────────────────────────────────────────────────────
-
-    private void Awake()
-    {
-        lgm = scrLocalGameManager.Instance;
-    }
+    
 
     private void Update()
     {
@@ -116,7 +112,7 @@ public class SoldierBullet : MonoBehaviour
     private void SimulateBullet()
     {
         // Calculate how far the bullet should travel this frame based on time dilation
-        float timeScale = (lgm != null) ? lgm.TimeDialation : 1f;
+        float timeScale = 1f;
         float travelDistance = bulletSpeed * Time.deltaTime * timeScale;
 
         // Break travel distance into segments for accurate collision detection
@@ -180,7 +176,7 @@ public class SoldierBullet : MonoBehaviour
             if (playerCore != null)
             {
                 playerCore.TakeDamage(damage);
-                Debug.Log($"[SoldierBullet] Hit player for {damage} damage!");
+                //Debug.Log($"[SoldierBullet] Hit player for {damage} damage!");
             }
         }
 

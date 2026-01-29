@@ -9,6 +9,7 @@ using UnityEngine;
 /// 
 /// REFACTORED: State-Logik ist jetzt in DefenderStates.cs ausgelagert.
 /// Diese Klasse ist nur noch der Koordinator und hält die Konfiguration.
+/// UPDATED: Migrated from INpcInteraction to IEnemy interface.
 /// </summary>
 public class DefenderNpc : NpcBase
 {
@@ -305,15 +306,16 @@ public class DefenderNpc : NpcBase
 
     /// <summary>
     /// Override: Blockt potentiell eingehenden Nahkampfschaden.
+    /// UPDATED: Renamed from OnMeeleDamage to OnMeleeDamage (fixed typo).
     /// </summary>
-    public override void OnMeeleDamage(int amount)
+    public override void OnMeleeDamage(int damage)
     {
         if (TryBlockAttack())
         {
             return; // Attack was blocked
         }
 
-        base.OnMeeleDamage(amount);
+        base.OnMeleeDamage(damage);
     }
 
     #endregion

@@ -1,9 +1,32 @@
 using UnityEngine;
-using System;
 
 // ════════════════════════════════════════════════════════════════════════════
 // GAME INTERFACES - Central location for all shared interfaces
 // ════════════════════════════════════════════════════════════════════════════
+//
+// Interface Hierarchy:
+//   IDamageable      - Base: anything that can take damage
+//   IStunnable       - Can be stunned (temporary disable)
+//   IEnemy           - Full enemy with all combat interactions
+//
+// ════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Interface for objects that can receive damage.
+/// Use for destructible objects, enemies, or any damageable entity.
+/// </summary>
+public interface IDamageable
+{
+    /// <summary>
+    /// Simple damage without position info.
+    /// </summary>
+    void TakeDamage(float damage);
+
+    /// <summary>
+    /// Damage with hit information for effects/ragdoll.
+    /// </summary>
+    void TakeDamage(float damage, Vector3 hitPoint, Vector3 hitDirection);
+}
 
 /// <summary>
 /// Interface for objects that can be stunned.
@@ -29,32 +52,65 @@ public interface IStunnable
 }
 
 /// <summary>
-/// Interface for objects that can receive damage.
-/// </summary>
-public interface IDamageable
-{
-    void TakeDamage(float damage);
-    void TakeDamage(float damage, Vector3 hitPoint, Vector3 hitDirection);
-}
-
-/// <summary>
-/// Combined interface for enemies that can be both damaged and stunned.
-/// Most enemies should implement this.
+/// Full enemy interface combining damage, stun, and combat-specific interactions.
+/// 
+/// Use this for NPCs that:
+/// - Can be damaged by melee attacks
+/// - Can be hit and stunned by thrown sword
+/// - Can have sword embedded in them
 /// </summary>
 public interface IEnemy : IDamageable, IStunnable
 {
-    bool IsDead { get; }
-    Transform Transform { get; }
-}
+    // ────────────────────────────────────────────────────────────────────────
+    // Properties
+    // ────────────────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Legacy interface - kept for backwards compatibility.
-/// Consider migrating to IEnemy instead.
-/// </summary>
-public interface INpcInteraction
-{
-    void OnMeeleDamage(int amount);
-    void OnThrowStun(float duration);
+    /// <summary>
+    /// Whether the enemy is dead.
+    /// </summary>
+    bool IsDead { get; }
+
+    /// <summary>
+    /// Transform of the enemy (for positioning, distance checks).
+    /// </summary>
+    Transform Transform { get; }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Melee Combat
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called when hit by a melee attack (player sword swing).
+    /// </summary>
+    void OnMeleeDamage(int damage);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Thrown Sword Interaction
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called when hit by a thrown sword (projectile phase).
+    /// </summary>
+    void OnThrownSwordHit(int damage, Vector3 swordDirection, Vector3 hitPoint);
+
+    /// <summary>
+    /// Called when the thrown sword embeds into this enemy.
+    /// Enemy should enter stunned state indefinitely until sword is removed.
+    /// </summary>
+    void OnSwordEmbedded();
+
+    /// <summary>
+    /// Called when the embedded sword is recalled/removed.
+    /// Enemy should apply residual stun and then recover.
+    /// </summary>
     void OnSwordRemoved();
-    void OnThrowDamage(int amount, Vector3 swordDirection, Vector3 hitPoint);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Ranged Damage
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called when hit by a bullet or projectile.
+    /// </summary>
+    void OnBulletDamage(int damage, Vector3 bulletDirection, Vector3 hitPoint);
 }
