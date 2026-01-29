@@ -5,6 +5,8 @@ using System;
 /// Manages sword throwing mechanics for the player.
 /// Separated from PlayerCombat for cleaner code organization.
 /// Communicates with PlayerCombat to disable attack/block while sword is thrown.
+/// 
+/// UPDATED: Added swordRemovalDamage - damage dealt when sword is recalled from an embedded enemy.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerSwordThrow : MonoBehaviour
@@ -37,12 +39,18 @@ public class PlayerSwordThrow : MonoBehaviour
     [SerializeField] private Transform throwOrigin;
 
     [Header("Throw Settings")]
-    [SerializeField] float postRemovalStunDuration = 1f;
     [SerializeField] private float throwSpeed = 300f;
     [SerializeField] private float returnSpeed = 900f;
     [SerializeField] private float catchDistance = 1.2f;
     [SerializeField] private float recallDelay = 1f;
     [SerializeField] private LayerMask throwLayerMask = -1;
+
+    [Header("Damage Settings")]
+    [Tooltip("Damage dealt to enemy when sword is recalled/removed from them")]
+    [SerializeField] private int swordRemovalDamage = 30;
+    
+    [Tooltip("Duration of stun applied after sword is removed (residual stun)")]
+    [SerializeField] private float postRemovalStunDuration = 2f;
 
     [Header("Input")]
     [SerializeField] private string throwActionName = "ThrowSword";
@@ -85,6 +93,9 @@ public class PlayerSwordThrow : MonoBehaviour
 
     /// <summary>Reference to the active thrown sword (null if none).</summary>
     public ThrownSword ActiveSword => activeSword;
+    
+    /// <summary>Damage dealt when sword is removed from an enemy.</summary>
+    public int SwordRemovalDamage => swordRemovalDamage;
 
     #endregion
 
@@ -175,8 +186,15 @@ public class PlayerSwordThrow : MonoBehaviour
         activeSword.OnReturnedToPlayer += HandleSwordReturned;
         activeSword.OnHitTarget += HandleSwordHit;
 
-        // Initialize and launch
-        activeSword.Initialize(throwDir,throwSpeed,returnSpeed,postRemovalStunDuration,throwLayerMask);
+        // Initialize and launch - pass removal damage and stun duration
+        activeSword.Initialize(
+            throwDir,
+            throwSpeed,
+            returnSpeed,
+            postRemovalStunDuration,
+            swordRemovalDamage,
+            throwLayerMask
+        );
 
         OnSwordThrown?.Invoke();
     }

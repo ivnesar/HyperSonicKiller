@@ -9,6 +9,7 @@ using UnityEngine.AI;
 /// REFACTORED: Now includes animator control (previously NPCanimatorController).
 /// UPDATED: Integrated with NpcRagdollController for death ragdolls.
 /// UPDATED: Migrated from INpcInteraction to IEnemy interface.
+/// UPDATED: Sword removal damage is now applied AFTER residual stun expires.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public abstract class NpcBase : MonoBehaviour, IEnemy
@@ -73,9 +74,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     // Sword embedding
     protected bool hasSwordEmbedded;
     
-    // Residual stun after sword removal
-    [Header("Sword Stun")]
-    [SerializeField] protected float residualStunAfterSwordRemoval = 2f;
+    // Pending damage after sword removal (applied when residual stun ends)
+    protected int pendingSwordRemovalDamage;
+    protected bool hasPendingSwordDamage;
 
     // State timer (shared utility for subclasses)
     protected float stateTimer;
@@ -348,6 +349,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         hasSwordEmbedded = true;
         
+        // Clear any pending damage from previous sword interactions
+        hasPendingSwordDamage = false;
+        pendingSwordRemovalDamage = 0;
+        
         // Enter stunned state - will stay stunned indefinitely while sword is embedded
         isStunned = true;
         stunEndTime = float.MaxValue; // No timeout while embedded
@@ -363,17 +368,29 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
     /// <summary>
     /// IEnemy: Called when embedded sword is removed.
+    /// Stores pending damage and starts residual stun. Damage is applied when stun ends.
     /// </summary>
-    public virtual void OnSwordRemoved()
+    /// <param name="damage">Damage to be dealt when residual stun expires</param>
+    /// <param name="residualStunDuration">Duration of stun after sword removal</param>
+    public virtual void OnSwordRemoved(int damage, float residualStunDuration)
     {
         if (!hasSwordEmbedded) return;
         
         hasSwordEmbedded = false;
         
-        // Start residual stun timer
-        stunEndTime = Time.time + residualStunAfterSwordRemoval;
+        // Store pending damage - will be applied when residual stun ends
+        if (damage > 0)
+        {
+            pendingSwordRemovalDamage = damage;
+            hasPendingSwordDamage = true;
+            
+            Debug.Log($"[{gameObject.name}] Sword removed - {damage} damage pending after {residualStunDuration}s stun");
+        }
         
-        Debug.Log($"[{gameObject.name}] Sword removed - residual stun for {residualStunAfterSwordRemoval}s");
+        // Start residual stun timer
+        stunEndTime = Time.time + residualStunDuration;
+        
+        Debug.Log($"[{gameObject.name}] Residual stun started for {residualStunDuration}s");
     }
 
     /// <summary>
@@ -414,12 +431,47 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
 
         animator?.SetBool("IsStunned", false);
-        OnStunEnd();
+        
+        // Apply pending sword removal damage NOW (after stun ends)
+        if (hasPendingSwordDamage)
+        {
+            ApplyPendingSwordDamage();
+        }
+        
+        // Only call OnStunEnd if we're still alive
+        if (!isDead)
+        {
+            OnStunEnd();
+        }
     }
-
-    public float GetResidualStunDuration()
+    
+    /// <summary>
+    /// Applies the stored sword removal damage after residual stun expires.
+    /// </summary>
+    private void ApplyPendingSwordDamage()
     {
-        return residualStunAfterSwordRemoval;
+        if (!hasPendingSwordDamage || pendingSwordRemovalDamage <= 0) return;
+        
+        int damage = pendingSwordRemovalDamage;
+        
+        // Clear pending damage
+        hasPendingSwordDamage = false;
+        pendingSwordRemovalDamage = 0;
+        
+        // Apply damage
+        currentHealth -= damage;
+        
+        // Trigger hit reaction
+        animator?.SetTrigger("Hit");
+        PlaySound(hitSound);
+        
+        Debug.Log($"[{gameObject.name}] Sword removal damage applied: {damage}. Health: {currentHealth}/{maxHealth}");
+        
+        // Check for death
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
     }
 
     #endregion
@@ -637,6 +689,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         
         isDead = true;
         isStunned = false;
+        
+        // Clear any pending damage
+        hasPendingSwordDamage = false;
+        pendingSwordRemovalDamage = 0;
 
         // Disable NavMeshAgent
         if (navAgent != null)
@@ -686,6 +742,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isDead = true;
         isStunned = false;
         currentHealth = 0;
+        
+        // Clear any pending damage
+        hasPendingSwordDamage = false;
+        pendingSwordRemovalDamage = 0;
 
         // Disable NavMeshAgent
         if (navAgent != null)
@@ -751,9 +811,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2.5f);
         if (screenPos.z > 0)
         {
+            string pendingDmgInfo = hasPendingSwordDamage ? $"\nPending: {pendingSwordRemovalDamage}" : "";
             GUI.Label(
-                new Rect(screenPos.x - 50, Screen.height - screenPos.y, 100, 60),
-                $"{GetNpcType()}\n{GetCurrentStateName()}\nHP: {currentHealth}/{maxHealth}"
+                new Rect(screenPos.x - 50, Screen.height - screenPos.y, 100, 80),
+                $"{GetNpcType()}\n{GetCurrentStateName()}\nHP: {currentHealth}/{maxHealth}{pendingDmgInfo}"
             );
         }
     }

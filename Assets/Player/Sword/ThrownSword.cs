@@ -5,7 +5,7 @@ using System;
 /// Thrown sword projectile that flies like an arrow and sticks to surfaces.
 /// Uses segmented spherecasting for reliable collision detection at high speeds.
 /// 
-/// UPDATED: Migrated to IEnemy interface for sword embedding mechanics.
+/// UPDATED: Now deals damage when sword is recalled/removed from an embedded enemy.
 /// </summary>
 public class ThrownSword : MonoBehaviour
 {
@@ -45,6 +45,7 @@ public class ThrownSword : MonoBehaviour
 
     // Flight parameters (set on Initialize)
     private float postRemovalStunDuration;
+    private int removalDamage;
     private Vector3 flyDirection;
     private float flySpeed;
     private float returnSpeed;
@@ -54,7 +55,7 @@ public class ThrownSword : MonoBehaviour
     private Transform returnTarget;
     private float catchDistance = 1f;
 
-    // Enemy tracking - now uses IEnemy for full sword interaction
+    // Enemy tracking - uses IEnemy for full sword interaction
     private IEnemy embeddedEnemy;
     private GameObject hitObject;
 
@@ -97,12 +98,19 @@ public class ThrownSword : MonoBehaviour
     /// <summary>
     /// Initialize and launch the sword as a projectile.
     /// </summary>
-    public void Initialize(Vector3 direction, float speed, float recallSpeed, float stunDuration, LayerMask collisionMask)
+    /// <param name="direction">Flight direction</param>
+    /// <param name="speed">Flight speed</param>
+    /// <param name="recallSpeed">Return flight speed</param>
+    /// <param name="stunDuration">Residual stun duration after removal</param>
+    /// <param name="damageOnRemoval">Damage dealt when sword is removed from enemy</param>
+    /// <param name="collisionMask">Layer mask for collision detection</param>
+    public void Initialize(Vector3 direction, float speed, float recallSpeed, float stunDuration, int damageOnRemoval, LayerMask collisionMask)
     {
         flyDirection = direction.normalized;
         flySpeed = speed;
         returnSpeed = recallSpeed;
         postRemovalStunDuration = stunDuration;
+        removalDamage = damageOnRemoval;
         hitMask = collisionMask;
 
         isFlying = true;
@@ -125,6 +133,7 @@ public class ThrownSword : MonoBehaviour
 
     /// <summary>
     /// Recall the sword to return to the player.
+    /// Deals damage and applies residual stun to embedded enemy.
     /// </summary>
     public void Recall(Transform target, float catchDist = 1f)
     {
@@ -139,10 +148,14 @@ public class ThrownSword : MonoBehaviour
         // Detach from any parent (was stuck to something)
         transform.SetParent(null);
 
-        // Notify embedded enemy that sword is being removed
+        // Notify embedded enemy that sword is being removed and deal damage
         if (embeddedEnemy != null)
         {
-            embeddedEnemy.OnSwordRemoved();
+            // Deal removal damage and apply residual stun
+            embeddedEnemy.OnSwordRemoved(removalDamage, postRemovalStunDuration);
+            
+            Debug.Log($"[ThrownSword] Removed from enemy - Dealt {removalDamage} damage, {postRemovalStunDuration}s residual stun");
+            
             embeddedEnemy = null;
         }
 
