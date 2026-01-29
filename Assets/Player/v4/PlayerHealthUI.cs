@@ -210,7 +210,6 @@ public class PlayerHealthUI : MonoBehaviour
     {
         string status = state switch
         {
-            PlayerCombat.CombatState.Blocking => "BLOCKING",
             PlayerCombat.CombatState.Stunned => "<color=red>STUNNED</color>",
             PlayerCombat.CombatState.Disarmed => "Sword Thrown",
             PlayerCombat.CombatState.Attacking => "ATTACK",

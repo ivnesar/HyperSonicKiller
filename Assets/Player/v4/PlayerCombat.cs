@@ -2,9 +2,9 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Handles melee combat and blocking.
-/// Sword throw is handled separately by PlayerSwordThrow.
-/// Block HP acts as a shield - when broken, player is stunned briefly.
+/// Handles melee combat and automatic blocking.
+/// Block is passive - player automatically blocks incoming damage as long as BlockHP > 0.
+/// When BlockHP is depleted, guard breaks and player is stunned.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerCombat : MonoBehaviour
@@ -17,9 +17,8 @@ public class PlayerCombat : MonoBehaviour
     {
         Idle,
         Attacking,
-        Blocking,
         Stunned,        // Guard broken
-        Disarmed        // Sword is thrown (can't attack/block)
+        Disarmed        // Sword is thrown (can't attack)
     }
 
     #endregion
@@ -30,8 +29,7 @@ public class PlayerCombat : MonoBehaviour
 
     public event Action<CombatState> OnCombatStateChanged;
     public event Action OnAttack;
-    public event Action OnBlockStart;
-    public event Action OnBlockEnd;
+    public event Action OnBlockedHit;           // Fired when a hit is automatically blocked
     public event Action OnGuardBroken;
     public event Action OnGuardRestored;
     public event Action<float, float> OnBlockHPChanged;  // (current, max)
@@ -55,7 +53,7 @@ public class PlayerCombat : MonoBehaviour
     #region Inspector - Block Settings
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Block / Shield")]
+    [Header("Passive Block / Shield")]
     [SerializeField] private float maxBlockHP = 100f;
     [SerializeField] private float blockRegenDelay = 1f;
     [SerializeField] private float blockRegenRate = 30f;
@@ -86,7 +84,20 @@ public class PlayerCombat : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     public CombatState CurrentState => currentState;
-    public bool IsBlocking => currentState == CombatState.Blocking;
+    
+    /// <summary>
+    /// Returns true if the player can currently auto-block (has BlockHP and isn't stunned/disarmed).
+    /// </summary>
+    public bool CanAutoBlock => currentBlockHP > 0 && 
+                                currentState != CombatState.Stunned && 
+                                currentState != CombatState.Disarmed &&
+                                HasSword;
+    
+    /// <summary>
+    /// For PlayerCore compatibility - returns true if player would block the next hit.
+    /// </summary>
+    public bool IsBlocking => CanAutoBlock;
+    
     public bool IsStunned => currentState == CombatState.Stunned;
     public bool IsDisarmed => currentState == CombatState.Disarmed;
     public bool HasSword => swordThrow == null || swordThrow.HasSword;
@@ -97,8 +108,6 @@ public class PlayerCombat : MonoBehaviour
 
     public bool CanAttack => currentState == CombatState.Idle && 
                              Time.time >= lastAttackTime + attackCooldown;
-    public bool CanBlock => currentState == CombatState.Idle || 
-                            currentState == CombatState.Blocking;
 
     #endregion
 
@@ -155,14 +164,6 @@ public class PlayerCombat : MonoBehaviour
                 HandleIdleInput();
                 break;
 
-            case CombatState.Blocking:
-                // Stop blocking when button released
-                if (!core.Input.GetAction("Block"))
-                {
-                    SetState(CombatState.Idle);
-                }
-                break;
-
             case CombatState.Disarmed:
                 // Can't do anything, waiting for sword to return
                 break;
@@ -178,12 +179,8 @@ public class PlayerCombat : MonoBehaviour
     {
         if (!core.CanAttack) return;
 
-        // Priority: Block > Attack
-        if (core.Input.GetAction("Block") && core.CanBlock && HasSword)
-        {
-            SetState(CombatState.Blocking);
-        }
-        else if (core.Input.GetActionDown("Attack") && CanAttack && HasSword)
+        // Only attack input needed - blocking is automatic
+        if (core.Input.GetActionDown("Attack") && CanAttack && HasSword)
         {
             PerformMeleeAttack();
         }
@@ -235,16 +232,17 @@ public class PlayerCombat : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Block Logic
+    #region Automatic Block Logic
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Called by PlayerCore when player takes damage while blocking.
-    /// Returns remaining damage that wasn't blocked.
+    /// Called by PlayerCore when player takes damage.
+    /// Automatically blocks if possible, returns remaining damage that wasn't blocked.
     /// </summary>
     public float TakeBlockDamage(float damage)
     {
-        if (!IsBlocking) return damage;
+        // Can't block if no BlockHP, stunned, or disarmed
+        if (!CanAutoBlock) return damage;
 
         lastDamageTime = Time.time;
 
@@ -253,6 +251,9 @@ public class PlayerCombat : MonoBehaviour
 
         currentBlockHP -= absorbed;
         OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
+        OnBlockedHit?.Invoke();
+
+        Debug.Log($"[PlayerCombat] Auto-blocked {absorbed} damage. BlockHP: {currentBlockHP}/{maxBlockHP}");
 
         if (currentBlockHP <= 0)
         {
@@ -313,12 +314,6 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleSwordThrown()
     {
-        // Can't be blocking when sword is thrown
-        if (currentState == CombatState.Blocking)
-        {
-            SetState(CombatState.Idle);
-        }
-
         SetState(CombatState.Disarmed);
     }
 
@@ -340,16 +335,7 @@ public class PlayerCombat : MonoBehaviour
     {
         if (currentState == newState) return;
 
-        CombatState oldState = currentState;
         currentState = newState;
-
-        // State transition events
-        if (oldState == CombatState.Blocking)
-            OnBlockEnd?.Invoke();
-
-        if (newState == CombatState.Blocking)
-            OnBlockStart?.Invoke();
-
         OnCombatStateChanged?.Invoke(newState);
     }
 
@@ -378,7 +364,7 @@ public class PlayerCombat : MonoBehaviour
     /// </summary>
     public void ForceGuardBreak()
     {
-        if (IsBlocking || currentState == CombatState.Idle)
+        if (currentState == CombatState.Idle)
         {
             BreakGuard();
         }
