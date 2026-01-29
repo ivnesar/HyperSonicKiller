@@ -726,9 +726,9 @@ GameObject:
   - component: {fileID: 614902531416003641}
   - component: {fileID: 3767853563656458135}
   - component: {fileID: 1935823726076951774}
-  - component: {fileID: 9195427862219244996}
-  - component: {fileID: 8585446149566900962}
   - component: {fileID: 3141529538732586769}
+  - component: {fileID: 99368030979546760}
+  - component: {fileID: 4891449849083221139}
   m_Layer: 6
   m_Name: Npc_Bullet
   m_TagString: Enemy
@@ -797,74 +797,6 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 2
---- !u!114 &9195427862219244996
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2472838132611520362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7927903dd1abbf4b91f35ae8f5929a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SoldierNpc
-  playerTransform: {fileID: 0}
-  maxHealth: 100
-  moveSpeed: 4
-  rotationSpeed: 10
-  stoppingDistance: 0.5
-  detectionRange: 25
-  fieldOfView: 270
-  lineOfSightMask:
-    serializedVersion: 2
-    m_Bits: 128
-  hitSound: {fileID: 0}
-  useRagdollOnDeath: 1
-  destroyDelay: 10
-  showDebugInfo: 1
-  residualStunAfterSwordRemoval: 2
-  preferredShootingRange: 12
-  minShootingRange: 6
-  maxShootingRange: 18
-  aimDuration: 0.6
-  timeBetweenShots: 0.05
-  shotsPerSalvo: 31
-  reloadDuration: 2
-  baseAccuracy: 0.85
-  accuracySpreadAngle: 5
-  damagePerShot: 10
-  muzzlePoint: {fileID: 2080795029759614631}
-  bulletPrefab: {fileID: 1644907230753414492, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
-  fireSound: {fileID: 0}
-  reloadSound: {fileID: 0}
-  muzzleFlash: {fileID: 7788846898744801054, guid: 03d8ae9170f22c341bc185835334f9c2, type: 3}
-  repositionCheckInterval: 0.5
-  currentState: 0
---- !u!114 &8585446149566900962
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2472838132611520362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbe2a735714d1bf4abfa9c1d59454343, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollController
-  totalMass: 70
-  ragdollDrag: 0.5
-  ragdollAngularDrag: 0.5
-  impactForceMultiplier: 1
-  maxImpactForce: 500
-  upwardForceBias: 0.3
-  meleeImpactForce: 300
-  thrownSwordImpactForce: 400
-  bulletImpactForce: 50
-  accumulateBulletImpacts: 1
-  mainRigidbody: {fileID: 0}
-  showDebugInfo: 1
 --- !u!136 &3141529538732586769
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -888,6 +820,73 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.9, z: 0}
+--- !u!114 &99368030979546760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7927903dd1abbf4b91f35ae8f5929a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoldierNpc
+  playerTransform: {fileID: 0}
+  maxHealth: 100
+  moveSpeed: 4
+  rotationSpeed: 10
+  stoppingDistance: 0.5
+  detectionRange: 25
+  fieldOfView: 120
+  lineOfSightMask:
+    serializedVersion: 2
+    m_Bits: 136
+  hitSound: {fileID: 0}
+  useRagdollOnDeath: 1
+  destroyDelay: 10
+  showDebugInfo: 1
+  residualStunAfterSwordRemoval: 2
+  preferredShootingRange: 6
+  minShootingRange: 3
+  maxShootingRange: 12
+  aimDuration: 0.6
+  timeBetweenShots: 0.06
+  shotsPerSalvo: 31
+  reloadDuration: 2
+  baseAccuracy: 0.85
+  accuracySpreadAngle: 5
+  damagePerShot: 10
+  muzzlePoint: {fileID: 2080795029759614631}
+  bulletPrefab: {fileID: 8718130687482727725, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
+  fireSound: {fileID: 0}
+  reloadSound: {fileID: 0}
+  muzzleFlash: {fileID: 0}
+  repositionCheckInterval: 0.5
+--- !u!114 &4891449849083221139
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbe2a735714d1bf4abfa9c1d59454343, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollController
+  totalMass: 70
+  ragdollDrag: 0.5
+  ragdollAngularDrag: 0.5
+  impactForceMultiplier: 1
+  maxImpactForce: 500
+  upwardForceBias: 0.3
+  meleeImpactForce: 300
+  thrownSwordImpactForce: 400
+  bulletImpactForce: 50
+  accumulateBulletImpacts: 1
+  mainRigidbody: {fileID: 0}
+  showDebugInfo: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

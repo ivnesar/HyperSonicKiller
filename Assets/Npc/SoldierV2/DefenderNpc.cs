@@ -7,30 +7,14 @@ using UnityEngine;
 /// 3. Blocks incoming attacks from the player
 /// 4. Counters with a melee attack if block is successful
 /// 
-/// REFACTORED: Uses NpcBase shared utilities for state timing and audio.
-/// UPDATED: Compatible with new PlayerCore system.
+/// REFACTORED: State-Logik ist jetzt in DefenderStates.cs ausgelagert.
+/// Diese Klasse ist nur noch der Koordinator und hält die Konfiguration.
 /// </summary>
 public class DefenderNpc : NpcBase
 {
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Enum
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    public enum DefenderState
-    {
-        Idle,
-        MovingToProtect,
-        Guarding,
-        Blocking,
-        Countering,
-        Stunned
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Inspector Fields - Defender Specific
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Inspector Fields - Defender Configuration
+    // ════════════════════════════════════════════════════════════════════════════
 
     [Header("Protection Behavior")]
     [SerializeField] private float protectDistance = 2.5f;
@@ -49,7 +33,7 @@ public class DefenderNpc : NpcBase
     [SerializeField] private float counterRange = 2.5f;
     [SerializeField] private int counterDamage = 25;
 
-    [Header("Defender Audio/VFX")]
+    [Header("Audio/VFX")]
     [SerializeField] private AudioClip blockSound;
     [SerializeField] private AudioClip perfectBlockSound;
     [SerializeField] private AudioClip counterSound;
@@ -58,313 +42,170 @@ public class DefenderNpc : NpcBase
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Public Config Accessors (readonly für States)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    // Protection
+    public float ProtectDistance => protectDistance;
+    public float RepositionThreshold => repositionThreshold;
+    public float SoldierSearchInterval => soldierSearchInterval;
+
+    // Blocking
+    public float BlockDetectionRange => blockDetectionRange;
+    public float BlockAngle => blockAngle;
+    public float BlockDuration => blockDuration;
+    public float BlockCooldown => blockCooldown;
+    public float PerfectBlockWindow => perfectBlockWindow;
+
+    // Counter
+    public float CounterDuration => counterDuration;
+    public float CounterRange => counterRange;
+    public int CounterDamage => counterDamage;
+
+    // Base class accessors
+    public Transform PlayerTransform => playerTransform;
+    public bool CanSeePlayer => canSeePlayer;
+    public Animator NpcAnimator => animator;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════════
     #region Runtime State
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
-    public DefenderState currentState = DefenderState.Idle;
+    private INpcState<DefenderNpc> currentState;
 
-    private NpcBase protectedSoldier;
-    private float nextSoldierSearchTime;
-    private float lastBlockTime;
-    private float blockStartTime;
-    private bool wasAttackBlocked;
-    private bool wasPerfectBlock;
+    // Shared state data (von States verwendet)
+    public NpcBase ProtectedSoldier { get; set; }
+    public float NextSoldierSearchTime { get; set; }
+    public float LastBlockTime { get; set; }
+    public float BlockStartTime { get; set; }
+    public bool WasAttackBlocked { get; set; }
+    public bool WasPerfectBlock { get; set; }
 
-    // ADDED: Cache for PlayerCore reference
+    // Player reference cache
     private PlayerCore playerCore;
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
     #region NpcBase Implementation
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
     protected override void OnStart()
     {
-        // ADDED: Cache PlayerCore reference
+        // Cache PlayerCore reference
         if (playerTransform != null)
         {
             playerCore = playerTransform.GetComponent<PlayerCore>();
         }
 
         FindSoldierToProtect();
-        TransitionToState(protectedSoldier != null ? DefenderState.MovingToProtect : DefenderState.Idle);
+        
+        if (ProtectedSoldier != null)
+        {
+            ChangeState(new DefenderStates.MovingToProtect());
+        }
+        else
+        {
+            ChangeState(new DefenderStates.Idle());
+        }
     }
 
     protected override void UpdateBehavior()
     {
-        // Periodically search for soldiers to protect
-        if (Time.time >= nextSoldierSearchTime)
+        // Periodisch nach Soldiers suchen
+        if (Time.time >= NextSoldierSearchTime)
         {
             FindSoldierToProtect();
-            nextSoldierSearchTime = Time.time + soldierSearchInterval;
+            NextSoldierSearchTime = Time.time + soldierSearchInterval;
         }
 
-        switch (currentState)
+        if (currentState == null) return;
+
+        var nextState = currentState.Update(this);
+        if (nextState != null)
         {
-            case DefenderState.Idle:
-                UpdateIdle();
-                break;
-
-            case DefenderState.MovingToProtect:
-                UpdateMovingToProtect();
-                break;
-
-            case DefenderState.Guarding:
-                UpdateGuarding();
-                break;
-
-            case DefenderState.Blocking:
-                UpdateBlocking();
-                break;
-
-            case DefenderState.Countering:
-                UpdateCountering();
-                break;
-        }
-    }
-
-    protected override void OnStunEnd()
-    {
-        if (protectedSoldier != null && !protectedSoldier.IsDead)
-        {
-            TransitionToState(DefenderState.MovingToProtect);
-        }
-        else
-        {
-            TransitionToState(DefenderState.Idle);
+            ChangeState(nextState);
         }
     }
 
     protected override void OnStunStart()
     {
-        TransitionToState(DefenderState.Stunned);
+        ChangeState(new DefenderStates.Stunned());
     }
 
-    public override string GetCurrentStateName() => currentState.ToString();
+    protected override void OnStunEnd()
+    {
+        if (ProtectedSoldier != null && !ProtectedSoldier.IsDead)
+        {
+            ChangeState(new DefenderStates.MovingToProtect());
+        }
+        else
+        {
+            ChangeState(new DefenderStates.Idle());
+        }
+    }
+
+    public override string GetCurrentStateName()
+    {
+        return currentState?.StateName ?? "None";
+    }
+
     public override NpcType GetNpcType() => NpcType.Defender;
 
     public override int GetStateID()
     {
-        return currentState switch
-        {
-            DefenderState.Idle => 0,
-            DefenderState.MovingToProtect => 1,
-            DefenderState.Guarding => 2,
-            DefenderState.Blocking => 3,
-            DefenderState.Countering => 4,
-            DefenderState.Stunned => 5,
-            _ => 0
-        };
+        return currentState?.StateID ?? 0;
     }
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Updates
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region State Management
+    // ════════════════════════════════════════════════════════════════════════════
 
-    private void UpdateIdle()
+    public void ChangeState(INpcState<DefenderNpc> newState)
     {
-        StopMovement();
-
-        if (canSeePlayer && playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 0.5f);
-        }
-
-        if (protectedSoldier != null && !protectedSoldier.IsDead)
-        {
-            TransitionToState(DefenderState.MovingToProtect);
-        }
-    }
-
-    private void UpdateMovingToProtect()
-    {
-        if (protectedSoldier == null || protectedSoldier.IsDead)
-        {
-            FindSoldierToProtect();
-            if (protectedSoldier == null)
-            {
-                TransitionToState(DefenderState.Idle);
-                return;
-            }
-        }
-
-        Vector3 targetPosition = GetInterceptPosition();
-
-        if (HasReachedDestination())
-        {
-            TransitionToState(DefenderState.Guarding);
-        }
-        else
-        {
-            MoveToward(targetPosition);
-            if (playerTransform != null)
-            {
-                RotateToward(playerTransform.position);
-            }
-        }
-    }
-
-    private void UpdateGuarding()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 2f);
-        }
-
-        // Check if repositioning needed
-        if (protectedSoldier != null && !protectedSoldier.IsDead)
-        {
-            Vector3 idealPosition = GetInterceptPosition();
-            if (Vector3.Distance(transform.position, idealPosition) > repositionThreshold)
-            {
-                TransitionToState(DefenderState.MovingToProtect);
-                return;
-            }
-        }
-        else
-        {
-            FindSoldierToProtect();
-            if (protectedSoldier == null)
-            {
-                TransitionToState(DefenderState.Idle);
-                return;
-            }
-        }
-
-        if (ShouldStartBlocking())
-        {
-            TransitionToState(DefenderState.Blocking);
-        }
-    }
-
-    private void UpdateBlocking()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 3f);
-        }
-
-        if (UpdateStateTimer())
-        {
-            TransitionToState(wasAttackBlocked ? DefenderState.Countering : DefenderState.Guarding);
-        }
-    }
-
-    private void UpdateCountering()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 4f);
-        }
-
-        if (UpdateStateTimer())
-        {
-            TransitionToState(DefenderState.Guarding);
-        }
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Transitions
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    private void TransitionToState(DefenderState newState)
-    {
-        // Exit current state
-        if (currentState == DefenderState.Blocking)
-        {
-            wasAttackBlocked = false;
-            wasPerfectBlock = false;
-        }
-
+        currentState?.Exit(this);
         currentState = newState;
+        currentState?.Enter(this);
 
-        // Enter new state
-        switch (newState)
+        if (showDebugInfo)
         {
-            case DefenderState.Idle:
-                StopMovement();
-                animator?.SetBool("IsGuarding", false);
-                break;
-
-            case DefenderState.MovingToProtect:
-                animator?.SetBool("IsMoving", true);
-                animator?.SetBool("IsGuarding", false);
-                break;
-
-            case DefenderState.Guarding:
-                StopMovement();
-                animator?.SetBool("IsMoving", false);
-                animator?.SetBool("IsGuarding", true);
-                break;
-
-            case DefenderState.Blocking:
-                SetStateTimer(blockDuration);
-                blockStartTime = Time.time;
-                lastBlockTime = Time.time;
-                wasAttackBlocked = false;
-                wasPerfectBlock = false;
-                StopMovement();
-                animator?.SetBool("IsBlocking", true);
-                animator?.SetTrigger("Block");
-                break;
-
-            case DefenderState.Countering:
-                SetStateTimer(counterDuration);
-                StopMovement();
-                animator?.SetBool("IsBlocking", false);
-                animator?.SetTrigger("Counter");
-                TryDealCounterDamage();
-                PlaySound(counterSound);
-                break;
-
-            case DefenderState.Stunned:
-                StopMovement();
-                animator?.SetBool("IsGuarding", false);
-                animator?.SetBool("IsBlocking", false);
-                break;
+            Debug.Log($"[{gameObject.name}] State → {newState?.StateName}");
         }
     }
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
     #region Protection Logic
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
-    private void FindSoldierToProtect()
+    public void FindSoldierToProtect()
     {
         NpcBase nearest = NpcManager.Instance?.GetSoldierClosestToPlayer();
 
-        if (nearest != null && nearest != protectedSoldier)
+        if (nearest != null && nearest != ProtectedSoldier)
         {
-            protectedSoldier = nearest;
+            ProtectedSoldier = nearest;
         }
         else if (nearest == null)
         {
-            protectedSoldier = null;
+            ProtectedSoldier = null;
         }
     }
 
-    private Vector3 GetInterceptPosition()
+    public Vector3 GetInterceptPosition()
     {
-        if (protectedSoldier == null || playerTransform == null)
+        if (ProtectedSoldier == null || playerTransform == null)
         {
             return transform.position;
         }
 
-        Vector3 soldierPos = protectedSoldier.transform.position;
+        Vector3 soldierPos = ProtectedSoldier.transform.position;
         Vector3 directionToPlayer = (playerTransform.position - soldierPos).normalized;
 
         return soldierPos + directionToPlayer * protectDistance;
@@ -372,13 +213,16 @@ public class DefenderNpc : NpcBase
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Block & Counter Logic
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Block & Counter Actions
+    // ════════════════════════════════════════════════════════════════════════════
 
-    private bool ShouldStartBlocking()
+    /// <summary>
+    /// Prüft ob der Defender einen Block starten sollte.
+    /// </summary>
+    public bool ShouldStartBlocking()
     {
-        if (Time.time - lastBlockTime < blockCooldown) return false;
+        if (Time.time - LastBlockTime < blockCooldown) return false;
         if (playerTransform == null) return false;
         if (GetDistanceToPlayer() > blockDetectionRange) return false;
 
@@ -387,25 +231,29 @@ public class DefenderNpc : NpcBase
     }
 
     /// <summary>
-    /// Called externally when an attack hits this defender. Returns true if blocked.
+    /// Wird extern aufgerufen wenn ein Angriff diesen Defender trifft.
+    /// Gibt true zurück wenn geblockt wurde.
     /// </summary>
     public bool TryBlockAttack()
     {
-        if (currentState != DefenderState.Guarding && currentState != DefenderState.Blocking)
+        // Kann nur im Guarding oder Blocking State blocken
+        if (currentState is not DefenderStates.Guarding && 
+            currentState is not DefenderStates.Blocking)
         {
             return false;
         }
 
-        if (currentState == DefenderState.Guarding)
+        // Falls im Guarding, wechsle zu Blocking
+        if (currentState is DefenderStates.Guarding)
         {
-            TransitionToState(DefenderState.Blocking);
+            ChangeState(new DefenderStates.Blocking());
         }
 
-        float timeSinceBlockStart = Time.time - blockStartTime;
-        wasPerfectBlock = timeSinceBlockStart <= perfectBlockWindow;
-        wasAttackBlocked = true;
+        float timeSinceBlockStart = Time.time - BlockStartTime;
+        WasPerfectBlock = timeSinceBlockStart <= perfectBlockWindow;
+        WasAttackBlocked = true;
 
-        if (wasPerfectBlock)
+        if (WasPerfectBlock)
         {
             PlaySound(perfectBlockSound);
             perfectBlockEffect?.Play();
@@ -419,7 +267,10 @@ public class DefenderNpc : NpcBase
         return true;
     }
 
-    private void TryDealCounterDamage()
+    /// <summary>
+    /// Führt den Counter-Angriff aus.
+    /// </summary>
+    public void TryDealCounterDamage()
     {
         if (playerTransform == null) return;
         if (GetDistanceToPlayer() > counterRange) return;
@@ -427,25 +278,33 @@ public class DefenderNpc : NpcBase
         float angle = Vector3.Angle(transform.forward, GetDirectionToPlayer());
         if (angle > 45f) return;
 
-        // UPDATED: Use PlayerCore instead of FPSPlayerController
         if (playerCore != null)
         {
             playerCore.TakeDamage(counterDamage);
         }
         else
         {
-            // Fallback: Try to get component if not cached
             var pc = playerTransform.GetComponent<PlayerCore>();
             if (pc != null)
             {
                 pc.TakeDamage(counterDamage);
-                playerCore = pc; // Cache for future use
+                playerCore = pc;
             }
         }
     }
 
+    public void PlayBlockSound()
+    {
+        PlaySound(blockSound);
+    }
+
+    public void PlayCounterSound()
+    {
+        PlaySound(counterSound);
+    }
+
     /// <summary>
-    /// Override melee damage to potentially block it.
+    /// Override: Blockt potentiell eingehenden Nahkampfschaden.
     /// </summary>
     public override void OnMeeleDamage(int amount)
     {
@@ -459,29 +318,79 @@ public class DefenderNpc : NpcBase
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Movement Helpers (Public für States)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    public new void MoveToward(Vector3 position, float speedMultiplier = 1f)
+    {
+        base.MoveToward(position, speedMultiplier);
+    }
+
+    public new void StopMovement()
+    {
+        base.StopMovement();
+    }
+
+    public new void RotateToward(Vector3 position, float speedMultiplier = 1f)
+    {
+        base.RotateToward(position, speedMultiplier);
+    }
+
+    public new float GetDistanceToPlayer()
+    {
+        return base.GetDistanceToPlayer();
+    }
+
+    public new Vector3 GetDirectionToPlayer()
+    {
+        return base.GetDirectionToPlayer();
+    }
+
+    public new bool HasReachedDestination()
+    {
+        return base.HasReachedDestination();
+    }
+
+    public new void SetStateTimer(float duration)
+    {
+        base.SetStateTimer(duration);
+    }
+
+    public new bool UpdateStateTimer()
+    {
+        return base.UpdateStateTimer();
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════════
     #region Debug Visualization
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
     protected override void OnDrawGizmosSelected()
     {
         base.OnDrawGizmosSelected();
 
+        // Block Range
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, blockDetectionRange);
 
+        // Counter Range
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireSphere(transform.position, counterRange);
 
-        if (protectedSoldier != null)
+        // Verbindung zum geschützten Soldier
+        if (ProtectedSoldier != null)
         {
             Gizmos.color = Color.green;
-            Gizmos.DrawLine(transform.position, protectedSoldier.transform.position);
+            Gizmos.DrawLine(transform.position, ProtectedSoldier.transform.position);
 
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(GetInterceptPosition(), 0.5f);
         }
 
+        // Block Cone
         Gizmos.color = new Color(0f, 1f, 1f, 0.3f);
         Vector3 leftBlock = Quaternion.Euler(0, -blockAngle * 0.5f, 0) * transform.forward;
         Vector3 rightBlock = Quaternion.Euler(0, blockAngle * 0.5f, 0) * transform.forward;

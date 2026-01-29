@@ -84,6 +84,7 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         if (core.IsDead) return;
+        if (!core.Controller.enabled) return; 
 
         // Track ground state changes
         CheckGroundStateChange();

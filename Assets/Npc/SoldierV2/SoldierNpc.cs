@@ -7,29 +7,14 @@ using UnityEngine;
 /// 3. Reloads
 /// 4. Repeat
 /// 
-/// REFACTORED: Uses NpcBase shared utilities for state timing and audio.
+/// REFACTORED: State-Logik ist jetzt in SoldierStates.cs ausgelagert.
+/// Diese Klasse ist nur noch der Koordinator und hält die Konfiguration.
 /// </summary>
 public class SoldierNpc : NpcBase
 {
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Enum
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    public enum SoldierState
-    {
-        Idle,
-        MovingToRange,
-        Aiming,
-        Firing,
-        Reloading,
-        Stunned
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Inspector Fields - Soldier Specific
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Inspector Fields - Combat Configuration
+    // ════════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
     [SerializeField] private float preferredShootingRange = 12f;
@@ -51,9 +36,9 @@ public class SoldierNpc : NpcBase
 
     [Header("Weapon Setup")]
     [SerializeField] private Transform muzzlePoint;
-    [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private SoldierBullet bulletPrefab;
 
-    [Header("Soldier Audio/VFX")]
+    [Header("Audio/VFX")]
     [SerializeField] private AudioClip fireSound;
     [SerializeField] private AudioClip reloadSound;
     [SerializeField] private ParticleSystem muzzleFlash;
@@ -63,21 +48,54 @@ public class SoldierNpc : NpcBase
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Runtime State
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Public Config Accessors (readonly für States)
+    // ════════════════════════════════════════════════════════════════════════════
 
-    public SoldierState currentState = SoldierState.Idle;
+    // Ranges
+    public float PreferredShootingRange => preferredShootingRange;
+    public float MinShootingRange => minShootingRange;
+    public float MaxShootingRange => maxShootingRange;
 
-    private float nextShotTime;
-    private int shotsFiredInSalvo;
-    private float nextRepositionCheckTime;
+    // Timing
+    public float AimDuration => aimDuration;
+    public float TimeBetweenShots => timeBetweenShots;
+    public int ShotsPerSalvo => shotsPerSalvo;
+    public float ReloadDuration => reloadDuration;
+    public float RepositionCheckInterval => repositionCheckInterval;
+
+    // Accuracy
+    public float BaseAccuracy => baseAccuracy;
+    public float AccuracySpreadAngle => accuracySpreadAngle;
+
+    // Damage
+    public int DamagePerShot => damagePerShot;
+
+    // Base class accessors (für States zugänglich machen)
+    public Transform PlayerTransform => playerTransform;
+    public float DetectionRange => detectionRange;
+    public bool CanSeePlayer => canSeePlayer;
+    public Animator NpcAnimator => animator;
+    public LayerMask LineOfSightMask => lineOfSightMask;
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Runtime State
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private INpcState<SoldierNpc> currentState;
+
+    // Firing state data (wird von FiringState verwendet)
+    public float NextShotTime { get; set; }
+    public int ShotsFiredInSalvo { get; set; }
+    public float NextRepositionCheckTime { get; set; }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════════
     #region NpcBase Implementation
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
     protected override void OnStart()
     {
@@ -86,243 +104,78 @@ public class SoldierNpc : NpcBase
             Debug.LogError($"[{gameObject.name}] No bullet prefab assigned!");
         }
 
-        TransitionToState(SoldierState.Idle);
+        // Starte im Idle-State
+        ChangeState(new SoldierStates.Idle());
     }
 
     protected override void UpdateBehavior()
     {
-        switch (currentState)
+        if (currentState == null) return;
+
+        // State-Update gibt optional einen neuen State zurück
+        var nextState = currentState.Update(this);
+
+        if (nextState != null)
         {
-            case SoldierState.Idle:
-                UpdateIdle();
-                break;
-
-            case SoldierState.MovingToRange:
-                UpdateMovingToRange();
-                break;
-
-            case SoldierState.Aiming:
-                UpdateAiming();
-                break;
-
-            case SoldierState.Firing:
-                UpdateFiring();
-                break;
-
-            case SoldierState.Reloading:
-                UpdateReloading();
-                break;
+            ChangeState(nextState);
         }
+    }
+
+    protected override void OnStunStart()
+    {
+        ChangeState(new SoldierStates.Stunned());
     }
 
     protected override void OnStunEnd()
     {
-        TransitionToState(SoldierState.MovingToRange);
-    }
-    
-    protected override void OnStunStart()
-    {
-        TransitionToState(SoldierState.Stunned);
+        ChangeState(new SoldierStates.MovingToRange());
     }
 
-    public override string GetCurrentStateName() => currentState.ToString();
+    public override string GetCurrentStateName()
+    {
+        return currentState?.StateName ?? "None";
+    }
+
     public override NpcType GetNpcType() => NpcType.Soldier;
 
     public override int GetStateID()
     {
-        return currentState switch
-        {
-            SoldierState.Idle => 0,
-            SoldierState.MovingToRange => 1,
-            SoldierState.Aiming => 2,
-            SoldierState.Firing => 3,
-            SoldierState.Reloading => 4,
-            SoldierState.Stunned => 5,
-            _ => 0
-        };
+        return currentState?.StateID ?? 0;
     }
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Updates
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region State Management
+    // ════════════════════════════════════════════════════════════════════════════
 
-    private void UpdateIdle()
+    /// <summary>
+    /// Wechselt zu einem neuen State.
+    /// Ruft Exit() auf dem alten und Enter() auf dem neuen State auf.
+    /// </summary>
+    public void ChangeState(INpcState<SoldierNpc> newState)
     {
-        float distanceToPlayer = GetDistanceToPlayer();
-
-        if (distanceToPlayer <= detectionRange && canSeePlayer)
-        {
-            TransitionToState(SoldierState.MovingToRange);
-        }
-    }
-
-    private void UpdateMovingToRange()
-    {
-        if (playerTransform == null) return;
-
-        float distanceToPlayer = GetDistanceToPlayer();
-        RotateToward(playerTransform.position);
-
-        if (Time.time >= nextRepositionCheckTime)
-        {
-            nextRepositionCheckTime = Time.time + repositionCheckInterval;
-
-            bool inRange = distanceToPlayer >= minShootingRange && distanceToPlayer <= maxShootingRange;
-
-            if (inRange && canSeePlayer)
-            {
-                StopMovement();
-                TransitionToState(SoldierState.Aiming);
-                return;
-            }
-
-            if (distanceToPlayer > preferredShootingRange || !canSeePlayer)
-            {
-                MoveToward(playerTransform.position);
-            }
-            else if (distanceToPlayer < minShootingRange)
-            {
-                Vector3 retreatTarget = transform.position - GetDirectionToPlayer() * 5f;
-                MoveToward(retreatTarget, 0.7f);
-            }
-            else
-            {
-                // Strafe to find line of sight
-                Vector3 strafeDir = Vector3.Cross(GetDirectionToPlayer(), Vector3.up);
-                if (Random.value > 0.8f) strafeDir = -strafeDir;
-                MoveToward(transform.position + strafeDir * 3f, 0.8f);
-            }
-        }
-    }
-
-    private void UpdateAiming()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 2f);
-        }
-
-        if (UpdateStateTimer())
-        {
-            if (canSeePlayer)
-            {
-                TransitionToState(SoldierState.Firing);
-            }
-            else
-            {
-                TransitionToState(SoldierState.MovingToRange);
-            }
-        }
-    }
-
-    private void UpdateFiring()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 3f);
-        }
-
-        if (Time.time >= nextShotTime && shotsFiredInSalvo < shotsPerSalvo)
-        {
-            FireShot();
-            shotsFiredInSalvo++;
-            nextShotTime = Time.time + timeBetweenShots;
-        }
-
-        if (shotsFiredInSalvo >= shotsPerSalvo)
-        {
-            TransitionToState(SoldierState.Reloading);
-        }
-    }
-
-    private void UpdateReloading()
-    {
-        StopMovement();
-
-        if (playerTransform != null)
-        {
-            RotateToward(playerTransform.position, 0.5f);
-        }
-
-        if (UpdateStateTimer())
-        {
-            float distanceToPlayer = GetDistanceToPlayer();
-            bool inRange = distanceToPlayer >= minShootingRange && distanceToPlayer <= maxShootingRange;
-
-            TransitionToState(inRange && canSeePlayer ? SoldierState.Aiming : SoldierState.MovingToRange);
-        }
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region State Transitions
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    private void TransitionToState(SoldierState newState)
-    {
-        // Exit current state
-        if (currentState == SoldierState.Firing)
-        {
-            shotsFiredInSalvo = 0;
-        }
-
+        currentState?.Exit(this);
         currentState = newState;
+        currentState?.Enter(this);
 
-        // Enter new state
-        switch (newState)
+        if (showDebugInfo)
         {
-            case SoldierState.Idle:
-                StopMovement();
-                break;
-
-            case SoldierState.MovingToRange:
-                nextRepositionCheckTime = 0f;
-                break;
-
-            case SoldierState.Aiming:
-                SetStateTimer(aimDuration);
-                StopMovement();
-                animator?.SetTrigger("Aim");
-                break;
-
-            case SoldierState.Firing:
-                shotsFiredInSalvo = 0;
-                nextShotTime = 0f;
-                StopMovement();
-                animator?.SetBool("IsFiring", true);
-                break;
-
-            case SoldierState.Reloading:
-                SetStateTimer(reloadDuration);
-                StopMovement();
-                animator?.SetBool("IsFiring", false);
-                animator?.SetTrigger("Reload");
-                PlaySound(reloadSound);
-                break;
-
-            case SoldierState.Stunned:
-                StopMovement();
-                break;
+            Debug.Log($"[{gameObject.name}] State → {newState?.StateName}");
         }
     }
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    #region Combat - Shooting
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Combat Actions (von States aufgerufen)
+    // ════════════════════════════════════════════════════════════════════════════
 
-    private void FireShot()
+    /// <summary>
+    /// Feuert einen einzelnen Schuss ab.
+    /// </summary>
+    public void FireShot()
     {
-        if (muzzlePoint == null || bulletPrefab == null) return;
-
         Vector3 targetPoint = playerTransform != null
             ? playerTransform.position + Vector3.up * 1f
             : transform.forward * 100f;
@@ -330,11 +183,13 @@ public class SoldierNpc : NpcBase
         Vector3 perfectDirection = (targetPoint - muzzlePoint.position).normalized;
         Vector3 shotDirection = ApplyAccuracySpread(perfectDirection);
 
-        muzzleFlash?.Play();
-        PlaySound(fireSound);
+        // VFX & Sound
+        //muzzleFlash?.Play();
+        //PlaySound(fireSound);
 
-        GameObject bulletObj = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
-        SoldierBullet bulletComponent = bulletObj.GetComponent<SoldierBullet>();
+
+        // Bullet spawnen
+        SoldierBullet bulletComponent = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
 
         if (bulletComponent != null)
         {
@@ -342,17 +197,27 @@ public class SoldierNpc : NpcBase
         }
         else
         {
-            Destroy(bulletObj);
+            Debug.LogError($"[{gameObject.name}] Bullet prefab missing SoldierBullet component!");
+            Destroy(bulletComponent.gameObject);
         }
 
+        // Animator Trigger
         animator?.SetTrigger("Fire");
+    }
+
+    /// <summary>
+    /// Spielt den Reload-Sound ab.
+    /// </summary>
+    public void PlayReloadSound()
+    {
+        PlaySound(reloadSound);
     }
 
     private Vector3 ApplyAccuracySpread(Vector3 perfectDirection)
     {
         float spreadAngle = Random.value <= baseAccuracy
-            ? accuracySpreadAngle * 0.2f
-            : accuracySpreadAngle;
+            ? accuracySpreadAngle * 0.2f  // Guter Schuss → wenig Spread
+            : accuracySpreadAngle;         // Schlechter Schuss → voller Spread
 
         Quaternion spread = Quaternion.Euler(
             Random.Range(-spreadAngle, spreadAngle),
@@ -364,23 +229,71 @@ public class SoldierNpc : NpcBase
 
     #endregion
 
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
+    #region Movement Helpers (Public für States)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    // Diese Methoden sind protected in NpcBase, wir machen sie hier public
+    // damit die States darauf zugreifen können.
+
+    public new void MoveToward(Vector3 position, float speedMultiplier = 1f)
+    {
+        base.MoveToward(position, speedMultiplier);
+    }
+
+    public new void StopMovement()
+    {
+        base.StopMovement();
+    }
+
+    public new void RotateToward(Vector3 position, float speedMultiplier = 1f)
+    {
+        base.RotateToward(position, speedMultiplier);
+    }
+
+    public new float GetDistanceToPlayer()
+    {
+        return base.GetDistanceToPlayer();
+    }
+
+    public new Vector3 GetDirectionToPlayer()
+    {
+        return base.GetDirectionToPlayer();
+    }
+
+    public new void SetStateTimer(float duration)
+    {
+        base.SetStateTimer(duration);
+    }
+
+    public new bool UpdateStateTimer()
+    {
+        return base.UpdateStateTimer();
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════════
     #region Debug Visualization
-    // ────────────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════════
 
     protected override void OnDrawGizmosSelected()
     {
         base.OnDrawGizmosSelected();
 
+        // Min Range (zu nah)
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
+        // Preferred Range (ideal)
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, preferredShootingRange);
 
-        Gizmos.color = new Color(1f, 0.5f, 0f);
+        // Max Range (zu weit)
+        Gizmos.color = new Color(1f, 0.5f, 0f); // Orange
         Gizmos.DrawWireSphere(transform.position, maxShootingRange);
 
+        // Muzzle Direction
         if (muzzlePoint != null)
         {
             Gizmos.color = Color.cyan;
