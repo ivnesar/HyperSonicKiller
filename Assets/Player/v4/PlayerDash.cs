@@ -6,6 +6,8 @@ using System;
 /// Communicates with PlayerCore for state changes.
 /// 
 /// NEW: Added sword dash - dash to stuck sword to retrieve it (invulnerable during dash).
+/// FIXED: Floor vs Wall detection - only walls trigger stick, not floors.
+/// FIXED: Can now dash to nearby floor positions.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerDash : MonoBehaviour
@@ -15,7 +17,7 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     public event Action OnDashStarted;
-    public event Action<bool> OnDashCompleted;  // bool = hit surface
+    public event Action<bool, bool> OnDashCompleted;  // (hitSurface, hitWall)
     public event Action OnWallStick;
     public event Action OnUnstick;
     public event Action<int> OnChargesChanged;  // remaining charges
@@ -35,6 +37,10 @@ public class PlayerDash : MonoBehaviour
     [SerializeField] private float dashSpeed = 20f;
     [SerializeField] private float dashMaxDistance = 15f;
     [SerializeField] private LayerMask dashSurfaceLayer = -1;
+    
+    [Header("Surface Detection")]
+    [Tooltip("Maximum angle from vertical (Y-up) for a surface to be considered a floor. 0 = only perfectly flat, 45 = gentle slopes")]
+    [SerializeField] private float maxFloorAngle = 45f;
 
     [Header("Time Slow During Dash")]
     [SerializeField] private float dashTimeScale = 0.1f;
@@ -75,6 +81,9 @@ public class PlayerDash : MonoBehaviour
     private Vector3 dashTargetPosition;
     private Vector3 dashDirection;
     private float dashProgress;
+    
+    // FIXED: Track if dash target is a wall or floor
+    private bool dashTargetIsWall;
 
     // Wall stick state
     private Vector3 stuckPosition;
@@ -158,6 +167,38 @@ public class PlayerDash : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Surface Detection
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Determines if a surface normal indicates a floor (walkable) or wall (stickable).
+    /// Uses the angle between the surface normal and world up (Vector3.up).
+    /// </summary>
+    /// <param name="surfaceNormal">The normal of the surface to check</param>
+    /// <returns>True if the surface is a floor, false if it's a wall</returns>
+    private bool IsFloorSurface(Vector3 surfaceNormal)
+    {
+        // Calculate angle between surface normal and world up
+        float angle = Vector3.Angle(surfaceNormal, Vector3.up);
+        
+        // If angle is less than maxFloorAngle, it's a floor
+        // angle = 0 means normal points straight up (flat floor)
+        // angle = 90 means normal points horizontally (vertical wall)
+        // angle = 180 means normal points straight down (ceiling)
+        return angle <= maxFloorAngle;
+    }
+    
+    /// <summary>
+    /// Determines if a surface is a wall (vertical enough to stick to).
+    /// </summary>
+    private bool IsWallSurface(Vector3 surfaceNormal)
+    {
+        return !IsFloorSurface(surfaceNormal);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Dash Logic
     // ════════════════════════════════════════════════════════════════════════
 
@@ -183,8 +224,9 @@ public class PlayerDash : MonoBehaviour
             dashMaxDistance,
             dashSurfaceLayer))
         {
-            // Don't dash to current surface
-            if (!IsCurrentSurface(hit))
+            // FIXED: Only block dash if targeting the SAME surface we're standing/stuck on
+            // Allow dashing to different positions on the same type of surface
+            if (!IsSameExactSurface(hit))
             {
                 StartDash(hit.point, hit.normal);
             }
@@ -206,6 +248,11 @@ public class PlayerDash : MonoBehaviour
         dashDirection = (dashTargetPosition - dashStartPosition).normalized;
         dashProgress = 0f;
         stuckSurfaceNormal = surfaceNormal;
+        
+        // FIXED: Determine if target is a wall or floor
+        dashTargetIsWall = IsWallSurface(surfaceNormal);
+        
+        Debug.Log($"[PlayerDash] Dash started - Target is {(dashTargetIsWall ? "WALL" : "FLOOR")} (normal angle: {Vector3.Angle(surfaceNormal, Vector3.up):F1}°)");
 
         // Slow time during dash
         Time.timeScale = dashTimeScale;
@@ -220,9 +267,10 @@ public class PlayerDash : MonoBehaviour
     {
         float dashDistance = Vector3.Distance(dashStartPosition, dashTargetPosition);
         
-        // Prevent division by zero
+        // FIXED: Handle very short dashes properly
         if (dashDistance < 0.01f)
         {
+            // Even with zero distance, complete the dash properly
             CompleteDash(hitSurface: true);
             return;
         }
@@ -256,7 +304,7 @@ public class PlayerDash : MonoBehaviour
                 dashMaxDistance,
                 dashSurfaceLayer))
             {
-                if (!IsCurrentSurface(hit))
+                if (!IsSameExactSurface(hit))
                 {
                     // Reset time scale before starting new dash
                     Time.timeScale = 1f;
@@ -283,13 +331,20 @@ public class PlayerDash : MonoBehaviour
         Time.timeScale = 1f;
         dashProgress = 0f;
 
-        // FIXED: Set up wall stick BEFORE changing state
-        if (hitSurface && !core.Controller.isGrounded)
+        // FIXED: Only activate wall stick if target was a WALL, not a floor
+        // Also ensure player is not currently grounded
+        if (hitSurface && dashTargetIsWall && !core.Controller.isGrounded)
         {
             ActivateWallStick(transform.position);
+            Debug.Log("[PlayerDash] Dash completed - sticking to WALL");
+        }
+        else
+        {
+            Debug.Log($"[PlayerDash] Dash completed - landing on {(dashTargetIsWall ? "wall but grounded" : "FLOOR")}");
         }
 
-        OnDashCompleted?.Invoke(hitSurface);
+        // FIXED: Pass both hitSurface AND hitWall to let PlayerCore decide state correctly
+        OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall);
     }
 
     private void CancelDash(float verticalForce)
@@ -512,9 +567,14 @@ public class PlayerDash : MonoBehaviour
     #region Helper Methods
     // ════════════════════════════════════════════════════════════════════════
 
-    private bool IsCurrentSurface(RaycastHit hit)
+    /// <summary>
+    /// FIXED: Check if the hit is the EXACT SAME surface we're currently on.
+    /// This prevents dashing to the spot directly beneath you, but allows
+    /// dashing to a different position on the floor in front of you.
+    /// </summary>
+    private bool IsSameExactSurface(RaycastHit hit)
     {
-        // Check if already stuck to this surface
+        // If stuck to a wall, check if targeting the same wall collider
         if (IsStuck && isWallStickActive)
         {
             if (Physics.Raycast(
@@ -524,12 +584,20 @@ public class PlayerDash : MonoBehaviour
                 wallStickCheckDistance + 0.5f,
                 dashSurfaceLayer))
             {
+                // Same collider AND very close hit point = same surface
                 if (surfaceHit.collider == hit.collider)
-                    return true;
+                {
+                    float hitDistance = Vector3.Distance(surfaceHit.point, hit.point);
+                    if (hitDistance < 0.5f)
+                    {
+                        return true;
+                    }
+                }
             }
         }
 
-        // Check if standing on this surface
+        // FIXED: Only block if targeting the EXACT spot directly below
+        // Allow dashing to floor positions in front of you
         if (core.Controller.enabled && core.Controller.isGrounded && !IsStuck)
         {
             if (Physics.Raycast(
@@ -539,8 +607,21 @@ public class PlayerDash : MonoBehaviour
                 core.Controller.height / 2 + 0.2f,
                 dashSurfaceLayer))
             {
+                // Same collider check
                 if (groundHit.collider == hit.collider)
-                    return true;
+                {
+                    // FIXED: Check if the target position is very close to current position
+                    // If it's more than 1 meter away horizontally, allow the dash
+                    Vector3 currentPosFlat = new Vector3(transform.position.x, 0, transform.position.z);
+                    Vector3 targetPosFlat = new Vector3(hit.point.x, 0, hit.point.z);
+                    float horizontalDistance = Vector3.Distance(currentPosFlat, targetPosFlat);
+                    
+                    // Only block if target is basically where we're standing (within 0.5m)
+                    if (horizontalDistance < 0.5f)
+                    {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -636,9 +717,14 @@ public class PlayerDash : MonoBehaviour
 
         if (IsDashing)
         {
-            Gizmos.color = Color.cyan;
+            // FIXED: Color indicates floor vs wall target
+            Gizmos.color = dashTargetIsWall ? Color.cyan : Color.green;
             Gizmos.DrawLine(dashStartPosition, dashTargetPosition);
             Gizmos.DrawWireSphere(dashTargetPosition, 0.5f);
+            
+            // Draw surface normal
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(dashTargetPosition, dashTargetPosition + stuckSurfaceNormal);
         }
         
         // NEW: Visualize sword dash

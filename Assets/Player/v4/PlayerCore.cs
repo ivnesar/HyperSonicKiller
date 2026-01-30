@@ -280,9 +280,10 @@ public class PlayerCore : MonoBehaviour
         Debug.Log("[PlayerCore] Player died!");
     }
 
-    private void HandleDashCompleted(bool hitSurface)
+    private void HandleDashCompleted(bool hitSurface, bool hitWall)
     {
-        if (hitSurface && !Controller.isGrounded)
+        // FIXED: Only stick to surface if it was a WALL, not a floor
+        if (hitSurface && hitWall && !Controller.isGrounded)
         {
             SetState(PlayerState.StuckToSurface);
         }
