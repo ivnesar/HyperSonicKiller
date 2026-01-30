@@ -44,6 +44,7 @@ public class PlayerSwordThrow : MonoBehaviour
     [SerializeField] private float returnSpeed = 900f;
     [SerializeField] private float catchDistance = 1.2f;
     [SerializeField] private float recallDelay = 1f;
+    [SerializeField] private float maxThrowDistance = 1000f;
     [SerializeField] private LayerMask throwLayerMask = -1;
 
     [Header("Damage Settings")]
@@ -223,7 +224,7 @@ public class PlayerSwordThrow : MonoBehaviour
         Vector3 targetPoint;
 
         // Check if ray hits something
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, throwLayerMask))
+        if (Physics.Raycast(ray, out RaycastHit hit, maxThrowDistance, throwLayerMask))
         {
             // Ray hit something - aim at that point
             targetPoint = hit.point;
@@ -231,7 +232,7 @@ public class PlayerSwordThrow : MonoBehaviour
         else
         {
             // Ray didn't hit anything - aim at a far point in that direction
-            targetPoint = ray.GetPoint(1000f);
+            targetPoint = ray.GetPoint(maxThrowDistance);
         }
 
         // Store for gizmo visualization

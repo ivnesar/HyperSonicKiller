@@ -37,7 +37,6 @@ public class PlayerHealth : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private PlayerCore core;
-    private bool isDead;
 
     #endregion
 
@@ -48,7 +47,11 @@ public class PlayerHealth : MonoBehaviour
     public float CurrentHP => currentHP;
     public float MaxHP => maxHP;
     public float HPPercent => currentHP / maxHP;
-    public bool IsDead => isDead;
+    
+    /// <summary>
+    /// Delegates to PlayerCore.IsDead to avoid duplicate state tracking.
+    /// </summary>
+    public bool IsDead => core != null && core.IsDead;
 
     #endregion
 
@@ -74,7 +77,7 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public void TakeDamage(float damage)
     {
-        if (isDead || damage <= 0) return;
+        if (IsDead || damage <= 0) return;
 
         currentHP -= damage;
         OnDamageTaken?.Invoke(damage);
@@ -92,7 +95,7 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public void Heal(float amount)
     {
-        if (isDead || amount <= 0) return;
+        if (IsDead || amount <= 0) return;
 
         float previousHP = currentHP;
         currentHP = Mathf.Min(currentHP + amount, maxHP);
@@ -111,7 +114,6 @@ public class PlayerHealth : MonoBehaviour
     public void ResetHealth()
     {
         currentHP = maxHP;
-        isDead = false;
         OnHealthChanged?.Invoke(currentHP, maxHP);
     }
 
@@ -142,11 +144,8 @@ public class PlayerHealth : MonoBehaviour
 
     private void Die()
     {
-        if (isDead) return;
-
-        isDead = true;
+        // Event nur einmal feuern - PlayerCore setzt dann IsDead auf true
         OnDeath?.Invoke();
-
         Debug.Log("[PlayerHealth] Player died!");
     }
 
