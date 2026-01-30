@@ -366,9 +366,10 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Initiates a dash towards the stuck sword.
+    /// Initiates a dash towards the stuck sword, or recalls if sword is not visible.
     /// Called by PlayerCombat when Attack is pressed while disarmed.
     /// Returns true if sword dash was started successfully.
+    /// If sword is blocked by an obstacle, it will be recalled instead (returns false).
     /// </summary>
     public bool TryStartSwordDash()
     {
@@ -382,7 +383,51 @@ public class PlayerDash : MonoBehaviour
         swordDashTarget = swordThrow.ActiveSword.transform;
         if (swordDashTarget == null) return false;
         
+        // NEW: Check if sword is visible (not blocked by obstacles)
+        if (!IsSwordVisible())
+        {
+            // Sword is blocked - recall instead of dash
+            Debug.Log("[PlayerDash] Sword not visible - recalling instead of dashing");
+            swordThrow.ForceRecall();
+            swordDashTarget = null;
+            return false;
+        }
+        
         StartSwordDash();
+        return true;
+    }
+    
+    /// <summary>
+    /// Checks if there's a clear line of sight to the sword.
+    /// Returns true if sword is visible, false if blocked by obstacles.
+    /// </summary>
+    private bool IsSwordVisible()
+    {
+        if (swordDashTarget == null) return false;
+        
+        // Raycast from player to sword
+        Vector3 playerPos = transform.position + Vector3.up * 1f; // Offset up to roughly chest height
+        Vector3 swordPos = swordDashTarget.position;
+        Vector3 toSword = swordPos - playerPos;
+        float distanceToSword = toSword.magnitude;
+        
+        // Cast ray towards sword
+        if (Physics.Raycast(playerPos, toSword.normalized, out RaycastHit hit, distanceToSword, dashSurfaceLayer))
+        {
+            // Check if we hit the sword itself or something else
+            // If hit distance is significantly shorter than sword distance, something is blocking
+            float hitDistance = hit.distance;
+            
+            // Allow small tolerance (sword might be slightly embedded in surface)
+            if (hitDistance < distanceToSword - 0.5f)
+            {
+                // Hit something before reaching the sword - blocked!
+                Debug.Log($"[PlayerDash] Sword blocked by {hit.collider.name} at distance {hitDistance:F1} (sword at {distanceToSword:F1})");
+                return false;
+            }
+        }
+        
+        // No obstruction found - sword is visible
         return true;
     }
 
