@@ -623,12 +623,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCombat
   attackRange: 3
   attackAngle: 30
-  meleeDamage: 50
+  meleeDamage: 100
   attackCooldown: 0.5
   enemyLayer:
     serializedVersion: 2
     m_Bits: 192
-  maxBlockHP: 100
+  maxBlockHP: 300
   blockRegenDelay: 1
   blockRegenRate: 30
   guardBreakStunDuration: 2
@@ -650,9 +650,12 @@ MonoBehaviour:
   throwSpeed: 300
   returnSpeed: 900
   catchDistance: 2
+  recallDelay: 1
   throwLayerMask:
     serializedVersion: 2
     m_Bits: 192
+  swordRemovalDamage: 100
+  postRemovalStunDuration: 2
   throwActionName: ThrowSword
 --- !u!114 &7005038953154893743
 MonoBehaviour:
@@ -666,7 +669,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 20989d60f05863548b7d9e4548385432, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
-  maxHP: 100
+  maxHP: 10
   currentHP: 0
 --- !u!1 &4042422906420918628
 GameObject:

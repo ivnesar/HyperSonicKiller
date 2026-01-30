@@ -9,9 +9,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5661404914362298593}
-  - component: {fileID: 8457591039214235636}
+  - component: {fileID: 7743404798265548882}
   m_Layer: 0
-  m_Name: LocalGameManager
+  m_Name: GameManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -32,7 +32,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8457591039214235636
+--- !u!114 &7743404798265548882
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -41,7 +41,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 5012603028766843520}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 41e67a7fc44c53a48b408db7c2d72505, type: 3}
+  m_Script: {fileID: 11500000, guid: 961759ce0443f1346ad15f7f26ba138e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
-  TimeDialation: 1
+  m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  restartKey: 98
+  allowRestartAnytime: 1
+  restartDelay: 0.1
+  showDebugUI: 1
