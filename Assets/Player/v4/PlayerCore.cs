@@ -5,6 +5,8 @@ using System;
 /// Central coordinator for all player subsystems.
 /// Acts as the single point of contact for external systems (enemies, pickups, UI).
 /// Manages player state machine and routes events between subsystems.
+/// 
+/// UPDATED: Adjusted for new dash-attack system where LMB = Dash with auto-attack.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(PlayerInputHandler))]
@@ -17,8 +19,8 @@ public class PlayerCore : MonoBehaviour
     public enum PlayerState
     {
         Normal,
-        Dashing,
-        DashingToSword,  // NEW: Invulnerable dash to retrieve thrown sword
+        Dashing,            // Attack dash (NOT invulnerable)
+        DashingToSword,     // Invulnerable dash to retrieve thrown sword
         StuckToSurface,
         Airborne,
         Dead
@@ -68,7 +70,8 @@ public class PlayerCore : MonoBehaviour
     public bool IsDead => CurrentState == PlayerState.Dead;
     
     /// <summary>
-    /// Returns true if player is currently invulnerable (e.g., during sword dash).
+    /// Returns true if player is currently invulnerable.
+    /// Only sword dash grants invulnerability - normal attack dash does NOT.
     /// </summary>
     public bool IsInvulnerable => CurrentState == PlayerState.DashingToSword;
 
@@ -141,12 +144,14 @@ public class PlayerCore : MonoBehaviour
     /// Main entry point for dealing damage to the player.
     /// Routes to Combat (if blocking) or Health (if not).
     /// Returns false if damage was ignored (e.g., player is invulnerable).
+    /// 
+    /// NOTE: Player is NOT invulnerable during attack dash - only during sword dash.
     /// </summary>
     public bool TakeDamage(float damage)
     {
         if (IsDead || damage <= 0) return false;
         
-        // NEW: Ignore damage while dashing to sword (invulnerable)
+        // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
 
         // Combat handles block logic, Health handles actual HP
@@ -170,7 +175,7 @@ public class PlayerCore : MonoBehaviour
     {
         if (IsDead || damage <= 0) return false;
         
-        // NEW: Ignore damage while dashing to sword (invulnerable)
+        // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
         
         Health?.TakeDamage(damage);
@@ -240,8 +245,13 @@ public class PlayerCore : MonoBehaviour
                 Dash?.ResetCharges();
                 break;
                 
+            case PlayerState.Dashing:
+                // Normal attack dash - NOT invulnerable
+                Debug.Log("[PlayerCore] Attack dash started");
+                break;
+                
             case PlayerState.DashingToSword:
-                // Player is invulnerable during this dash
+                // Sword dash - INVULNERABLE
                 Debug.Log("[PlayerCore] Sword dash started - player is invulnerable");
                 break;
 
@@ -264,6 +274,10 @@ public class PlayerCore : MonoBehaviour
             case PlayerState.DashingToSword:
                 Debug.Log("[PlayerCore] Sword dash ended - invulnerability removed");
                 break;
+                
+            case PlayerState.Dashing:
+                Debug.Log("[PlayerCore] Attack dash ended");
+                break;
         }
     }
 
@@ -282,7 +296,7 @@ public class PlayerCore : MonoBehaviour
 
     private void HandleDashCompleted(bool hitSurface, bool hitWall)
     {
-        // FIXED: Only stick to surface if it was a WALL, not a floor
+        // Only stick to surface if it was a WALL, not a floor
         if (hitSurface && hitWall && !Controller.isGrounded)
         {
             SetState(PlayerState.StuckToSurface);
@@ -316,31 +330,44 @@ public class PlayerCore : MonoBehaviour
     #region Helper Queries (For subsystems)
     // ════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Returns true if player can move normally (WASD).
+    /// </summary>
     public bool CanMove => CurrentState != PlayerState.Dead && 
                            CurrentState != PlayerState.Dashing && 
                            CurrentState != PlayerState.DashingToSword &&
                            CurrentState != PlayerState.StuckToSurface;
-                           
+    
+    /// <summary>
+    /// Returns true if player can initiate a dash (attack or sword).
+    /// </summary>
     public bool CanDash => CurrentState == PlayerState.Normal || 
                            CurrentState == PlayerState.Airborne || 
                            CurrentState == PlayerState.StuckToSurface;
-                           
-    public bool CanAttack => CurrentState != PlayerState.Dead && 
-                             CurrentState != PlayerState.Dashing &&
-                             CurrentState != PlayerState.DashingToSword;
-                             
-    public bool CanBlock => CurrentState != PlayerState.Dead && 
-                            CurrentState != PlayerState.Dashing &&
-                            CurrentState != PlayerState.DashingToSword;
     
     /// <summary>
-    /// Returns true if player can initiate a sword dash (sword is stuck somewhere).
+    /// Returns true if player can initiate a sword dash.
+    /// (Sword must be stuck somewhere)
     /// </summary>
     public bool CanSwordDash => CurrentState != PlayerState.Dead && 
                                 CurrentState != PlayerState.Dashing &&
                                 CurrentState != PlayerState.DashingToSword &&
                                 SwordThrow != null && 
                                 SwordThrow.IsSwordStuck;
+
+    /// <summary>
+    /// DEPRECATED: Manual attacks no longer exist.
+    /// Kept for backwards compatibility - always returns false.
+    /// Attacks are now automatic during dash.
+    /// </summary>
+    [Obsolete("Manual attacks removed - attacks are automatic during dash")]
+    public bool CanAttack => false;
+    
+    /// <summary>
+    /// Returns true if player can block incoming damage.
+    /// </summary>
+    public bool CanBlock => CurrentState != PlayerState.Dead && 
+                            CurrentState != PlayerState.DashingToSword;  // Can still block during attack dash
 
     #endregion
 }

@@ -589,11 +589,17 @@ MonoBehaviour:
   dashSurfaceLayer:
     serializedVersion: 2
     m_Bits: 128
+  maxFloorAngle: 45
   dashTimeScale: 0.01
   dashCancelUpwardForce: 10
   dashCancelDownwardForce: 15
   wallStickCheckDistance: 1
   wallStickOffset: 0.5
+  attackDashRadius: 1.5
+  attackDashDamage: 150
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 64
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
@@ -625,13 +631,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56eb2a256fbda8b43bde9ca9bc325344, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCombat
-  attackRange: 3
-  attackAngle: 30
-  meleeDamage: 100
-  attackCooldown: 0.5
+  meleeDamageReference: 50
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 192
+    m_Bits: 64
   maxBlockHP: 300
   blockRegenDelay: 1
   blockRegenRate: 30
@@ -655,6 +658,7 @@ MonoBehaviour:
   returnSpeed: 900
   catchDistance: 2
   recallDelay: 1
+  maxThrowDistance: 1000
   throwLayerMask:
     serializedVersion: 2
     m_Bits: 192

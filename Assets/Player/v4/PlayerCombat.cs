@@ -2,11 +2,11 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Handles melee combat and automatic blocking.
+/// Handles combat state and automatic blocking.
+/// 
+/// UPDATED: Manual melee attack removed - attacks are now automatic during dash.
 /// Block is passive - player automatically blocks incoming damage as long as BlockHP > 0.
 /// When BlockHP is depleted, guard breaks and player is stunned.
-/// 
-/// NEW: When disarmed (sword is thrown), pressing Attack will dash to the sword instead.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerCombat : MonoBehaviour
@@ -18,9 +18,9 @@ public class PlayerCombat : MonoBehaviour
     public enum CombatState
     {
         Idle,
-        Attacking,
+        Attacking,      // Now triggered by dash, not manual input
         Stunned,        // Guard broken
-        Disarmed        // Sword is thrown (can't attack, but can sword-dash)
+        Disarmed        // Sword is thrown
     }
 
     #endregion
@@ -30,26 +30,21 @@ public class PlayerCombat : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     public event Action<CombatState> OnCombatStateChanged;
-    public event Action OnAttack;
-    public event Action OnBlockedHit;           // Fired when a hit is automatically blocked
+    public event Action OnAttack;                           // Fired during dash attack
+    public event Action OnBlockedHit;                       // Fired when a hit is blocked
     public event Action OnGuardBroken;
     public event Action OnGuardRestored;
-    public event Action<float, float> OnBlockHPChanged;  // (current, max)
-    
-    // NEW: Sword dash event
-    public event Action OnSwordDashInitiated;
+    public event Action<float, float> OnBlockHPChanged;     // (current, max)
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Inspector - Attack Settings
+    #region Inspector - Attack Settings (for reference/tuning)
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Melee Attack")]
-    [SerializeField] private float attackRange = 3f;
-    [SerializeField] private float attackAngle = 30f;
-    [SerializeField] private int meleeDamage = 50;
-    [SerializeField] private float attackCooldown = 0.5f;
+    [Header("Melee Attack (Auto during Dash)")]
+    [Tooltip("These values are now in PlayerDash - kept here for reference")]
+    [SerializeField] private int meleeDamageReference = 50;
     [SerializeField] private LayerMask enemyLayer;
 
     #endregion
@@ -76,7 +71,6 @@ public class PlayerCombat : MonoBehaviour
 
     // Combat state
     private CombatState currentState = CombatState.Idle;
-    private float lastAttackTime;
     private float lastDamageTime;
     private float stunEndTime;
 
@@ -92,7 +86,7 @@ public class PlayerCombat : MonoBehaviour
     public CombatState CurrentState => currentState;
     
     /// <summary>
-    /// Returns true if the player can currently auto-block (has BlockHP and isn't stunned/disarmed).
+    /// Returns true if the player can currently auto-block.
     /// </summary>
     public bool CanAutoBlock => currentBlockHP > 0 && 
                                 currentState != CombatState.Stunned && 
@@ -111,9 +105,6 @@ public class PlayerCombat : MonoBehaviour
     public float CurrentBlockHP => currentBlockHP;
     public float MaxBlockHP => maxBlockHP;
     public float BlockHPPercent => currentBlockHP / maxBlockHP;
-
-    public bool CanAttack => currentState == CombatState.Idle && 
-                             Time.time >= lastAttackTime + attackCooldown;
 
     #endregion
 
@@ -137,6 +128,14 @@ public class PlayerCombat : MonoBehaviour
             swordThrow.OnSwordThrown += HandleSwordThrown;
             swordThrow.OnSwordCaught += HandleSwordCaught;
         }
+        
+        // Subscribe to dash attack events
+        if (dash != null)
+        {
+            dash.OnEnemyHitDuringDash += HandleDashAttackHit;
+            dash.OnDashStarted += HandleDashStarted;
+            dash.OnDashCompleted += HandleDashCompleted;
+        }
     }
 
     private void OnDestroy()
@@ -146,13 +145,19 @@ public class PlayerCombat : MonoBehaviour
             swordThrow.OnSwordThrown -= HandleSwordThrown;
             swordThrow.OnSwordCaught -= HandleSwordCaught;
         }
+        
+        if (dash != null)
+        {
+            dash.OnEnemyHitDuringDash -= HandleDashAttackHit;
+            dash.OnDashStarted -= HandleDashStarted;
+            dash.OnDashCompleted -= HandleDashCompleted;
+        }
     }
 
     private void Update()
     {
         if (core.IsDead) return;
 
-        HandleCombatInput();
         HandleBlockRegeneration();
         HandleStunRecovery();
     }
@@ -160,113 +165,33 @@ public class PlayerCombat : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Input Handling
+    #region Dash Attack Event Handlers (NEW)
     // ════════════════════════════════════════════════════════════════════════
 
-    private void HandleCombatInput()
+    private void HandleDashStarted()
     {
-        switch (currentState)
+        // Set attacking state when dash begins
+        if (currentState == CombatState.Idle)
         {
-            case CombatState.Idle:
-                HandleIdleInput();
-                break;
-
-            case CombatState.Disarmed:
-                HandleDisarmedInput();
-                break;
-
-            case CombatState.Stunned:
-            case CombatState.Attacking:
-                // Cannot act
-                break;
+            SetState(CombatState.Attacking);
         }
     }
 
-    private void HandleIdleInput()
+    private void HandleDashCompleted(bool hitSurface, bool hitWall)
     {
-        if (!core.CanAttack) return;
-
-        // Only attack input needed - blocking is automatic
-        if (core.Input.GetActionDown("Attack") && CanAttack && HasSword)
+        // Return to idle after dash completes (if not disarmed/stunned)
+        if (currentState == CombatState.Attacking)
         {
-            PerformMeleeAttack();
-        }
-    }
-    
-    /// <summary>
-    /// NEW: When disarmed, Attack button triggers sword dash instead of melee.
-    /// </summary>
-    private void HandleDisarmedInput()
-    {
-        // Check if sword is stuck somewhere (can dash to it)
-        if (core.Input.GetActionDown("Attack"))
-        {
-            TrySwordDash();
-        }
-    }
-    
-    /// <summary>
-    /// Attempts to initiate a sword dash.
-    /// </summary>
-    private void TrySwordDash()
-    {
-        // Must have a stuck sword to dash to
-        if (swordThrow == null || !swordThrow.IsSwordStuck)
-        {
-            Debug.Log("[PlayerCombat] Cannot sword dash - sword is not stuck");
-            return;
-        }
-        
-        // Ask dash system to perform the sword dash
-        if (dash != null && dash.TryStartSwordDash())
-        {
-            OnSwordDashInitiated?.Invoke();
-            Debug.Log("[PlayerCombat] Sword dash initiated!");
+            SetState(CombatState.Idle);
         }
     }
 
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Attack Logic
-    // ════════════════════════════════════════════════════════════════════════
-
-    private void PerformMeleeAttack()
+    private void HandleDashAttackHit(IEnemy enemy)
     {
-        lastAttackTime = Time.time;
-        SetState(CombatState.Attacking);
+        // Fire attack event for each hit (for sound/visual effects)
         OnAttack?.Invoke();
-
-        // Find enemies in range
-        Collider[] hits = Physics.OverlapSphere(transform.position, attackRange, enemyLayer);
-
-        foreach (var col in hits)
-        {
-            Vector3 toEnemy = (col.transform.position - core.CameraTransform.position).normalized;
-            float angle = Vector3.Angle(core.CameraTransform.forward, toEnemy);
-
-            if (angle <= attackAngle)
-            {
-                Debug.Log("meele: "+col.transform.name);
-                // Calculate hit point (closest point on collider)
-                Vector3 hitPoint = col.ClosestPoint(core.CameraTransform.position);
-                Vector3 hitDirection = core.CameraTransform.forward;
-
-                // Try IEnemy first (new unified interface)
-                if (col.TryGetComponent<IEnemy>(out var enemy))
-                {
-                    enemy.OnMeleeDamage(meleeDamage);
-                }
-                // Fallback to IDamageable for non-enemy destructibles
-                else if (col.TryGetComponent<IDamageable>(out var damageable))
-                {
-                    damageable.TakeDamage(meleeDamage, hitPoint, hitDirection);
-                }
-            }
-        }
-
-        // Return to idle immediately (instant attack)
-        SetState(CombatState.Idle);
+        
+        Debug.Log($"[PlayerCombat] Dash attack hit: {enemy.Transform.name}");
     }
 
     #endregion
@@ -281,7 +206,6 @@ public class PlayerCombat : MonoBehaviour
     /// </summary>
     public float TakeBlockDamage(float damage)
     {
-        // Can't block if no BlockHP, stunned, or disarmed
         if (!CanAutoBlock) return damage;
 
         lastDamageTime = Time.time;
@@ -337,7 +261,6 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleBlockRegeneration()
     {
-        // Only regen when idle and after delay
         if (currentState != CombatState.Idle) return;
         if (currentBlockHP >= maxBlockHP) return;
         if (Time.time < lastDamageTime + blockRegenDelay) return;
@@ -393,7 +316,6 @@ public class PlayerCombat : MonoBehaviour
         currentBlockHP = maxBlockHP;
         OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
 
-        // Also reset sword throw if present
         swordThrow?.ResetState();
 
         SetState(CombatState.Idle);

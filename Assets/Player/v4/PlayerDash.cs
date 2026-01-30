@@ -1,17 +1,35 @@
 using UnityEngine;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
-/// Handles dash movement and wall-stick mechanics.
-/// Communicates with PlayerCore for state changes.
+/// Handles all dash mechanics: Attack Dash, Sword Dash, and wall-stick.
 /// 
-/// NEW: Added sword dash - dash to stuck sword to retrieve it (invulnerable during dash).
-/// FIXED: Floor vs Wall detection - only walls trigger stick, not floors.
-/// FIXED: Can now dash to nearby floor positions.
+/// NEW SYSTEM:
+/// - Attack Dash (LMB): Player dashes to a surface, automatically attacking NPCs in the path
+/// - Sword Dash: Invulnerable dash to retrieve thrown sword
+/// - Wall Stick: Cling to walls after dashing
+/// 
+/// The player acts like a "projectile" - dashing THROUGH enemies to reach surfaces.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerDash : MonoBehaviour
 {
+    // ════════════════════════════════════════════════════════════════════════
+    #region Enums
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Types of dash the player can perform.
+    /// </summary>
+    public enum DashType
+    {
+        Attack,     // Normal dash with auto-attack on NPCs in path
+        ToSword     // Invulnerable dash to retrieve sword
+    }
+
+    #endregion
+
     // ════════════════════════════════════════════════════════════════════════
     #region Events
     // ════════════════════════════════════════════════════════════════════════
@@ -22,14 +40,17 @@ public class PlayerDash : MonoBehaviour
     public event Action OnUnstick;
     public event Action<int> OnChargesChanged;  // remaining charges
     
-    // NEW: Sword dash events
+    // Sword dash events
     public event Action OnSwordDashStarted;
     public event Action OnSwordDashCompleted;
+    
+    // NEW: Attack dash events
+    public event Action<IEnemy> OnEnemyHitDuringDash;  // Fired for each enemy hit
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Inspector Settings
+    #region Inspector Settings - General Dash
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Dash Settings")]
@@ -39,7 +60,7 @@ public class PlayerDash : MonoBehaviour
     [SerializeField] private LayerMask dashSurfaceLayer = -1;
     
     [Header("Surface Detection")]
-    [Tooltip("Maximum angle from vertical (Y-up) for a surface to be considered a floor. 0 = only perfectly flat, 45 = gentle slopes")]
+    [Tooltip("Maximum angle from vertical (Y-up) for a surface to be considered a floor")]
     [SerializeField] private float maxFloorAngle = 45f;
 
     [Header("Time Slow During Dash")]
@@ -51,49 +72,89 @@ public class PlayerDash : MonoBehaviour
 
     [Header("Wall Stick")]
     [SerializeField] private float wallStickCheckDistance = 1f;
-    [SerializeField] private float wallStickOffset = 0.5f;  // Distance from wall surface
+    [SerializeField] private float wallStickOffset = 0.5f;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Inspector Settings - Attack Dash (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Header("Attack Dash (NEW)")]
+    [Tooltip("Radius around the dash path to detect and hit enemies")]
+    [SerializeField] private float attackDashRadius = 1.5f;
     
-    [Header("Sword Dash (NEW)")]
+    [Tooltip("Damage dealt to each enemy hit during attack dash")]
+    [SerializeField] private int attackDashDamage = 50;
+    
+    [Tooltip("Layer mask for detecting enemies during dash")]
+    [SerializeField] private LayerMask enemyLayer;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Inspector Settings - Sword Dash
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Header("Sword Dash")]
     [Tooltip("Speed when dashing to retrieve the thrown sword")]
     [SerializeField] private float swordDashSpeed = 40f;
     
     [Tooltip("How close the player needs to be to 'catch' the sword")]
     [SerializeField] private float swordCatchDistance = 1.5f;
     
-    [Tooltip("Damage dealt to enemy when retrieving sword via dash (on top of normal removal damage)")]
+    [Tooltip("Damage dealt to enemy when retrieving sword via dash")]
     [SerializeField] private int swordDashDamage = 50;
     
-    [Tooltip("Time to smoothly rotate towards the sword during dash (in seconds)")]
+    [Tooltip("Time to smoothly rotate towards the sword during dash")]
     [SerializeField] private float swordDashRotationDuration = 0.2f;
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Runtime State
+    #region Runtime State - General
     // ════════════════════════════════════════════════════════════════════════
 
     private PlayerCore core;
     private PlayerSwordThrow swordThrow;
+    private PlayerCombat combat;
 
-    // Dash state
+    // Dash charges
     private int currentCharges;
+
+    // Current dash state
+    private DashType currentDashType;
     private Vector3 dashStartPosition;
     private Vector3 dashTargetPosition;
     private Vector3 dashDirection;
     private float dashProgress;
-    
-    // FIXED: Track if dash target is a wall or floor
     private bool dashTargetIsWall;
+    private Vector3 stuckSurfaceNormal;
 
     // Wall stick state
     private Vector3 stuckPosition;
-    private Vector3 stuckSurfaceNormal;
     private bool isWallStickActive;
 
     // Flags
     private bool dashDisabled;
-    
-    // NEW: Sword dash state
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Runtime State - Attack Dash (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Tracks enemies already hit during current dash to prevent double-hits.
+    /// </summary>
+    private HashSet<IEnemy> enemiesHitThisDash = new HashSet<IEnemy>();
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Runtime State - Sword Dash
+    // ════════════════════════════════════════════════════════════════════════
+
     private bool isSwordDashing;
     private Transform swordDashTarget;
     private Quaternion swordDashStartRotation;
@@ -110,9 +171,11 @@ public class PlayerDash : MonoBehaviour
     public bool IsDashing => core.CurrentState == PlayerCore.PlayerState.Dashing;
     public bool IsStuck => core.CurrentState == PlayerCore.PlayerState.StuckToSurface;
     public Vector3 StuckSurfaceNormal => stuckSurfaceNormal;
-    
-    /// <summary>Returns true if currently dashing to sword.</summary>
     public bool IsSwordDashing => isSwordDashing;
+    public bool IsWallStickActive => isWallStickActive;
+    
+    /// <summary>Current attack dash radius (for external systems).</summary>
+    public float AttackDashRadius => attackDashRadius;
 
     #endregion
 
@@ -124,6 +187,7 @@ public class PlayerDash : MonoBehaviour
     {
         core = GetComponent<PlayerCore>();
         swordThrow = GetComponent<PlayerSwordThrow>();
+        combat = GetComponent<PlayerCombat>();
         currentCharges = maxDashCharges;
     }
 
@@ -139,7 +203,7 @@ public class PlayerDash : MonoBehaviour
                 break;
 
             case PlayerCore.PlayerState.Dashing:
-                ProcessDashMovement();
+                ProcessAttackDashMovement();
                 CheckDashCancels();
                 break;
                 
@@ -157,7 +221,7 @@ public class PlayerDash : MonoBehaviour
 
     private void LateUpdate()
     {
-        // FIXED: Force position in LateUpdate to override any physics
+        // Force position in LateUpdate to override any physics
         if (isWallStickActive && core.CurrentState == PlayerCore.PlayerState.StuckToSurface)
         {
             transform.position = stuckPosition;
@@ -170,27 +234,12 @@ public class PlayerDash : MonoBehaviour
     #region Surface Detection
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Determines if a surface normal indicates a floor (walkable) or wall (stickable).
-    /// Uses the angle between the surface normal and world up (Vector3.up).
-    /// </summary>
-    /// <param name="surfaceNormal">The normal of the surface to check</param>
-    /// <returns>True if the surface is a floor, false if it's a wall</returns>
     private bool IsFloorSurface(Vector3 surfaceNormal)
     {
-        // Calculate angle between surface normal and world up
         float angle = Vector3.Angle(surfaceNormal, Vector3.up);
-        
-        // If angle is less than maxFloorAngle, it's a floor
-        // angle = 0 means normal points straight up (flat floor)
-        // angle = 90 means normal points horizontally (vertical wall)
-        // angle = 180 means normal points straight down (ceiling)
         return angle <= maxFloorAngle;
     }
     
-    /// <summary>
-    /// Determines if a surface is a wall (vertical enough to stick to).
-    /// </summary>
     private bool IsWallSurface(Vector3 surfaceNormal)
     {
         return !IsFloorSurface(surfaceNormal);
@@ -199,60 +248,112 @@ public class PlayerDash : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Dash Logic
+    #region Input Handling
     // ════════════════════════════════════════════════════════════════════════
 
     private void HandleDashInput()
     {
         if (dashDisabled) return;
         if (!core.CanDash) return;
-        if (currentCharges <= 0) return;
 
         if (core.Input.GetActionDown("Dash"))
         {
-            TryStartDash();
-        }
-    }
-
-    private void TryStartDash()
-    {
-        // Raycast from camera to find dash target
-        if (Physics.Raycast(
-            core.CameraTransform.position,
-            core.CameraTransform.forward,
-            out RaycastHit hit,
-            dashMaxDistance,
-            dashSurfaceLayer))
-        {
-            // FIXED: Only block dash if targeting the SAME surface we're standing/stuck on
-            // Allow dashing to different positions on the same type of surface
-            if (!IsSameExactSurface(hit))
+            // Check if sword is thrown and stuck - if so, do sword dash
+            if (swordThrow != null && swordThrow.IsSwordStuck)
             {
-                StartDash(hit.point, hit.normal);
+                TryStartSwordDash();
+            }
+            else if (currentCharges > 0)
+            {
+                // Normal attack dash
+                TryStartAttackDash();
             }
         }
     }
 
-    private void StartDash(Vector3 targetPoint, Vector3 surfaceNormal)
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Attack Dash Logic (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Attempts to start an attack dash. Finds the target surface and NPCs in path.
+    /// </summary>
+    private void TryStartAttackDash()
     {
-        // FIXED: Deactivate wall stick when starting new dash
+        Vector3 origin = core.CameraTransform.position;
+        Vector3 direction = core.CameraTransform.forward;
+
+        // Find all hits along the path (surfaces AND enemies)
+        RaycastHit[] allHits = Physics.RaycastAll(origin, direction, dashMaxDistance, dashSurfaceLayer | enemyLayer);
+        
+        if (allHits.Length == 0)
+        {
+            // Nothing hit at all - don't dash
+            Debug.Log("[PlayerDash] Attack dash failed - no targets found");
+            return;
+        }
+
+        // Sort by distance
+        System.Array.Sort(allHits, (a, b) => a.distance.CompareTo(b.distance));
+
+        // Find the first SURFACE (not an enemy)
+        RaycastHit? surfaceHit = null;
+        foreach (var hit in allHits)
+        {
+            // Check if this is a surface (not an enemy)
+            if (!hit.collider.TryGetComponent<IEnemy>(out _))
+            {
+                // Check if we're not trying to dash to the same spot
+                if (!IsSameExactSurface(hit))
+                {
+                    surfaceHit = hit;
+                    break;
+                }
+            }
+        }
+
+        // If no surface found, check if we hit an NPC - then stop at first NPC
+        if (!surfaceHit.HasValue)
+        {
+            foreach (var hit in allHits)
+            {
+                if (hit.collider.TryGetComponent<IEnemy>(out _))
+                {
+                    // Stop at this enemy's position (plus a small offset)
+                    Vector3 stopPoint = hit.point + direction * 0.5f;
+                    StartAttackDash(stopPoint, -direction); // Use reverse direction as "surface normal"
+                    return;
+                }
+            }
+            
+            // Nothing valid found
+            Debug.Log("[PlayerDash] Attack dash failed - no valid surface or enemy");
+            return;
+        }
+
+        StartAttackDash(surfaceHit.Value.point, surfaceHit.Value.normal);
+    }
+
+    private void StartAttackDash(Vector3 targetPoint, Vector3 surfaceNormal)
+    {
+        // Deactivate wall stick if active
         DeactivateWallStick();
 
         currentCharges--;
         OnChargesChanged?.Invoke(currentCharges);
 
         dashStartPosition = transform.position;
-        
-        // FIXED: Calculate proper target position (offset from wall)
         dashTargetPosition = targetPoint + surfaceNormal * wallStickOffset;
         dashDirection = (dashTargetPosition - dashStartPosition).normalized;
         dashProgress = 0f;
         stuckSurfaceNormal = surfaceNormal;
-        
-        // FIXED: Determine if target is a wall or floor
         dashTargetIsWall = IsWallSurface(surfaceNormal);
+        currentDashType = DashType.Attack;
         
-        Debug.Log($"[PlayerDash] Dash started - Target is {(dashTargetIsWall ? "WALL" : "FLOOR")} (normal angle: {Vector3.Angle(surfaceNormal, Vector3.up):F1}°)");
+        // Clear hit tracking for new dash
+        enemiesHitThisDash.Clear();
 
         // Slow time during dash
         Time.timeScale = dashTimeScale;
@@ -261,22 +362,21 @@ public class PlayerDash : MonoBehaviour
         core.SetState(PlayerCore.PlayerState.Dashing);
         
         OnDashStarted?.Invoke();
+        
+        Debug.Log($"[PlayerDash] Attack dash started - Target is {(dashTargetIsWall ? "WALL" : "FLOOR")}");
     }
 
-    private void ProcessDashMovement()
+    private void ProcessAttackDashMovement()
     {
         float dashDistance = Vector3.Distance(dashStartPosition, dashTargetPosition);
         
-        // FIXED: Handle very short dashes properly
         if (dashDistance < 0.01f)
         {
-            // Even with zero distance, complete the dash properly
             CompleteDash(hitSurface: true);
             return;
         }
         
-        float moveDistance = dashSpeed * Time.unscaledDeltaTime;  // Use unscaled for slow-mo
-
+        float moveDistance = dashSpeed * Time.unscaledDeltaTime;
         dashProgress += moveDistance / dashDistance;
 
         if (dashProgress >= 1f)
@@ -284,11 +384,48 @@ public class PlayerDash : MonoBehaviour
             // Reached target
             Vector3 finalMove = dashTargetPosition - transform.position;
             core.Controller.Move(finalMove);
+            
+            // Final check for enemies at destination
+            CheckAndDamageEnemiesInRadius();
+            
             CompleteDash(hitSurface: true);
         }
         else
         {
             core.Controller.Move(dashDirection * moveDistance);
+            
+            // Check for enemies to hit during movement
+            CheckAndDamageEnemiesInRadius();
+        }
+    }
+
+    /// <summary>
+    /// Checks for enemies within the attack radius and damages them.
+    /// </summary>
+    private void CheckAndDamageEnemiesInRadius()
+    {
+        Collider[] hits = Physics.OverlapSphere(transform.position, attackDashRadius, enemyLayer);
+        
+        foreach (var col in hits)
+        {
+            if (col.TryGetComponent<IEnemy>(out var enemy))
+            {
+                // Only hit each enemy once per dash
+                if (!enemiesHitThisDash.Contains(enemy))
+                {
+                    enemiesHitThisDash.Add(enemy);
+                    
+                    // Calculate hit info
+                    Vector3 hitPoint = col.ClosestPoint(transform.position);
+                    
+                    // Deal damage via melee interface
+                    enemy.OnMeleeDamage(attackDashDamage);
+                    
+                    OnEnemyHitDuringDash?.Invoke(enemy);
+                    
+                    Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage");
+                }
+            }
         }
     }
 
@@ -297,21 +434,14 @@ public class PlayerDash : MonoBehaviour
         // Redirect dash to new target
         if (core.Input.GetActionDown("Dash") && !dashDisabled && currentCharges > 0)
         {
-            if (Physics.Raycast(
-                core.CameraTransform.position,
-                core.CameraTransform.forward,
-                out RaycastHit hit,
-                dashMaxDistance,
-                dashSurfaceLayer))
-            {
-                if (!IsSameExactSurface(hit))
-                {
-                    // Reset time scale before starting new dash
-                    Time.timeScale = 1f;
-                    StartDash(hit.point, hit.normal);
-                    return;
-                }
-            }
+            // Reset time scale before trying new dash
+            Time.timeScale = 1f;
+            
+            // Clear hit tracking for redirect
+            enemiesHitThisDash.Clear();
+            
+            TryStartAttackDash();
+            return;
         }
 
         // Jump cancel (upward)
@@ -330,9 +460,9 @@ public class PlayerDash : MonoBehaviour
     {
         Time.timeScale = 1f;
         dashProgress = 0f;
+        enemiesHitThisDash.Clear();
 
-        // FIXED: Only activate wall stick if target was a WALL, not a floor
-        // Also ensure player is not currently grounded
+        // Only activate wall stick if target was a WALL and player is not grounded
         if (hitSurface && dashTargetIsWall && !core.Controller.isGrounded)
         {
             ActivateWallStick(transform.position);
@@ -343,7 +473,6 @@ public class PlayerDash : MonoBehaviour
             Debug.Log($"[PlayerDash] Dash completed - landing on {(dashTargetIsWall ? "wall but grounded" : "FLOOR")}");
         }
 
-        // FIXED: Pass both hitSurface AND hitWall to let PlayerCore decide state correctly
         OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall);
     }
 
@@ -351,8 +480,8 @@ public class PlayerDash : MonoBehaviour
     {
         Time.timeScale = 1f;
         dashProgress = 0f;
+        enemiesHitThisDash.Clear();
         
-        // FIXED: Make sure wall stick is deactivated
         DeactivateWallStick();
 
         core.Movement?.ApplyVerticalImpulse(verticalForce);
@@ -362,31 +491,25 @@ public class PlayerDash : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Sword Dash Logic (NEW)
+    #region Sword Dash Logic
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Initiates a dash towards the stuck sword, or recalls if sword is not visible.
-    /// Called by PlayerCombat when Attack is pressed while disarmed.
-    /// Returns true if sword dash was started successfully.
-    /// If sword is blocked by an obstacle, it will be recalled instead (returns false).
+    /// Attempts to start a sword dash. Returns true if successful.
     /// </summary>
     public bool TryStartSwordDash()
     {
-        // Validate conditions
         if (swordThrow == null || !swordThrow.IsSwordStuck) return false;
         if (swordThrow.ActiveSword == null) return false;
         if (isSwordDashing) return false;
         if (core.IsDead) return false;
         
-        // Get the sword transform as target
         swordDashTarget = swordThrow.ActiveSword.transform;
         if (swordDashTarget == null) return false;
         
-        // NEW: Check if sword is visible (not blocked by obstacles)
+        // Check if sword is visible (not blocked)
         if (!IsSwordVisible())
         {
-            // Sword is blocked - recall instead of dash
             Debug.Log("[PlayerDash] Sword not visible - recalling instead of dashing");
             swordThrow.ForceRecall();
             swordDashTarget = null;
@@ -397,53 +520,37 @@ public class PlayerDash : MonoBehaviour
         return true;
     }
     
-    /// <summary>
-    /// Checks if there's a clear line of sight to the sword.
-    /// Returns true if sword is visible, false if blocked by obstacles.
-    /// </summary>
     private bool IsSwordVisible()
     {
         if (swordDashTarget == null) return false;
         
-        // Raycast from player to sword
-        Vector3 playerPos = transform.position + Vector3.up * 1f; // Offset up to roughly chest height
+        Vector3 playerPos = transform.position + Vector3.up * 1f;
         Vector3 swordPos = swordDashTarget.position;
         Vector3 toSword = swordPos - playerPos;
         float distanceToSword = toSword.magnitude;
         
-        // Cast ray towards sword
         if (Physics.Raycast(playerPos, toSword.normalized, out RaycastHit hit, distanceToSword, dashSurfaceLayer))
         {
-            // Check if we hit the sword itself or something else
-            // If hit distance is significantly shorter than sword distance, something is blocking
             float hitDistance = hit.distance;
-            
-            // Allow small tolerance (sword might be slightly embedded in surface)
             if (hitDistance < distanceToSword - 0.5f)
             {
-                // Hit something before reaching the sword - blocked!
-                Debug.Log($"[PlayerDash] Sword blocked by {hit.collider.name} at distance {hitDistance:F1} (sword at {distanceToSword:F1})");
+                Debug.Log($"[PlayerDash] Sword blocked by {hit.collider.name}");
                 return false;
             }
         }
         
-        // No obstruction found - sword is visible
         return true;
     }
 
     private void StartSwordDash()
     {
-        // Deactivate wall stick if active
         DeactivateWallStick();
         
         isSwordDashing = true;
         dashStartPosition = transform.position;
-        
-        // Store current rotation for smooth interpolation
         swordDashStartRotation = transform.rotation;
         swordDashRotationTimer = 0f;
         
-        // Apply same slow-mo as normal dash
         Time.timeScale = dashTimeScale;
         
         OnSwordDashStarted?.Invoke();
@@ -453,7 +560,6 @@ public class PlayerDash : MonoBehaviour
 
     private void ProcessSwordDashMovement()
     {
-        // Safety check - if sword was destroyed, cancel dash
         if (swordDashTarget == null || swordThrow == null || swordThrow.ActiveSword == null)
         {
             CompleteSwordDash(caughtSword: false);
@@ -464,23 +570,18 @@ public class PlayerDash : MonoBehaviour
         Vector3 toTarget = targetPos - transform.position;
         float distance = toTarget.magnitude;
         
-        // Check if close enough to catch the sword
         if (distance <= swordCatchDistance)
         {
             CompleteSwordDash(caughtSword: true);
             return;
         }
         
-        // Move towards sword (always dash in direction of sword, not facing direction)
         Vector3 moveDirection = toTarget.normalized;
-        float moveDistance = swordDashSpeed * Time.unscaledDeltaTime;
-        
-        // Don't overshoot
-        moveDistance = Mathf.Min(moveDistance, distance);
+        float moveDistance = Mathf.Min(swordDashSpeed * Time.unscaledDeltaTime, distance);
         
         core.Controller.Move(moveDirection * moveDistance);
         
-        // Smoothly rotate towards the sword over the rotation duration
+        // Smooth rotation towards sword
         swordDashRotationTimer += Time.unscaledDeltaTime;
         float rotationProgress = Mathf.Clamp01(swordDashRotationTimer / swordDashRotationDuration);
         
@@ -501,7 +602,6 @@ public class PlayerDash : MonoBehaviour
         
         if (caughtSword && swordThrow != null)
         {
-            // Force the sword to return with extra dash damage to embedded enemy
             swordThrow.ForceRecallWithDashDamage(swordDashDamage);
             Debug.Log("[PlayerDash] Sword dash completed - sword caught!");
         }
@@ -513,9 +613,6 @@ public class PlayerDash : MonoBehaviour
         OnSwordDashCompleted?.Invoke();
     }
 
-    /// <summary>
-    /// Force cancel the sword dash (e.g., if player dies mid-dash).
-    /// </summary>
     public void ForceCancelSwordDash()
     {
         if (!isSwordDashing) return;
@@ -534,21 +631,16 @@ public class PlayerDash : MonoBehaviour
     #region Wall Stick Logic
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Activates wall stick at the specified position.
-    /// </summary>
     private void ActivateWallStick(Vector3 position)
     {
         stuckPosition = position;
         isWallStickActive = true;
         
-        // Disable CharacterController to prevent physics interference
         if (core.Controller != null)
         {
             core.Controller.enabled = false;
         }
         
-        // Force position immediately
         transform.position = stuckPosition;
         
         OnWallStick?.Invoke();
@@ -556,16 +648,12 @@ public class PlayerDash : MonoBehaviour
         Debug.Log($"[PlayerDash] Wall stick activated at {stuckPosition}");
     }
 
-    /// <summary>
-    /// Deactivates wall stick and re-enables physics.
-    /// </summary>
     private void DeactivateWallStick()
     {
         if (!isWallStickActive) return;
         
         isWallStickActive = false;
         
-        // Re-enable CharacterController
         if (core.Controller != null)
         {
             core.Controller.enabled = true;
@@ -576,7 +664,6 @@ public class PlayerDash : MonoBehaviour
 
     private void MaintainWallStick()
     {
-        // FIXED: Force position every frame while stuck
         if (isWallStickActive)
         {
             transform.position = stuckPosition;
@@ -585,12 +672,10 @@ public class PlayerDash : MonoBehaviour
 
     private void CheckUnstickInput()
     {
-        // Jump off wall
         if (core.Input.GetActionDown("Jump"))
         {
             Unstick(dashCancelUpwardForce);
         }
-        // Drop down
         else if (core.Input.GetActionDown("DashDown"))
         {
             Unstick(-dashCancelDownwardForce);
@@ -599,7 +684,6 @@ public class PlayerDash : MonoBehaviour
 
     private void Unstick(float verticalForce)
     {
-        // FIXED: Properly deactivate wall stick before applying force
         DeactivateWallStick();
         
         core.Movement?.ApplyVerticalImpulse(verticalForce);
@@ -612,14 +696,8 @@ public class PlayerDash : MonoBehaviour
     #region Helper Methods
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// FIXED: Check if the hit is the EXACT SAME surface we're currently on.
-    /// This prevents dashing to the spot directly beneath you, but allows
-    /// dashing to a different position on the floor in front of you.
-    /// </summary>
     private bool IsSameExactSurface(RaycastHit hit)
     {
-        // If stuck to a wall, check if targeting the same wall collider
         if (IsStuck && isWallStickActive)
         {
             if (Physics.Raycast(
@@ -629,7 +707,6 @@ public class PlayerDash : MonoBehaviour
                 wallStickCheckDistance + 0.5f,
                 dashSurfaceLayer))
             {
-                // Same collider AND very close hit point = same surface
                 if (surfaceHit.collider == hit.collider)
                 {
                     float hitDistance = Vector3.Distance(surfaceHit.point, hit.point);
@@ -641,8 +718,6 @@ public class PlayerDash : MonoBehaviour
             }
         }
 
-        // FIXED: Only block if targeting the EXACT spot directly below
-        // Allow dashing to floor positions in front of you
         if (core.Controller.enabled && core.Controller.isGrounded && !IsStuck)
         {
             if (Physics.Raycast(
@@ -652,16 +727,12 @@ public class PlayerDash : MonoBehaviour
                 core.Controller.height / 2 + 0.2f,
                 dashSurfaceLayer))
             {
-                // Same collider check
                 if (groundHit.collider == hit.collider)
                 {
-                    // FIXED: Check if the target position is very close to current position
-                    // If it's more than 1 meter away horizontally, allow the dash
                     Vector3 currentPosFlat = new Vector3(transform.position.x, 0, transform.position.z);
                     Vector3 targetPosFlat = new Vector3(hit.point.x, 0, hit.point.z);
                     float horizontalDistance = Vector3.Distance(currentPosFlat, targetPosFlat);
                     
-                    // Only block if target is basically where we're standing (within 0.5m)
                     if (horizontalDistance < 0.5f)
                     {
                         return true;
@@ -679,26 +750,17 @@ public class PlayerDash : MonoBehaviour
     #region Public API
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Reset dash charges to max (called when landing or sticking to wall).
-    /// </summary>
     public void ResetCharges()
     {
         currentCharges = maxDashCharges;
         OnChargesChanged?.Invoke(currentCharges);
     }
 
-    /// <summary>
-    /// Enable or disable dashing (e.g., during guard break).
-    /// </summary>
     public void SetDashEnabled(bool enabled)
     {
         dashDisabled = !enabled;
     }
 
-    /// <summary>
-    /// Force cancel current dash with fall velocity.
-    /// </summary>
     public void ForceCancelDash()
     {
         if (IsDashing)
@@ -712,16 +774,10 @@ public class PlayerDash : MonoBehaviour
         }
         else if (IsStuck)
         {
-            // Also handle being stuck to wall
             Unstick(-5f);
             core.SetState(PlayerCore.PlayerState.Airborne);
         }
     }
-
-    /// <summary>
-    /// Check if wall stick is currently active.
-    /// </summary>
-    public bool IsWallStickActive => isWallStickActive;
 
     #endregion
 
@@ -731,23 +787,21 @@ public class PlayerDash : MonoBehaviour
 
     private void OnDisable()
     {
-        // Make sure to re-enable controller if we get disabled
         if (isWallStickActive && core != null && core.Controller != null)
         {
             core.Controller.enabled = true;
             isWallStickActive = false;
         }
         
-        // Reset time scale if we were mid-dash
         if (Time.timeScale != 1f)
         {
             Time.timeScale = 1f;
         }
         
-        // Reset sword dash state
         isSwordDashing = false;
         swordDashTarget = null;
         swordDashRotationTimer = 0f;
+        enemiesHitThisDash.Clear();
     }
 
     #endregion
@@ -762,17 +816,20 @@ public class PlayerDash : MonoBehaviour
 
         if (IsDashing)
         {
-            // FIXED: Color indicates floor vs wall target
+            // Draw dash path
             Gizmos.color = dashTargetIsWall ? Color.cyan : Color.green;
             Gizmos.DrawLine(dashStartPosition, dashTargetPosition);
             Gizmos.DrawWireSphere(dashTargetPosition, 0.5f);
+            
+            // Draw attack radius along path
+            Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
+            Gizmos.DrawWireSphere(transform.position, attackDashRadius);
             
             // Draw surface normal
             Gizmos.color = Color.yellow;
             Gizmos.DrawLine(dashTargetPosition, dashTargetPosition + stuckSurfaceNormal);
         }
         
-        // NEW: Visualize sword dash
         if (isSwordDashing && swordDashTarget != null)
         {
             Gizmos.color = Color.magenta;
@@ -786,9 +843,15 @@ public class PlayerDash : MonoBehaviour
             Gizmos.DrawWireSphere(stuckPosition, 0.3f);
             Gizmos.DrawLine(stuckPosition, stuckPosition + stuckSurfaceNormal * 2f);
             
-            // Show stuck indicator
             Gizmos.color = Color.green;
             Gizmos.DrawCube(stuckPosition + Vector3.up * 2f, Vector3.one * 0.2f);
+        }
+        
+        // Always show attack radius when selected (in editor)
+        if (!IsDashing)
+        {
+            Gizmos.color = new Color(1f, 0.5f, 0f, 0.2f);
+            Gizmos.DrawWireSphere(transform.position, attackDashRadius);
         }
     }
 
