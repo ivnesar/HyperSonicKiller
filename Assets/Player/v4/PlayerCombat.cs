@@ -6,7 +6,7 @@ using System;
 /// Block is passive - player automatically blocks incoming damage as long as BlockHP > 0.
 /// When BlockHP is depleted, guard breaks and player is stunned.
 /// 
-/// UPDATED: Migrated from INpcInteraction to IEnemy interface.
+/// NEW: When disarmed (sword is thrown), pressing Attack will dash to the sword instead.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerCombat : MonoBehaviour
@@ -20,7 +20,7 @@ public class PlayerCombat : MonoBehaviour
         Idle,
         Attacking,
         Stunned,        // Guard broken
-        Disarmed        // Sword is thrown (can't attack)
+        Disarmed        // Sword is thrown (can't attack, but can sword-dash)
     }
 
     #endregion
@@ -35,6 +35,9 @@ public class PlayerCombat : MonoBehaviour
     public event Action OnGuardBroken;
     public event Action OnGuardRestored;
     public event Action<float, float> OnBlockHPChanged;  // (current, max)
+    
+    // NEW: Sword dash event
+    public event Action OnSwordDashInitiated;
 
     #endregion
 
@@ -69,6 +72,7 @@ public class PlayerCombat : MonoBehaviour
 
     private PlayerCore core;
     private PlayerSwordThrow swordThrow;
+    private PlayerDash dash;
 
     // Combat state
     private CombatState currentState = CombatState.Idle;
@@ -121,6 +125,7 @@ public class PlayerCombat : MonoBehaviour
     {
         core = GetComponent<PlayerCore>();
         swordThrow = GetComponent<PlayerSwordThrow>();
+        dash = GetComponent<PlayerDash>();
         currentBlockHP = maxBlockHP;
     }
 
@@ -167,7 +172,7 @@ public class PlayerCombat : MonoBehaviour
                 break;
 
             case CombatState.Disarmed:
-                // Can't do anything, waiting for sword to return
+                HandleDisarmedInput();
                 break;
 
             case CombatState.Stunned:
@@ -185,6 +190,38 @@ public class PlayerCombat : MonoBehaviour
         if (core.Input.GetActionDown("Attack") && CanAttack && HasSword)
         {
             PerformMeleeAttack();
+        }
+    }
+    
+    /// <summary>
+    /// NEW: When disarmed, Attack button triggers sword dash instead of melee.
+    /// </summary>
+    private void HandleDisarmedInput()
+    {
+        // Check if sword is stuck somewhere (can dash to it)
+        if (core.Input.GetActionDown("Attack"))
+        {
+            TrySwordDash();
+        }
+    }
+    
+    /// <summary>
+    /// Attempts to initiate a sword dash.
+    /// </summary>
+    private void TrySwordDash()
+    {
+        // Must have a stuck sword to dash to
+        if (swordThrow == null || !swordThrow.IsSwordStuck)
+        {
+            Debug.Log("[PlayerCombat] Cannot sword dash - sword is not stuck");
+            return;
+        }
+        
+        // Ask dash system to perform the sword dash
+        if (dash != null && dash.TryStartSwordDash())
+        {
+            OnSwordDashInitiated?.Invoke();
+            Debug.Log("[PlayerCombat] Sword dash initiated!");
         }
     }
 

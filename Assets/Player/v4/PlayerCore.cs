@@ -18,6 +18,7 @@ public class PlayerCore : MonoBehaviour
     {
         Normal,
         Dashing,
+        DashingToSword,  // NEW: Invulnerable dash to retrieve thrown sword
         StuckToSurface,
         Airborne,
         Dead
@@ -55,6 +56,7 @@ public class PlayerCore : MonoBehaviour
     [HideInInspector] public PlayerLook Look { get; private set; }
     [HideInInspector] public PlayerCombat Combat { get; private set; }
     [HideInInspector] public PlayerHealth Health { get; private set; }
+    [HideInInspector] public PlayerSwordThrow SwordThrow { get; private set; }
 
     #endregion
 
@@ -64,6 +66,11 @@ public class PlayerCore : MonoBehaviour
 
     public PlayerState CurrentState = PlayerState.Normal;
     public bool IsDead => CurrentState == PlayerState.Dead;
+    
+    /// <summary>
+    /// Returns true if player is currently invulnerable (e.g., during sword dash).
+    /// </summary>
+    public bool IsInvulnerable => CurrentState == PlayerState.DashingToSword;
 
     #endregion
 
@@ -85,6 +92,7 @@ public class PlayerCore : MonoBehaviour
         Look = GetComponent<PlayerLook>();
         Combat = GetComponent<PlayerCombat>();
         Health = GetComponent<PlayerHealth>();
+        SwordThrow = GetComponent<PlayerSwordThrow>();
 
         // Lock cursor
         Cursor.lockState = CursorLockMode.Locked;
@@ -106,6 +114,8 @@ public class PlayerCore : MonoBehaviour
             Dash.OnDashCompleted += HandleDashCompleted;
             Dash.OnWallStick += () => SetState(PlayerState.StuckToSurface);
             Dash.OnUnstick += () => SetState(PlayerState.Airborne);
+            Dash.OnSwordDashStarted += () => SetState(PlayerState.DashingToSword);
+            Dash.OnSwordDashCompleted += HandleSwordDashCompleted;
         }
 
         // Subscribe to movement for airborne detection
@@ -130,10 +140,14 @@ public class PlayerCore : MonoBehaviour
     /// <summary>
     /// Main entry point for dealing damage to the player.
     /// Routes to Combat (if blocking) or Health (if not).
+    /// Returns false if damage was ignored (e.g., player is invulnerable).
     /// </summary>
-    public void TakeDamage(float damage)
+    public bool TakeDamage(float damage)
     {
-        if (IsDead || damage <= 0) return;
+        if (IsDead || damage <= 0) return false;
+        
+        // NEW: Ignore damage while dashing to sword (invulnerable)
+        if (IsInvulnerable) return false;
 
         // Combat handles block logic, Health handles actual HP
         if (Combat != null && Combat.IsBlocking)
@@ -144,15 +158,23 @@ public class PlayerCore : MonoBehaviour
         {
             Health?.TakeDamage(damage);
         }
+        
+        return true;
     }
 
     /// <summary>
     /// Direct damage that bypasses blocking (e.g., environmental hazards).
+    /// Still respects invulnerability.
     /// </summary>
-    public void TakeDirectDamage(float damage)
+    public bool TakeDirectDamage(float damage)
     {
-        if (IsDead || damage <= 0) return;
+        if (IsDead || damage <= 0) return false;
+        
+        // NEW: Ignore damage while dashing to sword (invulnerable)
+        if (IsInvulnerable) return false;
+        
         Health?.TakeDamage(damage);
+        return true;
     }
 
     /// <summary>
@@ -217,6 +239,11 @@ public class PlayerCore : MonoBehaviour
             case PlayerState.StuckToSurface:
                 Dash?.ResetCharges();
                 break;
+                
+            case PlayerState.DashingToSword:
+                // Player is invulnerable during this dash
+                Debug.Log("[PlayerCore] Sword dash started - player is invulnerable");
+                break;
 
             case PlayerState.Dead:
                 Cursor.lockState = CursorLockMode.None;
@@ -232,6 +259,10 @@ public class PlayerCore : MonoBehaviour
             case PlayerState.Dead:
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
+                break;
+                
+            case PlayerState.DashingToSword:
+                Debug.Log("[PlayerCore] Sword dash ended - invulnerability removed");
                 break;
         }
     }
@@ -264,6 +295,19 @@ public class PlayerCore : MonoBehaviour
             SetState(PlayerState.Airborne);
         }
     }
+    
+    private void HandleSwordDashCompleted()
+    {
+        // After sword dash, determine state based on grounding
+        if (Controller.isGrounded)
+        {
+            SetState(PlayerState.Normal);
+        }
+        else
+        {
+            SetState(PlayerState.Airborne);
+        }
+    }
 
     #endregion
 
@@ -271,10 +315,31 @@ public class PlayerCore : MonoBehaviour
     #region Helper Queries (For subsystems)
     // ════════════════════════════════════════════════════════════════════════
 
-    public bool CanMove => CurrentState != PlayerState.Dead && CurrentState != PlayerState.Dashing && CurrentState != PlayerState.StuckToSurface;
-    public bool CanDash => CurrentState == PlayerState.Normal || CurrentState == PlayerState.Airborne || CurrentState == PlayerState.StuckToSurface;
-    public bool CanAttack => CurrentState != PlayerState.Dead && CurrentState != PlayerState.Dashing;
-    public bool CanBlock => CurrentState != PlayerState.Dead && CurrentState != PlayerState.Dashing;
+    public bool CanMove => CurrentState != PlayerState.Dead && 
+                           CurrentState != PlayerState.Dashing && 
+                           CurrentState != PlayerState.DashingToSword &&
+                           CurrentState != PlayerState.StuckToSurface;
+                           
+    public bool CanDash => CurrentState == PlayerState.Normal || 
+                           CurrentState == PlayerState.Airborne || 
+                           CurrentState == PlayerState.StuckToSurface;
+                           
+    public bool CanAttack => CurrentState != PlayerState.Dead && 
+                             CurrentState != PlayerState.Dashing &&
+                             CurrentState != PlayerState.DashingToSword;
+                             
+    public bool CanBlock => CurrentState != PlayerState.Dead && 
+                            CurrentState != PlayerState.Dashing &&
+                            CurrentState != PlayerState.DashingToSword;
+    
+    /// <summary>
+    /// Returns true if player can initiate a sword dash (sword is stuck somewhere).
+    /// </summary>
+    public bool CanSwordDash => CurrentState != PlayerState.Dead && 
+                                CurrentState != PlayerState.Dashing &&
+                                CurrentState != PlayerState.DashingToSword &&
+                                SwordThrow != null && 
+                                SwordThrow.IsSwordStuck;
 
     #endregion
 }

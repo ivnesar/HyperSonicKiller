@@ -7,6 +7,7 @@ using System;
 /// Communicates with PlayerCombat to disable attack/block while sword is thrown.
 /// 
 /// UPDATED: Added swordRemovalDamage - damage dealt when sword is recalled from an embedded enemy.
+/// UPDATED: Added ForceRecallWithDashDamage for sword dash mechanic.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerSwordThrow : MonoBehaviour
@@ -96,6 +97,9 @@ public class PlayerSwordThrow : MonoBehaviour
     
     /// <summary>Damage dealt when sword is removed from an enemy.</summary>
     public int SwordRemovalDamage => swordRemovalDamage;
+    
+    /// <summary>True if sword is currently embedded in an enemy.</summary>
+    public bool IsSwordInEnemy => activeSword != null && activeSword.IsStuck && activeSword.EmbeddedEnemy != null;
 
     #endregion
 
@@ -148,6 +152,7 @@ public class PlayerSwordThrow : MonoBehaviour
         // Can't throw while dead or dashing
         if (core.IsDead) return false;
         if (core.CurrentState == PlayerCore.PlayerState.Dashing) return false;
+        if (core.CurrentState == PlayerCore.PlayerState.DashingToSword) return false;
 
         return true;
     }
@@ -310,6 +315,7 @@ public class PlayerSwordThrow : MonoBehaviour
 
     /// <summary>
     /// Force recall the sword immediately (e.g., on death or scene change).
+    /// Does NOT deal extra damage to embedded enemy.
     /// </summary>
     public void ForceRecall()
     {
@@ -320,6 +326,26 @@ public class PlayerSwordThrow : MonoBehaviour
         }
 
         RestoreSword();
+    }
+
+    /// <summary>
+    /// Force recall the sword with additional damage dealt to embedded enemy.
+    /// Used by sword dash mechanic - player dashes to sword and retrieves it violently.
+    /// </summary>
+    /// <param name="extraDamage">Additional damage on top of normal removal damage</param>
+    public void ForceRecallWithDashDamage(int extraDamage)
+    {
+        if (activeSword != null)
+        {
+            // Deal damage to embedded enemy before destroying sword
+            activeSword.ApplyDashRemovalDamage(extraDamage, postRemovalStunDuration);
+            
+            Destroy(activeSword.gameObject);
+            activeSword = null;
+        }
+
+        RestoreSword();
+        OnSwordCaught?.Invoke();
     }
 
     /// <summary>

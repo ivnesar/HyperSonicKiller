@@ -6,6 +6,7 @@ using System;
 /// Uses segmented spherecasting for reliable collision detection at high speeds.
 /// 
 /// UPDATED: Now deals damage when sword is recalled/removed from an embedded enemy.
+/// UPDATED: Added ApplyDashRemovalDamage for sword dash mechanic - extra damage when player dashes to sword.
 /// </summary>
 public class ThrownSword : MonoBehaviour
 {
@@ -69,6 +70,16 @@ public class ThrownSword : MonoBehaviour
     public bool IsReturning => isReturning;
     public bool IsFlying => isFlying;
     public GameObject HitObject => hitObject;
+    
+    /// <summary>
+    /// Returns the enemy the sword is currently embedded in (null if not in an enemy).
+    /// </summary>
+    public IEnemy EmbeddedEnemy => embeddedEnemy;
+    
+    /// <summary>
+    /// Returns true if sword is currently embedded in an enemy.
+    /// </summary>
+    public bool IsEmbeddedInEnemy => embeddedEnemy != null && isStuck;
 
     #endregion
 
@@ -164,6 +175,29 @@ public class ThrownSword : MonoBehaviour
         {
             trail.Clear();
             trail.emitting = true;
+        }
+    }
+
+    /// <summary>
+    /// Apply damage when sword is removed via sword dash (player dashes to sword).
+    /// Deals extra damage on top of normal removal damage.
+    /// Called by PlayerSwordThrow.ForceRecallWithDashDamage().
+    /// </summary>
+    /// <param name="extraDamage">Additional damage from the dash attack</param>
+    /// <param name="stunDuration">Residual stun duration after removal</param>
+    public void ApplyDashRemovalDamage(int extraDamage, float stunDuration)
+    {
+        if (embeddedEnemy != null)
+        {
+            // Calculate total damage: normal removal damage + dash bonus damage
+            int totalDamage = removalDamage + extraDamage;
+            
+            // Deal combined damage and apply residual stun
+            embeddedEnemy.OnSwordRemoved(totalDamage, stunDuration);
+            
+            Debug.Log($"[ThrownSword] Dash removal from enemy - Dealt {totalDamage} damage ({removalDamage} base + {extraDamage} dash bonus), {stunDuration}s residual stun");
+            
+            embeddedEnemy = null;
         }
     }
 

@@ -4,6 +4,8 @@ using System;
 /// <summary>
 /// Handles dash movement and wall-stick mechanics.
 /// Communicates with PlayerCore for state changes.
+/// 
+/// NEW: Added sword dash - dash to stuck sword to retrieve it (invulnerable during dash).
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerDash : MonoBehaviour
@@ -17,6 +19,10 @@ public class PlayerDash : MonoBehaviour
     public event Action OnWallStick;
     public event Action OnUnstick;
     public event Action<int> OnChargesChanged;  // remaining charges
+    
+    // NEW: Sword dash events
+    public event Action OnSwordDashStarted;
+    public event Action OnSwordDashCompleted;
 
     #endregion
 
@@ -40,6 +46,16 @@ public class PlayerDash : MonoBehaviour
     [Header("Wall Stick")]
     [SerializeField] private float wallStickCheckDistance = 1f;
     [SerializeField] private float wallStickOffset = 0.5f;  // Distance from wall surface
+    
+    [Header("Sword Dash (NEW)")]
+    [Tooltip("Speed when dashing to retrieve the thrown sword")]
+    [SerializeField] private float swordDashSpeed = 40f;
+    
+    [Tooltip("How close the player needs to be to 'catch' the sword")]
+    [SerializeField] private float swordCatchDistance = 1.5f;
+    
+    [Tooltip("Damage dealt to enemy when retrieving sword via dash (on top of normal removal damage)")]
+    [SerializeField] private int swordDashDamage = 50;
 
     #endregion
 
@@ -48,6 +64,7 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private PlayerCore core;
+    private PlayerSwordThrow swordThrow;
 
     // Dash state
     private int currentCharges;
@@ -63,6 +80,10 @@ public class PlayerDash : MonoBehaviour
 
     // Flags
     private bool dashDisabled;
+    
+    // NEW: Sword dash state
+    private bool isSwordDashing;
+    private Transform swordDashTarget;
 
     #endregion
 
@@ -75,6 +96,9 @@ public class PlayerDash : MonoBehaviour
     public bool IsDashing => core.CurrentState == PlayerCore.PlayerState.Dashing;
     public bool IsStuck => core.CurrentState == PlayerCore.PlayerState.StuckToSurface;
     public Vector3 StuckSurfaceNormal => stuckSurfaceNormal;
+    
+    /// <summary>Returns true if currently dashing to sword.</summary>
+    public bool IsSwordDashing => isSwordDashing;
 
     #endregion
 
@@ -85,6 +109,7 @@ public class PlayerDash : MonoBehaviour
     private void Awake()
     {
         core = GetComponent<PlayerCore>();
+        swordThrow = GetComponent<PlayerSwordThrow>();
         currentCharges = maxDashCharges;
     }
 
@@ -102,6 +127,10 @@ public class PlayerDash : MonoBehaviour
             case PlayerCore.PlayerState.Dashing:
                 ProcessDashMovement();
                 CheckDashCancels();
+                break;
+                
+            case PlayerCore.PlayerState.DashingToSword:
+                ProcessSwordDashMovement();
                 break;
 
             case PlayerCore.PlayerState.StuckToSurface:
@@ -273,6 +302,129 @@ public class PlayerDash : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Sword Dash Logic (NEW)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Initiates a dash towards the stuck sword.
+    /// Called by PlayerCombat when Attack is pressed while disarmed.
+    /// Returns true if sword dash was started successfully.
+    /// </summary>
+    public bool TryStartSwordDash()
+    {
+        // Validate conditions
+        if (swordThrow == null || !swordThrow.IsSwordStuck) return false;
+        if (swordThrow.ActiveSword == null) return false;
+        if (isSwordDashing) return false;
+        if (core.IsDead) return false;
+        
+        // Get the sword transform as target
+        swordDashTarget = swordThrow.ActiveSword.transform;
+        if (swordDashTarget == null) return false;
+        
+        StartSwordDash();
+        return true;
+    }
+
+    private void StartSwordDash()
+    {
+        // Deactivate wall stick if active
+        DeactivateWallStick();
+        
+        isSwordDashing = true;
+        dashStartPosition = transform.position;
+        
+        // Rotate player to face the sword
+        Vector3 toSword = (swordDashTarget.position - transform.position);
+        toSword.y = 0; // Keep horizontal for body rotation
+        if (toSword.sqrMagnitude > 0.01f)
+        {
+            transform.rotation = Quaternion.LookRotation(toSword.normalized);
+        }
+        
+        // Apply same slow-mo as normal dash
+        Time.timeScale = dashTimeScale;
+        
+        OnSwordDashStarted?.Invoke();
+        
+        Debug.Log("[PlayerDash] Sword dash started!");
+    }
+
+    private void ProcessSwordDashMovement()
+    {
+        // Safety check - if sword was destroyed, cancel dash
+        if (swordDashTarget == null || swordThrow == null || swordThrow.ActiveSword == null)
+        {
+            CompleteSwordDash(caughtSword: false);
+            return;
+        }
+        
+        Vector3 targetPos = swordDashTarget.position;
+        Vector3 toTarget = targetPos - transform.position;
+        float distance = toTarget.magnitude;
+        
+        // Check if close enough to catch the sword
+        if (distance <= swordCatchDistance)
+        {
+            CompleteSwordDash(caughtSword: true);
+            return;
+        }
+        
+        // Move towards sword
+        Vector3 moveDirection = toTarget.normalized;
+        float moveDistance = swordDashSpeed * Time.unscaledDeltaTime;
+        
+        // Don't overshoot
+        moveDistance = Mathf.Min(moveDistance, distance);
+        
+        core.Controller.Move(moveDirection * moveDistance);
+        
+        // Keep facing the sword
+        Vector3 lookDir = toTarget;
+        lookDir.y = 0;
+        if (lookDir.sqrMagnitude > 0.01f)
+        {
+            transform.rotation = Quaternion.LookRotation(lookDir.normalized);
+        }
+    }
+
+    private void CompleteSwordDash(bool caughtSword)
+    {
+        Time.timeScale = 1f;
+        isSwordDashing = false;
+        swordDashTarget = null;
+        
+        if (caughtSword && swordThrow != null)
+        {
+            // Force the sword to return with extra dash damage to embedded enemy
+            swordThrow.ForceRecallWithDashDamage(swordDashDamage);
+            Debug.Log("[PlayerDash] Sword dash completed - sword caught!");
+        }
+        else
+        {
+            Debug.Log("[PlayerDash] Sword dash ended without catching sword");
+        }
+        
+        OnSwordDashCompleted?.Invoke();
+    }
+
+    /// <summary>
+    /// Force cancel the sword dash (e.g., if player dies mid-dash).
+    /// </summary>
+    public void ForceCancelSwordDash()
+    {
+        if (!isSwordDashing) return;
+        
+        Time.timeScale = 1f;
+        isSwordDashing = false;
+        swordDashTarget = null;
+        
+        OnSwordDashCompleted?.Invoke();
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Wall Stick Logic
     // ════════════════════════════════════════════════════════════════════════
 
@@ -421,6 +573,11 @@ public class PlayerDash : MonoBehaviour
         {
             CancelDash(-5f);
         }
+        else if (isSwordDashing)
+        {
+            ForceCancelSwordDash();
+            core.SetState(PlayerCore.PlayerState.Airborne);
+        }
         else if (IsStuck)
         {
             // Also handle being stuck to wall
@@ -454,6 +611,10 @@ public class PlayerDash : MonoBehaviour
         {
             Time.timeScale = 1f;
         }
+        
+        // Reset sword dash state
+        isSwordDashing = false;
+        swordDashTarget = null;
     }
 
     #endregion
@@ -471,6 +632,14 @@ public class PlayerDash : MonoBehaviour
             Gizmos.color = Color.cyan;
             Gizmos.DrawLine(dashStartPosition, dashTargetPosition);
             Gizmos.DrawWireSphere(dashTargetPosition, 0.5f);
+        }
+        
+        // NEW: Visualize sword dash
+        if (isSwordDashing && swordDashTarget != null)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawLine(transform.position, swordDashTarget.position);
+            Gizmos.DrawWireSphere(swordDashTarget.position, swordCatchDistance);
         }
 
         if (isWallStickActive)
