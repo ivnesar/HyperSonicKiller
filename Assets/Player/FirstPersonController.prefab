@@ -594,6 +594,10 @@ MonoBehaviour:
   dashCancelDownwardForce: 15
   wallStickCheckDistance: 1
   wallStickOffset: 0.5
+  swordDashSpeed: 40
+  swordCatchDistance: 1.5
+  swordDashDamage: 50
+  swordDashRotationDuration: 0.12
 --- !u!114 &8462264894812746746
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -56,6 +56,9 @@ public class PlayerDash : MonoBehaviour
     
     [Tooltip("Damage dealt to enemy when retrieving sword via dash (on top of normal removal damage)")]
     [SerializeField] private int swordDashDamage = 50;
+    
+    [Tooltip("Time to smoothly rotate towards the sword during dash (in seconds)")]
+    [SerializeField] private float swordDashRotationDuration = 0.2f;
 
     #endregion
 
@@ -84,6 +87,8 @@ public class PlayerDash : MonoBehaviour
     // NEW: Sword dash state
     private bool isSwordDashing;
     private Transform swordDashTarget;
+    private Quaternion swordDashStartRotation;
+    private float swordDashRotationTimer;
 
     #endregion
 
@@ -334,13 +339,9 @@ public class PlayerDash : MonoBehaviour
         isSwordDashing = true;
         dashStartPosition = transform.position;
         
-        // Rotate player to face the sword
-        Vector3 toSword = (swordDashTarget.position - transform.position);
-        toSword.y = 0; // Keep horizontal for body rotation
-        if (toSword.sqrMagnitude > 0.01f)
-        {
-            transform.rotation = Quaternion.LookRotation(toSword.normalized);
-        }
+        // Store current rotation for smooth interpolation
+        swordDashStartRotation = transform.rotation;
+        swordDashRotationTimer = 0f;
         
         // Apply same slow-mo as normal dash
         Time.timeScale = dashTimeScale;
@@ -370,7 +371,7 @@ public class PlayerDash : MonoBehaviour
             return;
         }
         
-        // Move towards sword
+        // Move towards sword (always dash in direction of sword, not facing direction)
         Vector3 moveDirection = toTarget.normalized;
         float moveDistance = swordDashSpeed * Time.unscaledDeltaTime;
         
@@ -379,12 +380,16 @@ public class PlayerDash : MonoBehaviour
         
         core.Controller.Move(moveDirection * moveDistance);
         
-        // Keep facing the sword
+        // Smoothly rotate towards the sword over the rotation duration
+        swordDashRotationTimer += Time.unscaledDeltaTime;
+        float rotationProgress = Mathf.Clamp01(swordDashRotationTimer / swordDashRotationDuration);
+        
         Vector3 lookDir = toTarget;
         lookDir.y = 0;
         if (lookDir.sqrMagnitude > 0.01f)
         {
-            transform.rotation = Quaternion.LookRotation(lookDir.normalized);
+            Quaternion targetRotation = Quaternion.LookRotation(lookDir.normalized);
+            transform.rotation = Quaternion.Slerp(swordDashStartRotation, targetRotation, rotationProgress);
         }
     }
 
@@ -418,6 +423,7 @@ public class PlayerDash : MonoBehaviour
         Time.timeScale = 1f;
         isSwordDashing = false;
         swordDashTarget = null;
+        swordDashRotationTimer = 0f;
         
         OnSwordDashCompleted?.Invoke();
     }
@@ -615,6 +621,7 @@ public class PlayerDash : MonoBehaviour
         // Reset sword dash state
         isSwordDashing = false;
         swordDashTarget = null;
+        swordDashRotationTimer = 0f;
     }
 
     #endregion
