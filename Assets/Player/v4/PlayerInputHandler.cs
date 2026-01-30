@@ -77,9 +77,9 @@ public class PlayerInputHandler : MonoBehaviour
             
             // Combat
             { "Attack",     new KeyBinding { Key = KeyCode.Mouse0 } },
-            { "Block",      new KeyBinding { Key = KeyCode.Mouse1 } },
-            { "ThrowSword", new KeyBinding { Key = KeyCode.R } },
-            { "ThrowDart",  new KeyBinding { Key = KeyCode.F } }
+            { "Block",      new KeyBinding {  } },
+            { "ThrowSword", new KeyBinding { Key = KeyCode.Mouse1 } },
+            { "ThrowDart",  new KeyBinding {  } }
         };
     }
 
