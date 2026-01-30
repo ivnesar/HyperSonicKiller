@@ -9,7 +9,9 @@ using UnityEngine.AI;
 /// REFACTORED: Now includes animator control (previously NPCanimatorController).
 /// UPDATED: Integrated with NpcRagdollController for death ragdolls.
 /// UPDATED: Migrated from INpcInteraction to IEnemy interface.
-/// UPDATED: Sword removal damage is now applied AFTER residual stun expires.
+/// UPDATED: Sword removal has two modes:
+///   - Normal recall (RMB): Damage applied AFTER residual stun expires
+///   - Sword dash: Damage applied IMMEDIATELY, then residual stun
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public abstract class NpcBase : MonoBehaviour, IEnemy
@@ -367,7 +369,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     }
 
     /// <summary>
-    /// IEnemy: Called when embedded sword is removed.
+    /// IEnemy: Called when embedded sword is removed via normal recall (RMB).
     /// Stores pending damage and starts residual stun. Damage is applied when stun ends.
     /// </summary>
     /// <param name="damage">Damage to be dealt when residual stun expires</param>
@@ -384,13 +386,54 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             pendingSwordRemovalDamage = damage;
             hasPendingSwordDamage = true;
             
-            Debug.Log($"[{gameObject.name}] Sword removed - {damage} damage pending after {residualStunDuration}s stun");
+            Debug.Log($"[{gameObject.name}] Sword removed (recall) - {damage} damage pending after {residualStunDuration}s stun");
         }
         
         // Start residual stun timer
         stunEndTime = Time.time + residualStunDuration;
         
         Debug.Log($"[{gameObject.name}] Residual stun started for {residualStunDuration}s");
+    }
+
+    /// <summary>
+    /// IEnemy: Called when embedded sword is removed via sword dash.
+    /// Damage is applied IMMEDIATELY, then residual stun is applied.
+    /// </summary>
+    /// <param name="damage">Damage dealt immediately</param>
+    /// <param name="residualStunDuration">Duration of stun after damage is applied</param>
+    public virtual void OnSwordDashRemoval(int damage, float residualStunDuration)
+    {
+        if (!hasSwordEmbedded) return;
+        
+        hasSwordEmbedded = false;
+        
+        // Clear any pending damage from previous interactions
+        hasPendingSwordDamage = false;
+        pendingSwordRemovalDamage = 0;
+        
+        // Apply damage IMMEDIATELY
+        if (damage > 0)
+        {
+            currentHealth -= damage;
+            
+            // Trigger hit reaction
+            animator?.SetTrigger("Hit");
+            PlaySound(hitSound);
+            
+            Debug.Log($"[{gameObject.name}] Sword dash removal - {damage} damage applied immediately. Health: {currentHealth}/{maxHealth}");
+            
+            // Check for death
+            if (currentHealth <= 0)
+            {
+                Die();
+                return; // Don't apply stun if dead
+            }
+        }
+        
+        // Start residual stun timer (enemy stays stunned but can recover)
+        stunEndTime = Time.time + residualStunDuration;
+        
+        Debug.Log($"[{gameObject.name}] Post-dash stun for {residualStunDuration}s");
     }
 
     /// <summary>

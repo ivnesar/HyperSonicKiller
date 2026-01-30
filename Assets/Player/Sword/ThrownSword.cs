@@ -6,7 +6,9 @@ using System;
 /// Uses segmented spherecasting for reliable collision detection at high speeds.
 /// 
 /// UPDATED: Now deals damage when sword is recalled/removed from an embedded enemy.
-/// UPDATED: Added ApplyDashRemovalDamage for sword dash mechanic - extra damage when player dashes to sword.
+/// UPDATED: Two removal modes:
+///   - Normal recall (RMB): Uses OnSwordRemoved() - damage after stun
+///   - Sword dash: Uses OnSwordDashRemoval() - damage IMMEDIATELY
 /// </summary>
 public class ThrownSword : MonoBehaviour
 {
@@ -181,6 +183,7 @@ public class ThrownSword : MonoBehaviour
     /// <summary>
     /// Apply damage when sword is removed via sword dash (player dashes to sword).
     /// Deals extra damage on top of normal removal damage.
+    /// Damage is applied IMMEDIATELY (not after stun).
     /// Called by PlayerSwordThrow.ForceRecallWithDashDamage().
     /// </summary>
     /// <param name="extraDamage">Additional damage from the dash attack</param>
@@ -192,10 +195,10 @@ public class ThrownSword : MonoBehaviour
             // Calculate total damage: normal removal damage + dash bonus damage
             int totalDamage = removalDamage + extraDamage;
             
-            // Deal combined damage and apply residual stun
-            embeddedEnemy.OnSwordRemoved(totalDamage, stunDuration);
+            // Use OnSwordDashRemoval for IMMEDIATE damage application
+            embeddedEnemy.OnSwordDashRemoval(totalDamage, stunDuration);
             
-            Debug.Log($"[ThrownSword] Dash removal from enemy - Dealt {totalDamage} damage ({removalDamage} base + {extraDamage} dash bonus), {stunDuration}s residual stun");
+            Debug.Log($"[ThrownSword] Dash removal from enemy - Dealt {totalDamage} damage IMMEDIATELY ({removalDamage} base + {extraDamage} dash bonus), {stunDuration}s residual stun");
             
             embeddedEnemy = null;
         }

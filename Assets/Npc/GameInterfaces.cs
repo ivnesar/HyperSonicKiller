@@ -100,12 +100,20 @@ public interface IEnemy : IDamageable, IStunnable
     void OnSwordEmbedded();
 
     /// <summary>
-    /// Called when the embedded sword is recalled/removed.
-    /// Deals damage to the enemy and applies residual stun.
+    /// Called when the embedded sword is recalled via normal recall (RMB).
+    /// Damage is applied AFTER residual stun expires.
     /// </summary>
-    /// <param name="damage">Damage dealt when sword is removed</param>
+    /// <param name="damage">Damage dealt when residual stun expires</param>
     /// <param name="residualStunDuration">Duration of stun after sword removal</param>
     void OnSwordRemoved(int damage, float residualStunDuration);
+
+    /// <summary>
+    /// Called when the embedded sword is removed via sword dash.
+    /// Damage is applied IMMEDIATELY, then residual stun is applied.
+    /// </summary>
+    /// <param name="damage">Damage dealt immediately</param>
+    /// <param name="residualStunDuration">Duration of stun after damage is applied</param>
+    void OnSwordDashRemoval(int damage, float residualStunDuration);
 
     // ────────────────────────────────────────────────────────────────────────
     // Ranged Damage
