@@ -83,8 +83,8 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Combat != null)
         {
             player.Combat.OnBlockHPChanged += UpdateBlockDisplay;
-            player.Combat.OnGuardBroken += HandleGuardBroken;
-            player.Combat.OnGuardRestored += HandleGuardRestored;
+            player.Combat.OnExhausted += HandleExhausted;
+            player.Combat.OnExhaustionRecovered += HandleExhaustionRecovered;
             player.Combat.OnCombatStateChanged += UpdateCombatStatus;
         }
 
@@ -110,8 +110,8 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Combat != null)
         {
             player.Combat.OnBlockHPChanged -= UpdateBlockDisplay;
-            player.Combat.OnGuardBroken -= HandleGuardBroken;
-            player.Combat.OnGuardRestored -= HandleGuardRestored;
+            player.Combat.OnExhausted -= HandleExhausted;
+            player.Combat.OnExhaustionRecovered -= HandleExhaustionRecovered;
             player.Combat.OnCombatStateChanged -= UpdateCombatStatus;
         }
 
@@ -210,7 +210,7 @@ public class PlayerHealthUI : MonoBehaviour
     {
         string status = state switch
         {
-            PlayerCombat.CombatState.Stunned => "<color=red>STUNNED</color>",
+            PlayerCombat.CombatState.Exhausted => "<color=orange>EXHAUSTED</color>",
             PlayerCombat.CombatState.Disarmed => "Sword Thrown",
             PlayerCombat.CombatState.Attacking => "ATTACK",
             _ => ""
@@ -244,14 +244,14 @@ public class PlayerHealthUI : MonoBehaviour
         InitializeUI();
     }
 
-    private void HandleGuardBroken()
+    private void HandleExhausted()
     {
-        UpdateStatus("<color=red>GUARD BROKEN!</color>");
+        UpdateStatus("<color=orange>EXHAUSTED!</color>");
     }
 
-    private void HandleGuardRestored()
+    private void HandleExhaustionRecovered()
     {
-        UpdateStatus("Guard Restored");
+        UpdateStatus("Recovered");
         
         // Clear status after a moment
         Invoke(nameof(ClearStatus), 1f);

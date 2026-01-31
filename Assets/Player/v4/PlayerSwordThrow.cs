@@ -104,6 +104,9 @@ public class PlayerSwordThrow : MonoBehaviour
 
     #endregion
 
+    // Reference to combat for exhaustion check
+    private PlayerCombat combat;
+
     // ════════════════════════════════════════════════════════════════════════
     #region Unity Lifecycle
     // ════════════════════════════════════════════════════════════════════════
@@ -111,6 +114,7 @@ public class PlayerSwordThrow : MonoBehaviour
     private void Awake()
     {
         core = GetComponent<PlayerCore>();
+        combat = GetComponent<PlayerCombat>();
     }
 
     private void Update()
@@ -154,6 +158,9 @@ public class PlayerSwordThrow : MonoBehaviour
         if (core.IsDead) return false;
         if (core.CurrentState == PlayerCore.PlayerState.Dashing) return false;
         if (core.CurrentState == PlayerCore.PlayerState.DashingToSword) return false;
+
+        // Can't throw while exhausted (BlockHP depleted)
+        if (combat != null && combat.IsExhausted) return false;
 
         return true;
     }

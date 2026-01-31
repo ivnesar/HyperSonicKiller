@@ -215,6 +215,49 @@ public class ThrownSword : MonoBehaviour
         StickToSurface(parent);
     }
 
+    /// <summary>
+    /// Force the sword to return immediately after being blocked by a shield.
+    /// Does NOT deal damage to any enemy, does NOT stick to anything.
+    /// Called by DefenderShield when sword hits the shield.
+    /// </summary>
+    public void ForceReturnFromShield()
+    {
+        // Stop any current flight/stuck state
+        isFlying = false;
+        isStuck = false;
+        
+        // Clear any parent (in case it briefly stuck)
+        transform.SetParent(null);
+        
+        // Clear enemy reference (shouldn't be any, but just in case)
+        embeddedEnemy = null;
+        hitObject = null;
+
+        // Find the player to return to
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            returnTarget = player.transform;
+            catchDistance = 1.5f; // Default catch distance
+            isReturning = true;
+
+            // Re-enable trail for return flight
+            if (trail != null)
+            {
+                trail.Clear();
+                trail.emitting = true;
+            }
+
+            Debug.Log("[ThrownSword] Deflected by shield - returning to player");
+        }
+        else
+        {
+            // No player found, just destroy
+            Debug.LogWarning("[ThrownSword] No player found for return after shield deflection!");
+            Destroy(gameObject);
+        }
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -337,6 +380,16 @@ public class ThrownSword : MonoBehaviour
     {
         hitObject = target;
         OnHitTarget?.Invoke(target);
+
+        // Check for DefenderShield FIRST (before IEnemy)
+        // Shield blocks sword completely - no embed, no stun on defender
+        DefenderShield shield = target.GetComponent<DefenderShield>();
+        if (shield != null)
+        {
+            // Shield handles the interaction (reflects sword, exhausts player)
+            shield.OnHitByThrownSword(this);
+            return; // Don't process as normal hit
+        }
 
         // Check for IEnemy (full sword interaction support)
         // Search up the hierarchy in case we hit a child collider

@@ -89,6 +89,9 @@ public class PlayerDash : MonoBehaviour
     
     [Tooltip("Layer mask for detecting enemies during dash")]
     [SerializeField] private LayerMask enemyLayer;
+    
+    [Tooltip("Layer mask for detecting defender shields during dash")]
+    [SerializeField] private LayerMask shieldLayer;
 
     #endregion
 
@@ -400,13 +403,25 @@ public class PlayerDash : MonoBehaviour
     }
 
     /// <summary>
-    /// Checks for enemies within the attack radius and damages them.
+    /// Checks for enemies and shields within the attack radius and processes hits.
+    /// Shields are checked first and can block the attack (dealing counter damage to player).
+    /// No damage is dealt when player is Exhausted.
     /// </summary>
     private void CheckAndDamageEnemiesInRadius()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, attackDashRadius, enemyLayer);
+        // Skip damage dealing if player is exhausted (dash still works, just no damage)
+        if (combat != null && combat.IsExhausted)
+        {
+            return;
+        }
+
+        // Check for shields FIRST (they have priority over enemies)
+        CheckShieldsInRadius();
+
+        // Then check for enemies
+        Collider[] enemyHits = Physics.OverlapSphere(transform.position, attackDashRadius, enemyLayer);
         
-        foreach (var col in hits)
+        foreach (var col in enemyHits)
         {
             if (col.TryGetComponent<IEnemy>(out var enemy))
             {
@@ -424,6 +439,35 @@ public class PlayerDash : MonoBehaviour
                     OnEnemyHitDuringDash?.Invoke(enemy);
                     
                     Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks for defender shields within the attack radius.
+    /// If a shield is hit from the front, it blocks and counter-attacks.
+    /// </summary>
+    private void CheckShieldsInRadius()
+    {
+        // Skip if no shield layer is set
+        if (shieldLayer == 0) return;
+
+        Collider[] shieldHits = Physics.OverlapSphere(transform.position, attackDashRadius, shieldLayer);
+        
+        foreach (var col in shieldHits)
+        {
+            DefenderShield shield = col.GetComponent<DefenderShield>();
+            if (shield != null)
+            {
+                // Let the shield determine if this is a frontal attack or not
+                // dashStartPosition is where the dash began (used to determine attack direction)
+                bool wasBlocked = shield.OnHitByDashAttack(dashStartPosition);
+                
+                if (wasBlocked)
+                {
+                    Debug.Log("[PlayerDash] Attack blocked by DefenderShield!");
+                    // Note: Shield already dealt counter damage to player
                 }
             }
         }
