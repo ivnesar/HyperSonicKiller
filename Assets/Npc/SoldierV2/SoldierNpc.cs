@@ -1,20 +1,16 @@
 using UnityEngine;
 
 /// <summary>
-/// Soldier NPC - Ranged combatant that:
-/// 1. Uses NavMesh to move to get line of sight and into shooting range
-/// 2. Fires bullets by directly instantiating bullet GameObjects
-/// 3. Reloads
-/// 4. Repeat
-/// 
-/// REFACTORED: State-Logik ist jetzt in SoldierStates.cs ausgelagert.
-/// Diese Klasse ist nur noch der Koordinator und hält die Konfiguration.
+/// Soldier NPC - Ranged Combatant.
+/// Verhaltensweisen:
+/// - Stationary: Bleibt an Position, schießt wenn Spieler in Reichweite
+/// - Pursuing: Verfolgt Spieler um Line-of-Sight und Schussreichweite zu bekommen
 /// </summary>
 public class SoldierNpc : NpcBase
 {
-    // ════════════════════════════════════════════════════════════════════════════
-    #region Inspector Fields - Combat Configuration
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    #region Inspector Fields
+    // ════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
     [SerializeField] private float preferredShootingRange = 12f;
@@ -26,6 +22,7 @@ public class SoldierNpc : NpcBase
     [SerializeField] private float timeBetweenShots = 0.15f;
     [SerializeField] private int shotsPerSalvo = 5;
     [SerializeField] private float reloadDuration = 2.0f;
+    [SerializeField] private float repositionCheckInterval = 0.5f;
 
     [Header("Combat - Accuracy")]
     [SerializeField] private float baseAccuracy = 0.85f;
@@ -34,7 +31,7 @@ public class SoldierNpc : NpcBase
     [Header("Combat - Damage")]
     [SerializeField] private int damagePerShot = 10;
 
-    [Header("Weapon Setup")]
+    [Header("Weapon")]
     [SerializeField] private Transform muzzlePoint;
     [SerializeField] private SoldierBullet bulletPrefab;
 
@@ -43,35 +40,24 @@ public class SoldierNpc : NpcBase
     [SerializeField] private AudioClip reloadSound;
     [SerializeField] private ParticleSystem muzzleFlash;
 
-    [Header("NavMesh Movement")]
-    [SerializeField] private float repositionCheckInterval = 0.5f;
-
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
-    #region Public Config Accessors (readonly für States)
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    #region Public Accessors (für States)
+    // ════════════════════════════════════════════════════════════════════════
 
-    // Ranges
     public float PreferredShootingRange => preferredShootingRange;
     public float MinShootingRange => minShootingRange;
     public float MaxShootingRange => maxShootingRange;
-
-    // Timing
     public float AimDuration => aimDuration;
     public float TimeBetweenShots => timeBetweenShots;
     public int ShotsPerSalvo => shotsPerSalvo;
     public float ReloadDuration => reloadDuration;
     public float RepositionCheckInterval => repositionCheckInterval;
-
-    // Accuracy
     public float BaseAccuracy => baseAccuracy;
     public float AccuracySpreadAngle => accuracySpreadAngle;
-
-    // Damage
     public int DamagePerShot => damagePerShot;
 
-    // Base class accessors (für States zugänglich machen)
     public Transform PlayerTransform => playerTransform;
     public float DetectionRange => detectionRange;
     public bool CanSeePlayer => canSeePlayer;
@@ -80,31 +66,28 @@ public class SoldierNpc : NpcBase
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     #region Runtime State
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
 
     private INpcState<SoldierNpc> currentState;
 
-    // Firing state data (wird von FiringState verwendet)
+    // State-spezifische Daten
     public float NextShotTime { get; set; }
     public int ShotsFiredInSalvo { get; set; }
     public float NextRepositionCheckTime { get; set; }
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     #region NpcBase Implementation
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
 
     protected override void OnStart()
     {
         if (bulletPrefab == null)
-        {
             Debug.LogError($"[{gameObject.name}] No bullet prefab assigned!");
-        }
 
-        // Starte im Idle-State
         ChangeState(new SoldierStates.Idle());
     }
 
@@ -112,47 +95,27 @@ public class SoldierNpc : NpcBase
     {
         if (currentState == null) return;
 
-        // State-Update gibt optional einen neuen State zurück
         var nextState = currentState.Update(this);
-
         if (nextState != null)
-        {
             ChangeState(nextState);
-        }
     }
 
-    protected override void OnStunStart()
-    {
-        ChangeState(new SoldierStates.Stunned());
-    }
+    protected override void OnStunStart() => ChangeState(new SoldierStates.Stunned());
 
-    protected override void OnStunEnd()
-    {
-        ChangeState(new SoldierStates.MovingToRange());
-    }
+    protected override void OnStunEnd() => ChangeState(new SoldierStates.MovingToRange());
 
-    public override string GetCurrentStateName()
-    {
-        return currentState?.StateName ?? "None";
-    }
+    public override string GetCurrentStateName() => currentState?.StateName ?? "None";
 
     public override NpcType GetNpcType() => NpcType.Soldier;
 
-    public override int GetStateID()
-    {
-        return currentState?.StateID ?? 0;
-    }
+    public override int GetStateID() => currentState?.StateID ?? 0;
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     #region State Management
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Wechselt zu einem neuen State.
-    /// Ruft Exit() auf dem alten und Enter() auf dem neuen State auf.
-    /// </summary>
     public void ChangeState(INpcState<SoldierNpc> newState)
     {
         currentState?.Exit(this);
@@ -160,20 +123,15 @@ public class SoldierNpc : NpcBase
         currentState?.Enter(this);
 
         if (showDebugInfo)
-        {
             Debug.Log($"[{gameObject.name}] State → {newState?.StateName}");
-        }
     }
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
-    #region Combat Actions (von States aufgerufen)
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    #region Combat Actions
+    // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Feuert einen einzelnen Schuss ab.
-    /// </summary>
     public void FireShot()
     {
         Vector3 targetPoint = playerTransform != null
@@ -183,41 +141,19 @@ public class SoldierNpc : NpcBase
         Vector3 perfectDirection = (targetPoint - muzzlePoint.position).normalized;
         Vector3 shotDirection = ApplyAccuracySpread(perfectDirection);
 
-        // VFX & Sound
-        //muzzleFlash?.Play();
-        //PlaySound(fireSound);
+        var bullet = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
+        bullet?.Initialize(shotDirection, damagePerShot, transform, lineOfSightMask);
 
-
-        // Bullet spawnen
-        SoldierBullet bulletComponent = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
-
-        if (bulletComponent != null)
-        {
-            bulletComponent.Initialize(shotDirection, damagePerShot, transform, lineOfSightMask);
-        }
-        else
-        {
-            Debug.LogError($"[{gameObject.name}] Bullet prefab missing SoldierBullet component!");
-            Destroy(bulletComponent.gameObject);
-        }
-
-        // Animator Trigger
         animator?.SetTrigger("Fire");
     }
 
-    /// <summary>
-    /// Spielt den Reload-Sound ab.
-    /// </summary>
-    public void PlayReloadSound()
-    {
-        PlaySound(reloadSound);
-    }
+    public void PlayReloadSound() => PlaySound(reloadSound);
 
     private Vector3 ApplyAccuracySpread(Vector3 perfectDirection)
     {
         float spreadAngle = Random.value <= baseAccuracy
-            ? accuracySpreadAngle * 0.2f  // Guter Schuss → wenig Spread
-            : accuracySpreadAngle;         // Schlechter Schuss → voller Spread
+            ? accuracySpreadAngle * 0.2f
+            : accuracySpreadAngle;
 
         Quaternion spread = Quaternion.Euler(
             Random.Range(-spreadAngle, spreadAngle),
@@ -229,71 +165,45 @@ public class SoldierNpc : NpcBase
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     #region Movement Helpers (Public für States)
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
 
-    // Diese Methoden sind protected in NpcBase, wir machen sie hier public
-    // damit die States darauf zugreifen können.
-
-    public new void MoveToward(Vector3 position, float speedMultiplier = 1f)
-    {
+    public new void MoveToward(Vector3 position, float speedMultiplier = 1f) =>
         base.MoveToward(position, speedMultiplier);
-    }
 
-    public new void StopMovement()
-    {
-        base.StopMovement();
-    }
+    public new void StopMovement() => base.StopMovement();
 
-    public new void RotateToward(Vector3 position, float speedMultiplier = 1f)
-    {
+    public new void RotateToward(Vector3 position, float speedMultiplier = 1f) =>
         base.RotateToward(position, speedMultiplier);
-    }
 
-    public new float GetDistanceToPlayer()
-    {
-        return base.GetDistanceToPlayer();
-    }
+    public new float GetDistanceToPlayer() => base.GetDistanceToPlayer();
 
-    public new Vector3 GetDirectionToPlayer()
-    {
-        return base.GetDirectionToPlayer();
-    }
+    public new Vector3 GetDirectionToPlayer() => base.GetDirectionToPlayer();
 
-    public new void SetStateTimer(float duration)
-    {
-        base.SetStateTimer(duration);
-    }
+    public new void SetStateTimer(float duration) => base.SetStateTimer(duration);
 
-    public new bool UpdateStateTimer()
-    {
-        return base.UpdateStateTimer();
-    }
+    public new bool UpdateStateTimer() => base.UpdateStateTimer();
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════════
-    #region Debug Visualization
-    // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    #region Debug
+    // ════════════════════════════════════════════════════════════════════════
 
     protected override void OnDrawGizmosSelected()
     {
         base.OnDrawGizmosSelected();
 
-        // Min Range (zu nah)
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
-        // Preferred Range (ideal)
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, preferredShootingRange);
 
-        // Max Range (zu weit)
-        Gizmos.color = new Color(1f, 0.5f, 0f); // Orange
+        Gizmos.color = new Color(1f, 0.5f, 0f);
         Gizmos.DrawWireSphere(transform.position, maxShootingRange);
 
-        // Muzzle Direction
         if (muzzlePoint != null)
         {
             Gizmos.color = Color.cyan;

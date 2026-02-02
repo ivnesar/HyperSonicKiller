@@ -751,7 +751,6 @@ Transform:
   m_Children:
   - {fileID: 6715754653127372163}
   - {fileID: 2828544880027105670}
-  - {fileID: 5363113495235611610}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &3767853563656458135
@@ -833,6 +832,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fbcc368b233f1124a8d5976473f91eae, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefenderNpc
+  behaviorMode: 1
   playerTransform: {fileID: 0}
   maxHealth: 100
   moveSpeed: 4
@@ -847,22 +847,8 @@ MonoBehaviour:
   useRagdollOnDeath: 1
   destroyDelay: 10
   showDebugInfo: 1
-  protectDistance: 2.5
-  repositionThreshold: 1.5
-  soldierSearchInterval: 0.5
-  blockDetectionRange: 4
-  blockAngle: 90
-  blockDuration: 0.8
-  blockCooldown: 0.3
-  perfectBlockWindow: 0.15
-  counterDuration: 0.6
-  counterRange: 2.5
-  counterDamage: 25
-  blockSound: {fileID: 0}
-  perfectBlockSound: {fileID: 0}
-  counterSound: {fileID: 0}
-  blockEffect: {fileID: 0}
-  perfectBlockEffect: {fileID: 0}
+  approachDistance: 1.5
+  reengageDistance: 3
 --- !u!114 &4891449849083221139
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1938,6 +1924,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2012788575354644146}
+  - {fileID: 5363113495235611610}
   m_Father: {fileID: 3261166803042749475}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!136 &4887964682390873131
@@ -2449,12 +2436,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9088637679061434273}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.00000011920929, y: 1.0000001, z: 0.6}
-  m_LocalScale: {x: 1.2, y: 1.5, z: 0.1}
+  m_LocalRotation: {x: 0.09641613, y: 0.6506192, z: -0.16969626, w: 0.73389506}
+  m_LocalPosition: {x: 0.00015, y: 0.00158, z: -0.0028}
+  m_LocalScale: {x: -0.011999996, y: -0.015, z: -0.0009999998}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 614902531416003641}
+  m_Father: {fileID: 6799100324046362052}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &7049300455519263750
 MeshFilter:
