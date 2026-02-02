@@ -3,11 +3,19 @@ using UnityEngine;
 // ════════════════════════════════════════════════════════════════════════════
 // DEFENDER STATES - Alle Zustände des Defender NPCs
 // ════════════════════════════════════════════════════════════════════════════
+//
+// States:
+// - Idle: Wartet, kein Pfad - alle "Warte-Situationen"
+// - Approaching: Läuft auf Spieler zu
+// - InPosition: Nah beim Spieler, wartet
+// - Stunned: Bewegungsunfähig
+//
+// ════════════════════════════════════════════════════════════════════════════
 
 namespace DefenderStates
 {
     // ────────────────────────────────────────────────────────────────────────
-    // IDLE - Wartet auf Spieler-Erkennung
+    // IDLE - Sammel-State für alle Warte-Situationen
     // ────────────────────────────────────────────────────────────────────────
     public class Idle : NpcStateBase<DefenderNpc>
     {
@@ -18,20 +26,28 @@ namespace DefenderStates
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
         {
-            // Zum Spieler drehen wenn sichtbar
+            // Immer: Langsam zur letzten bekannten Position drehen
             if (npc.CanSeePlayer && npc.PlayerTransform != null)
                 npc.RotateToward(npc.PlayerTransform.position, 0.5f);
+            else
+                npc.RotateTowardLastKnownPosition(0.3f);
 
-            // Spieler erkannt → Verhalten abhängig vom Modus
             float distance = npc.GetDistanceToPlayer();
 
-            if (npc.CanSeePlayer && distance <= npc.ApproachDistance * 5f)
+            // Spieler erkannt + Pfad vorhanden + Pursuing-Modus → Bewegen
+            if (npc.CanDetectPlayer && npc.HasValidPathToPlayer)
             {
                 if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing)
-                    return new Approaching();
-                // Stationär: Nur drehen, im Idle bleiben
+                {
+                    // Reaktionsverzögerung beachten
+                    if (npc.CanSeePlayer || npc.CanReactToPlayerLoss)
+                    {
+                        return new Approaching();
+                    }
+                }
             }
 
+            // Sonst: Weiter warten
             return null;
         }
     }
@@ -62,9 +78,24 @@ namespace DefenderStates
                 return new InPosition();
             }
 
-            // Weiter auf Spieler zulaufen
-            npc.MoveToward(npc.PlayerTransform.position);
-            npc.RotateToward(npc.PlayerTransform.position);
+            // Spieler verloren? (Kann letzte Position sehen aber Spieler nicht dort)
+            if (npc.HasLostPlayer)
+            {
+                npc.StopMovement();
+                return new Idle();
+            }
+
+            // Kein gültiger Pfad mehr → zurück zu Idle
+            if (!npc.HasValidPathToPlayer)
+            {
+                npc.StopMovement();
+                return new Idle();
+            }
+
+            // Bewegung zur aktuellen Position (wenn sichtbar) oder letzten bekannten Position
+            Vector3 target = npc.CanSeePlayer ? npc.PlayerTransform.position : npc.LastKnownPlayerPosition;
+            npc.MoveToward(target);
+            npc.RotateToward(target);
 
             return null;
         }
@@ -93,18 +124,20 @@ namespace DefenderStates
         {
             if (npc.PlayerTransform == null) return new Idle();
 
-            // Immer zum Spieler drehen
-            npc.RotateToward(npc.PlayerTransform.position, 2f);
+            // Zur letzten bekannten Position drehen
+            npc.RotateTowardLastKnownPosition(2f);
 
             float distance = npc.GetDistanceToPlayer();
 
-            // Spieler zu weit weg → wieder verfolgen
+            // Spieler zu weit weg?
             if (distance > npc.ReengageDistance)
             {
-                if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing)
-                    return new Approaching();
-                else
-                    return new Idle();
+                // Reaktionsverzögerung beachten
+                if (!npc.CanSeePlayer && !npc.CanReactToPlayerLoss)
+                    return null; // Noch warten
+
+                // Zurück zu Idle (übernimmt Pfad-Check etc.)
+                return new Idle();
             }
 
             return null;

@@ -25,7 +25,7 @@ public enum NpcType
 
 /// <summary>
 /// Abstrakte Basisklasse für alle NPC-Gegner.
-/// Handhabt: Movement, Stun, Health, Sword-Interaktion, Animation.
+/// Handhabt: Movement, Stun, Health, Sword-Interaktion, Animation, Awareness.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public abstract class NpcBase : MonoBehaviour, IEnemy
@@ -50,8 +50,27 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
     [Header("Detection")]
     [SerializeField] protected float detectionRange = 25f;
-    [SerializeField] protected float fieldOfView = 120f;
     [SerializeField] protected LayerMask lineOfSightMask;
+
+    [Header("Tracking FOV (für aktives Verfolgen)")]
+    [Tooltip("Fester FOV für aktives Tracking - Spieler muss hier drin sein damit NPC ihn anvisieren kann")]
+    [SerializeField] protected float trackingFOV = 120f;
+
+    [Header("Detection FOV (für Wahrnehmung)")]
+    [Tooltip("FOV wenn Spieler weit entfernt ist - nur für initiale Erkennung")]
+    [SerializeField] protected float detectionFOVFar = 60f;
+    [Tooltip("FOV wenn Spieler sehr nah ist (360 = Rundumwahrnehmung) - 'spürt' dass jemand da ist")]
+    [SerializeField] protected float detectionFOVNear = 360f;
+    [Tooltip("Distanz ab der volle Nahbereichs-FOV gilt")]
+    [SerializeField] protected float detectionNearDistance = 2f;
+    [Tooltip("Distanz ab der minimaler Fernbereichs-FOV gilt")]
+    [SerializeField] protected float detectionFarDistance = 15f;
+
+    [Header("Awareness")]
+    [Tooltip("Verzögerung bevor der NPC reagiert wenn der Spieler aus dem Sichtfeld verschwindet")]
+    [SerializeField] protected float reactionDelay = 0.3f;
+    [Tooltip("Rotationsgeschwindigkeit-Multiplikator wenn Spieler nicht sichtbar ist (0.3 = 30% der normalen Geschwindigkeit)")]
+    [SerializeField] protected float blindRotationMultiplier = 0.3f;
 
     [Header("Audio")]
     [SerializeField] protected AudioClip hitSound;
@@ -88,9 +107,20 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     protected int pendingSwordRemovalDamage;
     protected bool hasPendingSwordDamage;
     protected float stateTimer;
-    protected bool canSeePlayer;
+    protected Vector3 startPosition;
+
+    // Visibility & Awareness
+    protected bool canSeePlayer;            // Tracking: Kann aktiv verfolgen
+    protected bool canDetectPlayer;         // Detection: Weiß dass Spieler da ist
     protected float lastVisibilityCheckTime;
-    protected Vector3 startPosition; // Für stationären Modus
+    protected Vector3 lastKnownPlayerPosition;
+    protected float lostSightTime;              // Wann wurde der Spieler zuletzt aus den Augen verloren
+    protected bool hadPlayerInSight;            // War der Spieler jemals im Sichtfeld
+
+    // Pathfinding
+    protected bool hasValidPathToPlayer;
+    protected float lastPathCheckTime;
+    protected const float PATH_CHECK_INTERVAL = 0.5f;
 
     private float currentSpeedVelocity;
     private const float VISIBILITY_CHECK_INTERVAL = 0.15f;
@@ -111,6 +141,39 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     public float RemainingStunTime => isStunned ? Mathf.Max(0f, stunEndTime - Time.time) : 0f;
     public Transform Transform => transform;
 
+    /// <summary>
+    /// Letzte bekannte Position des Spielers (wird nur aktualisiert wenn Spieler sichtbar).
+    /// </summary>
+    public Vector3 LastKnownPlayerPosition => lastKnownPlayerPosition;
+
+    /// <summary>
+    /// True wenn die Reaktionsverzögerung abgelaufen ist und der NPC reagieren darf.
+    /// </summary>
+    public bool CanReactToPlayerLoss => Time.time >= lostSightTime + reactionDelay;
+
+    /// <summary>
+    /// True wenn der NPC den Spieler aktiv verfolgen kann (im Tracking-FOV).
+    /// lastKnownPlayerPosition wird nur aktualisiert wenn dies true ist.
+    /// </summary>
+    public bool CanSeePlayer => canSeePlayer;
+
+    /// <summary>
+    /// True wenn der NPC den Spieler wahrnimmt (im Detection-FOV).
+    /// Wird für initiale Erkennung und "Spüren" von nahen Gegnern verwendet.
+    /// </summary>
+    public bool CanDetectPlayer => canDetectPlayer;
+
+    /// <summary>
+    /// True wenn ein gültiger NavMesh-Pfad zum Spieler existiert.
+    /// </summary>
+    public bool HasValidPathToPlayer => hasValidPathToPlayer;
+
+    /// <summary>
+    /// True wenn der NPC die letzte bekannte Position sehen kann aber der Spieler nicht dort ist.
+    /// Bedeutet: Spieler ist entkommen, Bewegung zur letzten Position ist sinnlos.
+    /// </summary>
+    public bool HasLostPlayer => HasLostPlayerAtLastKnownPosition();
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -126,6 +189,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         currentHealth = maxHealth;
         startPosition = transform.position;
+        lastKnownPlayerPosition = transform.position + transform.forward * 5f; // Default: vor dem NPC
 
         if (navAgent != null)
         {
@@ -143,6 +207,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             var player = GameObject.FindGameObjectWithTag("Player");
             if (player != null) playerTransform = player.transform;
         }
+
+        // Initiale Position speichern falls Spieler schon existiert
+        if (playerTransform != null)
+            lastKnownPlayerPosition = playerTransform.position;
 
         OnStart();
     }
@@ -171,6 +239,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
 
         UpdateVisibilityCache();
+        UpdatePathCache();
         UpdateBehavior();
         UpdateAnimator();
     }
@@ -382,6 +451,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
                (!navAgent.hasPath || navAgent.velocity.sqrMagnitude < 0.01f);
     }
 
+    /// <summary>
+    /// Rotiert den NPC zu einer Zielposition.
+    /// Wenn der Spieler nicht sichtbar ist, wird langsamer rotiert.
+    /// </summary>
     protected void RotateToward(Vector3 targetPosition, float speedMultiplier = 1f)
     {
         Vector3 direction = targetPosition - transform.position;
@@ -389,13 +462,25 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         if (direction.sqrMagnitude > 0.01f)
         {
+            // Langsamere Rotation wenn Spieler nicht sichtbar
+            float effectiveMultiplier = canSeePlayer ? speedMultiplier : speedMultiplier * blindRotationMultiplier;
+
             Quaternion targetRotation = Quaternion.LookRotation(direction);
             transform.rotation = Quaternion.Slerp(
                 transform.rotation,
                 targetRotation,
-                rotationSpeed * speedMultiplier * Time.deltaTime
+                rotationSpeed * effectiveMultiplier * Time.deltaTime
             );
         }
+    }
+
+    /// <summary>
+    /// Rotiert zur letzten bekannten Spielerposition.
+    /// Nützlich wenn der Spieler gerade aus dem Sichtfeld verschwunden ist.
+    /// </summary>
+    protected void RotateTowardLastKnownPosition(float speedMultiplier = 1f)
+    {
+        RotateToward(lastKnownPlayerPosition, speedMultiplier);
     }
 
     #endregion
@@ -422,12 +507,73 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     {
         if (Time.time - lastVisibilityCheckTime >= VISIBILITY_CHECK_INTERVAL)
         {
-            canSeePlayer = CheckLineOfSightToPlayer();
+            bool wasVisible = canSeePlayer;
+            
+            // Zwei separate Checks
+            canSeePlayer = CheckTrackingLineOfSight();      // Enges FOV - für aktives Verfolgen
+            canDetectPlayer = CheckDetectionLineOfSight(); // Dynamisches FOV - für Wahrnehmung
+
+            // Position nur aktualisieren wenn im TRACKING-FOV (nicht Detection!)
+            if (canSeePlayer && playerTransform != null)
+            {
+                lastKnownPlayerPosition = playerTransform.position;
+                hadPlayerInSight = true;
+            }
+            // Spieler gerade aus TRACKING-Sicht verloren → Timer starten
+            else if (wasVisible && !canSeePlayer)
+            {
+                lostSightTime = Time.time;
+            }
+
             lastVisibilityCheckTime = Time.time;
         }
     }
 
-    protected bool CheckLineOfSightToPlayer()
+    /// <summary>
+    /// Prüft periodisch ob ein gültiger Pfad zum Spieler existiert.
+    /// </summary>
+    protected void UpdatePathCache()
+    {
+        if (Time.time - lastPathCheckTime >= PATH_CHECK_INTERVAL)
+        {
+            hasValidPathToPlayer = CheckPathToPlayer();
+            lastPathCheckTime = Time.time;
+        }
+    }
+
+    /// <summary>
+    /// Prüft ob ein vollständiger NavMesh-Pfad zum Spieler existiert.
+    /// </summary>
+    protected bool CheckPathToPlayer()
+    {
+        if (playerTransform == null || navAgent == null || !navAgent.enabled)
+            return false;
+
+        NavMeshPath path = new NavMeshPath();
+        navAgent.CalculatePath(playerTransform.position, path);
+        
+        return path.status == NavMeshPathStatus.PathComplete;
+    }
+
+    /// <summary>
+    /// Prüft ob ein vollständiger NavMesh-Pfad zu einer Position existiert.
+    /// </summary>
+    protected bool CheckPathToPosition(Vector3 targetPosition)
+    {
+        if (navAgent == null || !navAgent.enabled)
+            return false;
+
+        NavMeshPath path = new NavMeshPath();
+        navAgent.CalculatePath(targetPosition, path);
+        
+        return path.status == NavMeshPathStatus.PathComplete;
+    }
+
+    /// <summary>
+    /// Tracking Check: Kann der NPC den Spieler aktiv anvisieren?
+    /// Verwendet festen trackingFOV.
+    /// </summary>
+    protected bool CheckTrackingLineOfSight()
     {
         if (playerTransform == null) return false;
 
@@ -436,9 +582,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         if (distanceToPlayer > detectionRange) return false;
 
+        // Fester Tracking-FOV
         float angle = Vector3.Angle(transform.forward, directionToPlayer);
-        if (angle > fieldOfView * 0.5f) return false;
+        if (angle > trackingFOV * 0.5f) return false;
 
+        // Raycast für Hindernisse
         Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
         Vector3 targetPosition = playerTransform.position + Vector3.up * 1f;
 
@@ -449,6 +597,55 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Detection Check: Nimmt der NPC den Spieler wahr?
+    /// Verwendet dynamischen FOV basierend auf Distanz.
+    /// </summary>
+    protected bool CheckDetectionLineOfSight()
+    {
+        if (playerTransform == null) return false;
+
+        Vector3 directionToPlayer = playerTransform.position - transform.position;
+        float distanceToPlayer = directionToPlayer.magnitude;
+
+        if (distanceToPlayer > detectionRange) return false;
+
+        // Dynamischer Detection-FOV
+        float currentFov = CalculateDynamicDetectionFOV(distanceToPlayer);
+        
+        float angle = Vector3.Angle(transform.forward, directionToPlayer);
+        if (angle > currentFov * 0.5f) return false;
+
+        // Raycast für Hindernisse
+        Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
+        Vector3 targetPosition = playerTransform.position + Vector3.up * 1f;
+
+        if (Physics.Raycast(eyePosition, (targetPosition - eyePosition).normalized,
+            out RaycastHit hit, distanceToPlayer, lineOfSightMask))
+        {
+            return hit.transform == playerTransform || hit.transform.IsChildOf(playerTransform);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Berechnet den Detection-FOV basierend auf der Distanz.
+    /// Je näher der Spieler, desto größer der FOV (bis zu 360°).
+    /// </summary>
+    protected float CalculateDynamicDetectionFOV(float distance)
+    {
+        if (distance <= detectionNearDistance)
+            return detectionFOVNear;
+        
+        if (distance >= detectionFarDistance)
+            return detectionFOVFar;
+
+        // Linear interpolieren zwischen Near und Far
+        float t = (distance - detectionNearDistance) / (detectionFarDistance - detectionNearDistance);
+        return Mathf.Lerp(detectionFOVNear, detectionFOVFar, t);
     }
 
     protected float GetDistanceToPlayer()
@@ -464,6 +661,54 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         Vector3 dir = playerTransform.position - transform.position;
         dir.y = 0f;
         return dir.normalized;
+    }
+
+    /// <summary>
+    /// Gibt die Richtung zur letzten bekannten Spielerposition zurück.
+    /// </summary>
+    protected Vector3 GetDirectionToLastKnownPosition()
+    {
+        Vector3 dir = lastKnownPlayerPosition - transform.position;
+        dir.y = 0f;
+        return dir.normalized;
+    }
+
+    /// <summary>
+    /// Prüft ob der NPC eine bestimmte Position sehen kann (Line of Sight).
+    /// </summary>
+    protected bool CanSeePosition(Vector3 targetPosition)
+    {
+        Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
+        Vector3 direction = targetPosition - eyePosition;
+        float distance = direction.magnitude;
+
+        // Zu weit weg
+        if (distance > detectionRange) return false;
+
+        // Raycast - wenn nichts getroffen wird, ist die Position sichtbar
+        if (Physics.Raycast(eyePosition, direction.normalized, out RaycastHit hit, distance, lineOfSightMask))
+        {
+            // Etwas blockiert die Sicht
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Prüft ob der NPC die letzte bekannte Spielerposition sehen kann,
+    /// aber der Spieler nicht dort ist (= Spieler ist entkommen).
+    /// </summary>
+    protected bool HasLostPlayerAtLastKnownPosition()
+    {
+        // Spieler ist sichtbar → nicht verloren
+        if (canSeePlayer) return false;
+
+        // Kann die letzte bekannte Position sehen?
+        if (!CanSeePosition(lastKnownPlayerPosition)) return false;
+
+        // Position sichtbar aber Spieler nicht → verloren
+        return true;
     }
 
     #endregion
@@ -575,19 +820,50 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
-        // Field of View
+        // Tracking FOV (fester Kegel - grün)
+        Gizmos.color = Color.green;
+        Vector3 leftTracking = Quaternion.Euler(0, -trackingFOV * 0.5f, 0) * transform.forward;
+        Vector3 rightTracking = Quaternion.Euler(0, trackingFOV * 0.5f, 0) * transform.forward;
+        Gizmos.DrawRay(transform.position + Vector3.up, leftTracking * detectionRange * 0.5f);
+        Gizmos.DrawRay(transform.position + Vector3.up, rightTracking * detectionRange * 0.5f);
+
+        // Detection FOV - Far (äußerer Kegel - blau)
         Gizmos.color = Color.blue;
-        Vector3 leftBoundary = Quaternion.Euler(0, -fieldOfView * 0.5f, 0) * transform.forward;
-        Vector3 rightBoundary = Quaternion.Euler(0, fieldOfView * 0.5f, 0) * transform.forward;
-        Gizmos.DrawRay(transform.position + Vector3.up, leftBoundary * detectionRange);
-        Gizmos.DrawRay(transform.position + Vector3.up, rightBoundary * detectionRange);
+        Vector3 leftDetectionFar = Quaternion.Euler(0, -detectionFOVFar * 0.5f, 0) * transform.forward;
+        Vector3 rightDetectionFar = Quaternion.Euler(0, detectionFOVFar * 0.5f, 0) * transform.forward;
+        Gizmos.DrawRay(transform.position + Vector3.up, leftDetectionFar * detectionFarDistance);
+        Gizmos.DrawRay(transform.position + Vector3.up, rightDetectionFar * detectionFarDistance);
+
+        // Detection FOV - Near (innerer Bereich - cyan)
+        if (detectionFOVNear < 360f)
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 leftDetectionNear = Quaternion.Euler(0, -detectionFOVNear * 0.5f, 0) * transform.forward;
+            Vector3 rightDetectionNear = Quaternion.Euler(0, detectionFOVNear * 0.5f, 0) * transform.forward;
+            Gizmos.DrawRay(transform.position + Vector3.up, leftDetectionNear * detectionNearDistance);
+            Gizmos.DrawRay(transform.position + Vector3.up, rightDetectionNear * detectionNearDistance);
+        }
+        else
+        {
+            // 360° Nahbereich als Kreis darstellen
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireSphere(transform.position + Vector3.up, detectionNearDistance);
+        }
 
         // Startposition für stationären Modus
         if (behaviorMode == BehaviorMode.Stationary)
         {
-            Gizmos.color = Color.cyan;
+            Gizmos.color = Color.magenta;
             Vector3 pos = Application.isPlaying ? startPosition : transform.position;
             Gizmos.DrawWireSphere(pos, 0.5f);
+        }
+
+        // Letzte bekannte Spielerposition (nur im Play Mode)
+        if (Application.isPlaying && hadPlayerInSight)
+        {
+            Gizmos.color = canSeePlayer ? Color.green : Color.red;
+            Gizmos.DrawWireSphere(lastKnownPlayerPosition, 0.3f);
+            Gizmos.DrawLine(transform.position + Vector3.up, lastKnownPlayerPosition + Vector3.up);
         }
 
         // NavMesh Path
@@ -608,9 +884,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (screenPos.z > 0)
         {
             string modeStr = behaviorMode == BehaviorMode.Stationary ? "[S]" : "[P]";
+            // 👁 = Tracking (kann anvisieren), 👂 = Detection only (spürt), ? = nichts
+            string sightStr = canSeePlayer ? "👁" : (canDetectPlayer ? "👂" : "?");
             GUI.Label(
                 new Rect(screenPos.x - 50, Screen.height - screenPos.y, 100, 60),
-                $"{GetNpcType()} {modeStr}\n{GetCurrentStateName()}\nHP: {currentHealth}/{maxHealth}"
+                $"{GetNpcType()} {modeStr} {sightStr}\n{GetCurrentStateName()}\nHP: {currentHealth}/{maxHealth}"
             );
         }
     }

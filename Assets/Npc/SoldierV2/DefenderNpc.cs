@@ -7,6 +7,10 @@ using UnityEngine;
 /// Verhaltensweisen:
 /// - Stationary: Bleibt an Position, dreht sich zum Spieler
 /// - Pursuing: Läuft auf den Spieler zu (stoppt bei approachDistance)
+/// 
+/// Awareness-System:
+/// - Reagiert verzögert wenn Spieler aus Sicht verschwindet
+/// - Dreht sich langsamer wenn Spieler nicht sichtbar
 /// </summary>
 public class DefenderNpc : NpcBase
 {
@@ -30,7 +34,12 @@ public class DefenderNpc : NpcBase
     public float ApproachDistance => approachDistance;
     public float ReengageDistance => reengageDistance;
     public Transform PlayerTransform => playerTransform;
-    public bool CanSeePlayer => canSeePlayer;
+    public new bool CanSeePlayer => canSeePlayer;
+    public new bool CanDetectPlayer => canDetectPlayer;
+    public new bool CanReactToPlayerLoss => base.CanReactToPlayerLoss;
+    public new bool HasValidPathToPlayer => hasValidPathToPlayer;
+    public new bool HasLostPlayer => base.HasLostPlayer;
+    public new Vector3 LastKnownPlayerPosition => lastKnownPlayerPosition;
     public Animator NpcAnimator => animator;
 
     #endregion
@@ -106,6 +115,9 @@ public class DefenderNpc : NpcBase
 
     public new void RotateToward(Vector3 position, float speedMultiplier = 1f) =>
         base.RotateToward(position, speedMultiplier);
+
+    public new void RotateTowardLastKnownPosition(float speedMultiplier = 1f) =>
+        base.RotateTowardLastKnownPosition(speedMultiplier);
 
     public new float GetDistanceToPlayer() => base.GetDistanceToPlayer();
 

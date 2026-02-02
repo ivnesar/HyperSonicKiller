@@ -5,6 +5,10 @@ using UnityEngine;
 /// Verhaltensweisen:
 /// - Stationary: Bleibt an Position, schießt wenn Spieler in Reichweite
 /// - Pursuing: Verfolgt Spieler um Line-of-Sight und Schussreichweite zu bekommen
+/// 
+/// Awareness-System:
+/// - Schießt auf die letzte bekannte Spielerposition (nicht die aktuelle)
+/// - Reagiert verzögert wenn Spieler aus Sicht verschwindet
 /// </summary>
 public class SoldierNpc : NpcBase
 {
@@ -60,7 +64,12 @@ public class SoldierNpc : NpcBase
 
     public Transform PlayerTransform => playerTransform;
     public float DetectionRange => detectionRange;
-    public bool CanSeePlayer => canSeePlayer;
+    public new bool CanSeePlayer => canSeePlayer;
+    public new bool CanDetectPlayer => canDetectPlayer;
+    public new bool CanReactToPlayerLoss => base.CanReactToPlayerLoss;
+    public new bool HasValidPathToPlayer => hasValidPathToPlayer;
+    public new bool HasLostPlayer => base.HasLostPlayer;
+    public new Vector3 LastKnownPlayerPosition => lastKnownPlayerPosition;
     public Animator NpcAnimator => animator;
     public LayerMask LineOfSightMask => lineOfSightMask;
 
@@ -132,12 +141,16 @@ public class SoldierNpc : NpcBase
     #region Combat Actions
     // ════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Feuert einen Schuss auf die letzte bekannte Spielerposition.
+    /// - Spieler sichtbar → lastKnownPlayerPosition wird aktualisiert → Kugeln "tracken"
+    /// - Spieler nicht sichtbar → Position bleibt gleich → Kugeln fliegen zur alten Position
+    /// </summary>
     public void FireShot()
     {
-        Vector3 targetPoint = playerTransform != null
-            ? playerTransform.position + Vector3.up * 1f
-            : transform.forward * 100f;
-
+        // Ziel ist immer die letzte bekannte Position (+Höhenoffset für Körpermitte)
+        Vector3 targetPoint = lastKnownPlayerPosition + Vector3.up * 1f;
+        
         Vector3 perfectDirection = (targetPoint - muzzlePoint.position).normalized;
         Vector3 shotDirection = ApplyAccuracySpread(perfectDirection);
 
@@ -176,6 +189,9 @@ public class SoldierNpc : NpcBase
 
     public new void RotateToward(Vector3 position, float speedMultiplier = 1f) =>
         base.RotateToward(position, speedMultiplier);
+
+    public new void RotateTowardLastKnownPosition(float speedMultiplier = 1f) =>
+        base.RotateTowardLastKnownPosition(speedMultiplier);
 
     public new float GetDistanceToPlayer() => base.GetDistanceToPlayer();
 

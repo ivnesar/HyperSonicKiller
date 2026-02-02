@@ -729,6 +729,7 @@ GameObject:
   - component: {fileID: 3141529538732586769}
   - component: {fileID: 3415283527969894265}
   - component: {fileID: 4891449849083221139}
+  - component: {fileID: 2021042655059817858}
   m_Layer: 6
   m_Name: Npc_Defender
   m_TagString: Enemy
@@ -839,10 +840,16 @@ MonoBehaviour:
   rotationSpeed: 10
   stoppingDistance: 0.5
   detectionRange: 25
-  fieldOfView: 120
   lineOfSightMask:
     serializedVersion: 2
     m_Bits: 136
+  trackingFOV: 120
+  detectionFOVFar: 60
+  detectionFOVNear: 360
+  detectionNearDistance: 2
+  detectionFarDistance: 15
+  reactionDelay: 0.3
+  blindRotationMultiplier: 0.3
   hitSound: {fileID: 0}
   useRagdollOnDeath: 1
   destroyDelay: 10
@@ -873,6 +880,40 @@ MonoBehaviour:
   accumulateBulletImpacts: 1
   mainRigidbody: {fileID: 0}
   showDebugInfo: 0
+--- !u!114 &2021042655059817858
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa64e76d9deb88449974112c59975987, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcDebugInspector
+  npcType: 0
+  currentState: "\u2014"
+  stateID: 0
+  behaviorMode: 0
+  currentHealth: 0
+  maxHealth: 0
+  isDead: 0
+  isStunned: 0
+  remainingStunTime: 0
+  canSeePlayer: 0
+  canDetectPlayer: 0
+  canReactToPlayerLoss: 0
+  lastKnownPlayerPosition: {x: 0, y: 0, z: 0}
+  distanceToPlayer: 0
+  hasValidPathToPlayer: 0
+  hasReachedDestination: 0
+  shotsFiredInSalvo: 0
+  shotsPerSalvo: 0
+  isInShootingRange: 0
+  approachDistance: 0
+  reengageDistance: 0
+  isInApproachRange: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0
