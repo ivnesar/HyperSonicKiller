@@ -92,6 +92,13 @@ public class PlayerDash : MonoBehaviour
     
     [Tooltip("Layer mask for detecting defender shields during dash")]
     [SerializeField] private LayerMask shieldLayer;
+    
+    [Header("Attack Angle Thresholds")]
+    [Tooltip("Max angle from dash direction to hit normal enemies (generous)")]
+    [SerializeField] private float enemyHitAngle = 60f;
+    
+    [Tooltip("Max angle from dash direction to hit shields (strict - requires precision)")]
+    [SerializeField] private float shieldHitAngle = 25f;
 
     #endregion
 
@@ -406,6 +413,9 @@ public class PlayerDash : MonoBehaviour
     /// Checks for enemies and shields within the attack radius and processes hits.
     /// Shields are checked first and can block the attack (dealing counter damage to player).
     /// No damage is dealt when player is Exhausted.
+    /// 
+    /// Enemies must be within enemyHitAngle of dash direction to be hit (generous).
+    /// Shields require shieldHitAngle precision (strict).
     /// </summary>
     private void CheckAndDamageEnemiesInRadius()
     {
@@ -428,6 +438,16 @@ public class PlayerDash : MonoBehaviour
                 // Only hit each enemy once per dash
                 if (!enemiesHitThisDash.Contains(enemy))
                 {
+                    // Check if enemy is within the generous hit angle
+                    Vector3 toEnemy = (col.transform.position - transform.position).normalized;
+                    float angle = Vector3.Angle(dashDirection, toEnemy);
+                    
+                    if (angle > enemyHitAngle)
+                    {
+                        // Enemy is too far off to the side - player is dashing past
+                        continue;
+                    }
+                    
                     enemiesHitThisDash.Add(enemy);
                     
                     // Calculate hit info
@@ -438,7 +458,7 @@ public class PlayerDash : MonoBehaviour
                     
                     OnEnemyHitDuringDash?.Invoke(enemy);
                     
-                    Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage");
+                    Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage (angle: {angle:F1}°)");
                 }
             }
         }
@@ -447,6 +467,7 @@ public class PlayerDash : MonoBehaviour
     /// <summary>
     /// Checks for defender shields within the attack radius.
     /// If a shield is hit from the front, it blocks and counter-attacks.
+    /// Only triggers if shield is within shieldHitAngle of dash direction (requires precision).
     /// </summary>
     private void CheckShieldsInRadius()
     {
@@ -460,13 +481,23 @@ public class PlayerDash : MonoBehaviour
             DefenderShield shield = col.GetComponent<DefenderShield>();
             if (shield != null)
             {
+                // Check if shield is within the strict hit angle (requires precision)
+                Vector3 toShield = (col.transform.position - transform.position).normalized;
+                float angle = Vector3.Angle(dashDirection, toShield);
+                
+                if (angle > shieldHitAngle)
+                {
+                    // Shield is not in direct path - player is dashing past it
+                    continue;
+                }
+                
                 // Let the shield determine if this is a frontal attack or not
                 // dashStartPosition is where the dash began (used to determine attack direction)
                 bool wasBlocked = shield.OnHitByDashAttack(dashStartPosition);
                 
                 if (wasBlocked)
                 {
-                    Debug.Log("[PlayerDash] Attack blocked by DefenderShield!");
+                    Debug.Log($"[PlayerDash] Attack blocked by DefenderShield! (angle: {angle:F1}°)");
                     // Note: Shield already dealt counter damage to player
                 }
             }
