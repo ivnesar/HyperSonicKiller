@@ -1,14 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Soldier NPC - Ranged Combatant.
-/// Verhaltensweisen:
-/// - Stationary: Bleibt an Position, schießt wenn Spieler in Reichweite
-/// - Pursuing: Verfolgt Spieler um Line-of-Sight und Schussreichweite zu bekommen
-/// 
-/// Awareness-System:
-/// - Schießt auf die letzte bekannte Spielerposition (nicht die aktuelle)
-/// - Reagiert verzögert wenn Spieler aus Sicht verschwindet
+/// Soldier NPC - Schießt auf den Spieler aus der Distanz.
 /// </summary>
 public class SoldierNpc : NpcBase
 {
@@ -17,16 +10,15 @@ public class SoldierNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
-    [SerializeField] private float preferredShootingRange = 12f;
     [SerializeField] private float minShootingRange = 6f;
     [SerializeField] private float maxShootingRange = 18f;
+    [SerializeField] private float preferredRange = 12f;
 
     [Header("Combat - Timing")]
     [SerializeField] private float aimDuration = 0.6f;
     [SerializeField] private float timeBetweenShots = 0.15f;
     [SerializeField] private int shotsPerSalvo = 5;
     [SerializeField] private float reloadDuration = 2.0f;
-    [SerializeField] private float repositionCheckInterval = 0.5f;
 
     [Header("Combat - Accuracy")]
     [SerializeField] private float baseAccuracy = 0.85f;
@@ -38,6 +30,7 @@ public class SoldierNpc : NpcBase
     [Header("Weapon")]
     [SerializeField] private Transform muzzlePoint;
     [SerializeField] private SoldierBullet bulletPrefab;
+    [SerializeField] private LayerMask lineOfSightMask;
 
     [Header("Audio/VFX")]
     [SerializeField] private AudioClip fireSound;
@@ -47,31 +40,17 @@ public class SoldierNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Public Accessors (für States)
+    #region Public Accessors
     // ════════════════════════════════════════════════════════════════════════
 
-    public float PreferredShootingRange => preferredShootingRange;
     public float MinShootingRange => minShootingRange;
     public float MaxShootingRange => maxShootingRange;
+    public float PreferredRange => preferredRange;
     public float AimDuration => aimDuration;
     public float TimeBetweenShots => timeBetweenShots;
     public int ShotsPerSalvo => shotsPerSalvo;
     public float ReloadDuration => reloadDuration;
-    public float RepositionCheckInterval => repositionCheckInterval;
-    public float BaseAccuracy => baseAccuracy;
-    public float AccuracySpreadAngle => accuracySpreadAngle;
-    public int DamagePerShot => damagePerShot;
-
-    public Transform PlayerTransform => playerTransform;
-    public float DetectionRange => detectionRange;
-    public new bool CanSeePlayer => canSeePlayer;
-    public new bool CanDetectPlayer => canDetectPlayer;
-    public new bool CanReactToPlayerLoss => base.CanReactToPlayerLoss;
-    public new bool HasValidPathToPlayer => hasValidPathToPlayer;
-    public new bool HasLostPlayer => base.HasLostPlayer;
-    public new Vector3 LastKnownPlayerPosition => lastKnownPlayerPosition;
     public Animator NpcAnimator => animator;
-    public LayerMask LineOfSightMask => lineOfSightMask;
 
     #endregion
 
@@ -80,11 +59,8 @@ public class SoldierNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     private INpcState<SoldierNpc> currentState;
-
-    // State-spezifische Daten
-    public float NextShotTime { get; set; }
     public int ShotsFiredInSalvo { get; set; }
-    public float NextRepositionCheckTime { get; set; }
+    public float NextShotTime { get; set; }
 
     #endregion
 
@@ -94,9 +70,6 @@ public class SoldierNpc : NpcBase
 
     protected override void OnStart()
     {
-        if (bulletPrefab == null)
-            Debug.LogError($"[{gameObject.name}] No bullet prefab assigned!");
-
         ChangeState(new SoldierStates.Idle());
     }
 
@@ -110,13 +83,10 @@ public class SoldierNpc : NpcBase
     }
 
     protected override void OnStunStart() => ChangeState(new SoldierStates.Stunned());
-
-    protected override void OnStunEnd() => ChangeState(new SoldierStates.MovingToRange());
+    protected override void OnStunEnd() => ChangeState(new SoldierStates.Idle());
 
     public override string GetCurrentStateName() => currentState?.StateName ?? "None";
-
     public override NpcType GetNpcType() => NpcType.Soldier;
-
     public override int GetStateID() => currentState?.StateID ?? 0;
 
     #endregion
@@ -130,76 +100,69 @@ public class SoldierNpc : NpcBase
         currentState?.Exit(this);
         currentState = newState;
         currentState?.Enter(this);
-
-        if (showDebugInfo)
-            Debug.Log($"[{gameObject.name}] State → {newState?.StateName}");
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Combat Actions
+    #region Combat
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Feuert einen Schuss auf die letzte bekannte Spielerposition.
-    /// - Spieler sichtbar → lastKnownPlayerPosition wird aktualisiert → Kugeln "tracken"
-    /// - Spieler nicht sichtbar → Position bleibt gleich → Kugeln fliegen zur alten Position
-    /// </summary>
+    public bool IsInShootingRange()
+    {
+        float dist = DistanceToTarget;
+        return dist >= minShootingRange && dist <= maxShootingRange;
+    }
+
     public void FireShot()
     {
-        // Ziel ist immer die letzte bekannte Position (+Höhenoffset für Körpermitte)
-        Vector3 targetPoint = lastKnownPlayerPosition + Vector3.up * 1f;
-        
-        Vector3 perfectDirection = (targetPoint - muzzlePoint.position).normalized;
-        Vector3 shotDirection = ApplyAccuracySpread(perfectDirection);
+        if (muzzlePoint == null || bulletPrefab == null) return;
+
+        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
+        Vector3 direction = (targetPoint - muzzlePoint.position).normalized;
+        direction = ApplySpread(direction);
 
         var bullet = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
-        bullet?.Initialize(shotDirection, damagePerShot, transform, lineOfSightMask);
+        if (bullet != null)
+            bullet.Initialize(direction, damagePerShot, transform, lineOfSightMask);
 
-        animator?.SetTrigger("Fire");
+        if (animator != null)
+            animator.SetTrigger("Fire");
+        
+        PlaySound(fireSound);
+        
+        if (muzzleFlash != null)
+            muzzleFlash.Play();
+    }
+
+    private Vector3 ApplySpread(Vector3 direction)
+    {
+        float spread = Random.value <= baseAccuracy 
+            ? accuracySpreadAngle * 0.2f 
+            : accuracySpreadAngle;
+
+        return Quaternion.Euler(
+            Random.Range(-spread, spread),
+            Random.Range(-spread, spread),
+            0
+        ) * direction;
     }
 
     public void PlayReloadSound() => PlaySound(reloadSound);
 
-    private Vector3 ApplyAccuracySpread(Vector3 perfectDirection)
-    {
-        float spreadAngle = Random.value <= baseAccuracy
-            ? accuracySpreadAngle * 0.2f
-            : accuracySpreadAngle;
-
-        Quaternion spread = Quaternion.Euler(
-            Random.Range(-spreadAngle, spreadAngle),
-            Random.Range(-spreadAngle, spreadAngle),
-            0
-        );
-        return spread * perfectDirection;
-    }
-
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Movement Helpers (Public für States)
+    #region Helpers für States
     // ════════════════════════════════════════════════════════════════════════
 
-    public new void MoveToward(Vector3 position, float speedMultiplier = 1f) =>
-        base.MoveToward(position, speedMultiplier);
-
+    public new void MoveTowardTarget(float speed = 1f) => base.MoveTowardTarget(speed);
+    public void MoveToward(Vector3 position, float speed = 1f) => base.MoveToward(position, speed);
     public new void StopMovement() => base.StopMovement();
-
-    public new void RotateToward(Vector3 position, float speedMultiplier = 1f) =>
-        base.RotateToward(position, speedMultiplier);
-
-    public new void RotateTowardLastKnownPosition(float speedMultiplier = 1f) =>
-        base.RotateTowardLastKnownPosition(speedMultiplier);
-
-    public new float GetDistanceToPlayer() => base.GetDistanceToPlayer();
-
-    public new Vector3 GetDirectionToPlayer() => base.GetDirectionToPlayer();
-
-    public new void SetStateTimer(float duration) => base.SetStateTimer(duration);
-
+    public new void RotateTowardTarget() => base.RotateTowardTarget();
+    public new void SetStateTimer(float t) => base.SetStateTimer(t);
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
+    public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
 
     #endregion
 
@@ -215,16 +178,10 @@ public class SoldierNpc : NpcBase
         Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
         Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(transform.position, preferredShootingRange);
+        Gizmos.DrawWireSphere(transform.position, preferredRange);
 
-        Gizmos.color = new Color(1f, 0.5f, 0f);
+        Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, maxShootingRange);
-
-        if (muzzlePoint != null)
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawRay(muzzlePoint.position, muzzlePoint.forward * 3f);
-        }
     }
 
     #endregion

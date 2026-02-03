@@ -1,148 +1,96 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// SOLDIER STATES - Alle Zustände des Soldier NPCs
+// SOLDIER STATES
 // ════════════════════════════════════════════════════════════════════════════
 //
-// States:
-// - Idle: Wartet, sucht, kein Pfad - alle "Warte-Situationen"
-// - MovingToRange: Bewegt sich in Schussreichweite
-// - Aiming: Zielt auf Spieler
-// - Firing: Feuert Salve
-// - Reloading: Lädt nach
-// - Stunned: Bewegungsunfähig
+// Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
 // ════════════════════════════════════════════════════════════════════════════
 
 namespace SoldierStates
 {
-    // ────────────────────────────────────────────────────────────────────────
-    // IDLE - Sammel-State für alle Warte-Situationen
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // IDLE
+    // ─────────────────────────────────────────────────────────────────────
     public class Idle : NpcStateBase<SoldierNpc>
     {
         public override string StateName => "Idle";
         public override int StateID => 0;
 
-        public override void Enter(SoldierNpc npc) => npc.StopMovement();
+        public override void Enter(SoldierNpc npc)
+        {
+            npc.StopMovement();
+        }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            float distance = npc.GetDistanceToPlayer();
-            bool inRange = distance >= npc.MinShootingRange && distance <= npc.MaxShootingRange;
+            npc.RotateTowardTarget();
 
-            // Immer: Langsam zur letzten bekannten Position drehen
-            if (npc.CanSeePlayer && npc.PlayerTransform != null)
-                npc.RotateToward(npc.PlayerTransform.position, 0.5f);
-            else
-                npc.RotateTowardLastKnownPosition(0.3f);
-
-            // Kann schießen? (Sicht + Reichweite, auch ohne Pfad)
-            if (npc.CanSeePlayer && inRange)
-            {
+            if (npc.IsInShootingRange())
                 return new Aiming();
-            }
 
-            // Spieler erkannt + Pfad vorhanden → Bewegen
-            if (npc.CanDetectPlayer && npc.HasValidPathToPlayer)
-            {
-                // Reaktionsverzögerung beachten (wenn Spieler gerade aus Sicht verschwunden)
-                if (npc.CanSeePlayer || npc.CanReactToPlayerLoss)
-                {
-                    return new MovingToRange();
-                }
-            }
+            if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing && npc.CanReachPlayer)
+                return new MovingToRange();
 
-            // Sonst: Weiter warten
             return null;
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // MOVING TO RANGE - Bewegt sich in Schussreichweite
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // MOVING TO RANGE
+    // ─────────────────────────────────────────────────────────────────────
     public class MovingToRange : NpcStateBase<SoldierNpc>
     {
-        public override string StateName => "MovingToRange";
+        public override string StateName => "Moving";
         public override int StateID => 1;
 
-        public override void Enter(SoldierNpc npc) => npc.NextRepositionCheckTime = 0f;
+        public override void Enter(SoldierNpc npc)
+        {
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsMoving", true);
+        }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            if (npc.PlayerTransform == null) return new Idle();
+            npc.RotateTowardTarget();
 
-            float distance = npc.GetDistanceToPlayer();
+            if (!npc.CanReachPlayer)
+            {
+                npc.StopMovement();
+                return new Idle();
+            }
 
-            // Rotation: Wenn sichtbar → zum Spieler, sonst → zur letzten bekannten Position
-            if (npc.CanSeePlayer)
-                npc.RotateToward(npc.PlayerTransform.position);
-            else
-                npc.RotateTowardLastKnownPosition();
-
-            // Periodischer Check
-            if (Time.time < npc.NextRepositionCheckTime) return null;
-            npc.NextRepositionCheckTime = Time.time + npc.RepositionCheckInterval;
-
-            bool inRange = distance >= npc.MinShootingRange && distance <= npc.MaxShootingRange;
-
-            // In Reichweite mit Sicht → Zielen
-            if (inRange && npc.CanSeePlayer)
+            if (npc.IsInShootingRange())
             {
                 npc.StopMovement();
                 return new Aiming();
             }
 
-            // Spieler verloren? (Kann letzte Position sehen aber Spieler nicht dort)
-            if (npc.HasLostPlayer)
+            if (npc.DistanceToTarget > npc.PreferredRange)
             {
-                npc.StopMovement();
-                return new Idle();
+                npc.MoveTowardTarget();
             }
-
-            // Kein gültiger Pfad mehr → zurück zu Idle
-            if (!npc.HasValidPathToPlayer)
+            else if (npc.DistanceToTarget < npc.MinShootingRange)
             {
-                npc.StopMovement();
-                return new Idle();
-            }
-
-            // Stationär: Nur drehen, nicht bewegen
-            if (npc.CurrentBehaviorMode == BehaviorMode.Stationary)
-            {
-                npc.StopMovement();
-
-                if (npc.CanSeePlayer && distance <= npc.MaxShootingRange)
-                    return new Aiming();
-
-                return null;
-            }
-
-            // Pursuing: Bewegungslogik
-            if (distance > npc.PreferredShootingRange || !npc.CanSeePlayer)
-            {
-                Vector3 target = npc.CanSeePlayer ? npc.PlayerTransform.position : npc.LastKnownPlayerPosition;
-                npc.MoveToward(target);
-            }
-            else if (distance < npc.MinShootingRange)
-            {
-                Vector3 retreatTarget = npc.transform.position - npc.GetDirectionToPlayer() * 5f;
-                npc.MoveToward(retreatTarget, 0.7f);
-            }
-            else
-            {
-                Vector3 strafeDir = Vector3.Cross(npc.GetDirectionToPlayer(), Vector3.up);
-                if (Random.value > 0.8f) strafeDir = -strafeDir;
-                npc.MoveToward(npc.transform.position + strafeDir * 3f, 0.8f);
+                Vector3 retreatDir = -npc.GetDirectionToTarget();
+                Vector3 retreatPos = npc.transform.position + retreatDir * 5f;
+                npc.MoveToward(retreatPos, 0.7f);
             }
 
             return null;
         }
+
+        public override void Exit(SoldierNpc npc)
+        {
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsMoving", false);
+        }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // AIMING - Zielt auf den Spieler
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // AIMING
+    // ─────────────────────────────────────────────────────────────────────
     public class Aiming : NpcStateBase<SoldierNpc>
     {
         public override string StateName => "Aiming";
@@ -152,25 +100,25 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
-            npc.NpcAnimator?.SetTrigger("Aim");
+            
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetTrigger("Aim");
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            npc.RotateTowardLastKnownPosition(2f);
+            npc.RotateTowardTarget();
 
             if (npc.UpdateStateTimer())
-            {
                 return new Firing();
-            }
 
             return null;
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // FIRING - Feuert eine Salve ab
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // FIRING
+    // ─────────────────────────────────────────────────────────────────────
     public class Firing : NpcStateBase<SoldierNpc>
     {
         public override string StateName => "Firing";
@@ -181,16 +129,14 @@ namespace SoldierStates
             npc.StopMovement();
             npc.ShotsFiredInSalvo = 0;
             npc.NextShotTime = 0f;
-            npc.NpcAnimator?.SetBool("IsFiring", true);
+            
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsFiring", true);
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            // Rotation nur wenn Spieler sichtbar
-            if (npc.CanSeePlayer && npc.PlayerTransform != null)
-            {
-                npc.RotateToward(npc.PlayerTransform.position, 2f);
-            }
+            npc.RotateTowardTarget();
 
             if (Time.time >= npc.NextShotTime && npc.ShotsFiredInSalvo < npc.ShotsPerSalvo)
             {
@@ -207,14 +153,14 @@ namespace SoldierStates
 
         public override void Exit(SoldierNpc npc)
         {
-            npc.ShotsFiredInSalvo = 0;
-            npc.NpcAnimator?.SetBool("IsFiring", false);
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsFiring", false);
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // RELOADING - Lädt die Waffe nach
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // RELOADING
+    // ─────────────────────────────────────────────────────────────────────
     public class Reloading : NpcStateBase<SoldierNpc>
     {
         public override string StateName => "Reloading";
@@ -224,40 +170,42 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
-            npc.NpcAnimator?.SetTrigger("Reload");
+            
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetTrigger("Reload");
+            
             npc.PlayReloadSound();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            npc.RotateTowardLastKnownPosition(0.5f);
+            npc.RotateTowardTarget();
 
             if (npc.UpdateStateTimer())
-            {
-                float distance = npc.GetDistanceToPlayer();
-                bool inRange = distance >= npc.MinShootingRange && distance <= npc.MaxShootingRange;
-
-                // Direkt wieder zielen wenn möglich
-                if (inRange && npc.CanSeePlayer)
-                    return new Aiming();
-
-                // Sonst zurück zu Idle (übernimmt alle Warte-Logik)
                 return new Idle();
-            }
 
             return null;
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // STUNNED - Bewegungsunfähig
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // STUNNED
+    // ─────────────────────────────────────────────────────────────────────
     public class Stunned : NpcStateBase<SoldierNpc>
     {
         public override string StateName => "Stunned";
         public override int StateID => 5;
 
-        public override void Enter(SoldierNpc npc) => npc.StopMovement();
+        public override void Enter(SoldierNpc npc)
+        {
+            npc.StopMovement();
+            
+            if (npc.NpcAnimator != null)
+            {
+                npc.NpcAnimator.SetBool("IsFiring", false);
+                npc.NpcAnimator.SetBool("IsMoving", false);
+            }
+        }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc) => null;
     }

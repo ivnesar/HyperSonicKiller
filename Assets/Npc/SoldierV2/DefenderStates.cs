@@ -1,60 +1,45 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// DEFENDER STATES - Alle Zustände des Defender NPCs
+// DEFENDER STATES
 // ════════════════════════════════════════════════════════════════════════════
 //
-// States:
-// - Idle: Wartet, kein Pfad - alle "Warte-Situationen"
-// - Approaching: Läuft auf Spieler zu
-// - InPosition: Nah beim Spieler, wartet
-// - Stunned: Bewegungsunfähig
+// Idle → Approaching → InPosition → zurück
 //
 // ════════════════════════════════════════════════════════════════════════════
 
 namespace DefenderStates
 {
-    // ────────────────────────────────────────────────────────────────────────
-    // IDLE - Sammel-State für alle Warte-Situationen
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // IDLE
+    // ─────────────────────────────────────────────────────────────────────
     public class Idle : NpcStateBase<DefenderNpc>
     {
         public override string StateName => "Idle";
         public override int StateID => 0;
 
-        public override void Enter(DefenderNpc npc) => npc.StopMovement();
+        public override void Enter(DefenderNpc npc)
+        {
+            npc.StopMovement();
+        }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
         {
-            // Immer: Langsam zur letzten bekannten Position drehen
-            if (npc.CanSeePlayer && npc.PlayerTransform != null)
-                npc.RotateToward(npc.PlayerTransform.position, 0.5f);
-            else
-                npc.RotateTowardLastKnownPosition(0.3f);
+            npc.RotateTowardTarget();
 
-            float distance = npc.GetDistanceToPlayer();
+            if (npc.IsCloseEnough())
+                return new InPosition();
 
-            // Spieler erkannt + Pfad vorhanden + Pursuing-Modus → Bewegen
-            if (npc.CanDetectPlayer && npc.HasValidPathToPlayer)
-            {
-                if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing)
-                {
-                    // Reaktionsverzögerung beachten
-                    if (npc.CanSeePlayer || npc.CanReactToPlayerLoss)
-                    {
-                        return new Approaching();
-                    }
-                }
-            }
+            if (npc.CanReachPlayer && npc.CurrentBehaviorMode == BehaviorMode.Pursuing)
+                return new Approaching();
 
-            // Sonst: Weiter warten
             return null;
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // APPROACHING - Läuft auf den Spieler zu
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // APPROACHING
+    // ─────────────────────────────────────────────────────────────────────
     public class Approaching : NpcStateBase<DefenderNpc>
     {
         public override string StateName => "Approaching";
@@ -62,53 +47,40 @@ namespace DefenderStates
 
         public override void Enter(DefenderNpc npc)
         {
-            npc.NpcAnimator?.SetBool("IsMoving", true);
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsMoving", true);
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
         {
-            if (npc.PlayerTransform == null) return new Idle();
+            npc.RotateTowardTarget();
 
-            float distance = npc.GetDistanceToPlayer();
+            if (!npc.CanReachPlayer)
+            {
+                npc.StopMovement();
+                return new Idle();
+            }
 
-            // Nah genug → In Position bleiben
-            if (distance <= npc.ApproachDistance)
+            if (npc.IsCloseEnough())
             {
                 npc.StopMovement();
                 return new InPosition();
             }
 
-            // Spieler verloren? (Kann letzte Position sehen aber Spieler nicht dort)
-            if (npc.HasLostPlayer)
-            {
-                npc.StopMovement();
-                return new Idle();
-            }
-
-            // Kein gültiger Pfad mehr → zurück zu Idle
-            if (!npc.HasValidPathToPlayer)
-            {
-                npc.StopMovement();
-                return new Idle();
-            }
-
-            // Bewegung zur aktuellen Position (wenn sichtbar) oder letzten bekannten Position
-            Vector3 target = npc.CanSeePlayer ? npc.PlayerTransform.position : npc.LastKnownPlayerPosition;
-            npc.MoveToward(target);
-            npc.RotateToward(target);
-
+            npc.MoveTowardTarget();
             return null;
         }
 
         public override void Exit(DefenderNpc npc)
         {
-            npc.NpcAnimator?.SetBool("IsMoving", false);
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsMoving", false);
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // IN POSITION - Steht nah beim Spieler, wartet
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // IN POSITION
+    // ─────────────────────────────────────────────────────────────────────
     public class InPosition : NpcStateBase<DefenderNpc>
     {
         public override string StateName => "InPosition";
@@ -117,41 +89,31 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
-            npc.NpcAnimator?.SetBool("IsGuarding", true);
+            
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsGuarding", true);
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
         {
-            if (npc.PlayerTransform == null) return new Idle();
+            npc.RotateTowardTarget();
 
-            // Zur letzten bekannten Position drehen
-            npc.RotateTowardLastKnownPosition(2f);
-
-            float distance = npc.GetDistanceToPlayer();
-
-            // Spieler zu weit weg?
-            if (distance > npc.ReengageDistance)
-            {
-                // Reaktionsverzögerung beachten
-                if (!npc.CanSeePlayer && !npc.CanReactToPlayerLoss)
-                    return null; // Noch warten
-
-                // Zurück zu Idle (übernimmt Pfad-Check etc.)
+            if (npc.IsTooFar())
                 return new Idle();
-            }
 
             return null;
         }
 
         public override void Exit(DefenderNpc npc)
         {
-            npc.NpcAnimator?.SetBool("IsGuarding", false);
+            if (npc.NpcAnimator != null)
+                npc.NpcAnimator.SetBool("IsGuarding", false);
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // STUNNED - Bewegungsunfähig
-    // ────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // STUNNED
+    // ─────────────────────────────────────────────────────────────────────
     public class Stunned : NpcStateBase<DefenderNpc>
     {
         public override string StateName => "Stunned";
@@ -160,8 +122,12 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
-            npc.NpcAnimator?.SetBool("IsGuarding", false);
-            npc.NpcAnimator?.SetBool("IsMoving", false);
+            
+            if (npc.NpcAnimator != null)
+            {
+                npc.NpcAnimator.SetBool("IsGuarding", false);
+                npc.NpcAnimator.SetBool("IsMoving", false);
+            }
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc) => null;
