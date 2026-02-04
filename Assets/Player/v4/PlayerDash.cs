@@ -506,19 +506,8 @@ public class PlayerDash : MonoBehaviour
 
     private void CheckDashCancels()
     {
-        // Redirect dash to new target
-        if (core.Input.GetActionDown("Dash") && !dashDisabled && currentCharges > 0)
-        {
-            // Reset time scale before trying new dash
-            Time.timeScale = 1f;
-            
-            // Clear hit tracking for redirect
-            enemiesHitThisDash.Clear();
-            
-            TryStartAttackDash();
-            return;
-        }
-
+        // NOTE: Dash redirect removed - player must complete or cancel dash before starting a new one
+        
         // Jump cancel (upward)
         if (core.Input.GetActionDown("Jump"))
         {
