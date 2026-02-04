@@ -21,10 +21,10 @@ public enum BehaviorMode
 public enum NpcType
 {
     Soldier,
-    Defender
+    Defender,
+    GenOne
 }
 
-[RequireComponent(typeof(NavMeshAgent))]
 public abstract class NpcBase : MonoBehaviour, IEnemy
 {
     // ════════════════════════════════════════════════════════════════════════
@@ -248,7 +248,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
     }
 
-    protected void RotateTowardTarget()
+    public void RotateTowardTarget()
     {
         if (playerTransform != null)
             RotateToward(playerTransform.position);

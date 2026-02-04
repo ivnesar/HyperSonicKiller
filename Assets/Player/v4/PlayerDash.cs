@@ -7,7 +7,9 @@ using System.Collections.Generic;
 /// 
 /// NEW SYSTEM:
 /// - Attack Dash (LMB): Player dashes to a surface, automatically attacking NPCs in the path
-/// - Sword Dash: Invulnerable dash to retrieve thrown sword
+/// - Sword Dash (LMB while looking at stuck sword): Invulnerable dash to retrieve thrown sword
+///   * Requires sword to be within crosshair FOV cone (default 9°)
+///   * Requires line of sight to sword (not blocked by walls)
 /// - Wall Stick: Cling to walls after dashing
 /// 
 /// The player acts like a "projectile" - dashing THROUGH enemies to reach surfaces.
@@ -118,6 +120,10 @@ public class PlayerDash : MonoBehaviour
     
     [Tooltip("Time to smoothly rotate towards the sword during dash")]
     [SerializeField] private float swordDashRotationDuration = 0.2f;
+    
+    [Header("Sword Dash Targeting")]
+    [Tooltip("Maximum angle from crosshair to sword for Sword Dash to trigger (in degrees)")]
+    [SerializeField] private float swordDashMaxAngle = 9f;
 
     #endregion
 
@@ -268,17 +274,46 @@ public class PlayerDash : MonoBehaviour
 
         if (core.Input.GetActionDown("Dash"))
         {
-            // Check if sword is thrown and stuck - if so, do sword dash
-            if (swordThrow != null && swordThrow.IsSwordStuck)
+            // Check if sword is thrown and stuck AND player is looking at it
+            if (swordThrow != null && swordThrow.IsSwordStuck && IsSwordInCrosshairFOV())
             {
                 TryStartSwordDash();
             }
             else if (currentCharges > 0)
             {
-                // Normal attack dash
+                // Normal attack dash (either no sword out, or not looking at sword)
                 TryStartAttackDash();
             }
         }
+    }
+    
+    /// <summary>
+    /// Checks if the stuck sword is within the crosshair FOV cone.
+    /// Returns true if the angle between camera forward and direction to sword
+    /// is less than or equal to swordDashMaxAngle.
+    /// </summary>
+    private bool IsSwordInCrosshairFOV()
+    {
+        if (swordThrow == null || swordThrow.ActiveSword == null) return false;
+        
+        Vector3 cameraPosition = core.CameraTransform.position;
+        Vector3 cameraForward = core.CameraTransform.forward;
+        Vector3 swordPosition = swordThrow.ActiveSword.transform.position;
+        
+        // Direction from camera to sword
+        Vector3 toSword = (swordPosition - cameraPosition).normalized;
+        
+        // Angle between look direction and sword direction
+        float angleToSword = Vector3.Angle(cameraForward, toSword);
+        
+        bool isInFOV = angleToSword <= swordDashMaxAngle;
+        
+        if (!isInFOV)
+        {
+            Debug.Log($"[PlayerDash] Sword outside FOV cone ({angleToSword:F1}° > {swordDashMaxAngle}°) - using Attack Dash");
+        }
+        
+        return isInFOV;
     }
 
     #endregion
@@ -560,6 +595,8 @@ public class PlayerDash : MonoBehaviour
 
     /// <summary>
     /// Attempts to start a sword dash. Returns true if successful.
+    /// Called only after FOV check has passed (sword is in crosshair cone).
+    /// Still checks visibility (line of sight not blocked by walls).
     /// </summary>
     public bool TryStartSwordDash()
     {
