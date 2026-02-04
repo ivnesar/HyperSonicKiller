@@ -34,6 +34,9 @@ public class SoldierNpc : NpcBase
     [SerializeField] private SoldierBullet bulletPrefab;
     [Tooltip("Layer für Line-of-Sight Check (sollte Player + Hindernisse enthalten)")]
     [SerializeField] private LayerMask lineOfSightMask;
+    
+    [Tooltip("FOV-Winkel der Mündung in Grad. Wenn Spieler innerhalb dieses Winkels ist, wird direkt auf ihn gezielt.")]
+    [SerializeField] private float muzzleAimAssistFOV = 5f;
 
     [Header("Aim Bone Rotation")]
     [Tooltip("Der Bone der sich vertikal neigen soll (z.B. Stomach, Spine, Chest)")]
@@ -257,8 +260,7 @@ public class SoldierNpc : NpcBase
     {
         if (muzzlePoint == null || bulletPrefab == null) return;
 
-        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
-        Vector3 direction = (targetPoint - muzzlePoint.position).normalized;
+        Vector3 direction = CalculateFireDirection();
         direction = ApplySpread(direction);
 
         var bullet = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
@@ -272,6 +274,33 @@ public class SoldierNpc : NpcBase
         
         if (muzzleFlash != null)
             muzzleFlash.Play();
+    }
+
+    /// <summary>
+    /// Berechnet die Schussrichtung.
+    /// Wenn der Spieler innerhalb des Muzzle-FOV ist → direkt zum Spieler zielen.
+    /// Ansonsten → in Laufrichtung schießen (kann verfehlen).
+    /// </summary>
+    private Vector3 CalculateFireDirection()
+    {
+        // Mündungsrichtung (Lauf-Forward)
+        Vector3 muzzleForward = muzzlePoint.forward;
+        
+        // Richtung zum Spieler (Brusthöhe)
+        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
+        Vector3 directionToPlayer = (targetPoint - muzzlePoint.position).normalized;
+        
+        // Winkel zwischen Mündung und Spieler berechnen
+        float angleToPlayer = Vector3.Angle(muzzleForward, directionToPlayer);
+        
+        // Spieler innerhalb FOV → direkt auf ihn zielen (Aim-Assist)
+        if (angleToPlayer <= muzzleAimAssistFOV)
+        {
+            return directionToPlayer;
+        }
+        
+        // Spieler außerhalb FOV → in Laufrichtung schießen
+        return muzzleForward;
     }
 
     private Vector3 ApplySpread(Vector3 direction)
