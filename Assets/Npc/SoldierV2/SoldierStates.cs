@@ -6,6 +6,15 @@ using UnityEngine;
 //
 // Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
+// Line-of-Sight wird geprüft in:
+// - Aiming: Wechselt nur zu Firing wenn LOS frei
+// - Firing: Bei LOS-Verlust → sofort Reloading (Salve abgebrochen)
+//
+// IsAiming wird gesetzt in:
+// - Aiming.Enter() → true
+// - Firing.Enter() → true (bleibt aktiv)
+// - Alle anderen States → false
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 namespace SoldierStates
@@ -21,15 +30,22 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.StopMovement();
+            npc.IsAiming = false;
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
             npc.RotateTowardTarget();
 
-            if (npc.IsInShootingRange())
+            // Kann schießen = in Reichweite UND freie Sicht
+            if (npc.CanShoot())
                 return new Aiming();
 
+            // Nur in Reichweite aber keine Sicht → warten
+            if (npc.IsInShootingRange() && !npc.HasLineOfSight())
+                return null;
+
+            // Außerhalb Reichweite → bewegen
             if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing && npc.CanReachPlayer)
                 return new MovingToRange();
 
@@ -47,6 +63,8 @@ namespace SoldierStates
 
         public override void Enter(SoldierNpc npc)
         {
+            npc.IsAiming = false;
+            
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetBool("IsMoving", true);
         }
@@ -61,12 +79,14 @@ namespace SoldierStates
                 return new Idle();
             }
 
-            if (npc.IsInShootingRange())
+            // Kann schießen → Aiming
+            if (npc.CanShoot())
             {
                 npc.StopMovement();
                 return new Aiming();
             }
 
+            // Bewegungslogik
             if (npc.DistanceToTarget > npc.PreferredRange)
             {
                 npc.MoveTowardTarget();
@@ -100,6 +120,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
+            npc.IsAiming = true;  // Bone-Rotation aktivieren
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetTrigger("Aim");
@@ -109,6 +130,15 @@ namespace SoldierStates
         {
             npc.RotateTowardTarget();
 
+            // LOS verloren während Zielen → zurück zu Idle
+            if (!npc.HasLineOfSight())
+                return new Idle();
+
+            // Außerhalb Reichweite → Idle (wird dann zu Moving wechseln)
+            if (!npc.IsInShootingRange())
+                return new Idle();
+
+            // Timer abgelaufen → Feuern
             if (npc.UpdateStateTimer())
                 return new Firing();
 
@@ -129,6 +159,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.ShotsFiredInSalvo = 0;
             npc.NextShotTime = 0f;
+            npc.IsAiming = true;  // Bone-Rotation bleibt aktiv
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetBool("IsFiring", true);
@@ -138,6 +169,11 @@ namespace SoldierStates
         {
             npc.RotateTowardTarget();
 
+            // LOS verloren → Salve abbrechen, sofort nachladen
+            if (!npc.HasLineOfSight())
+                return new Reloading();
+
+            // Schuss abfeuern
             if (Time.time >= npc.NextShotTime && npc.ShotsFiredInSalvo < npc.ShotsPerSalvo)
             {
                 npc.FireShot();
@@ -145,6 +181,7 @@ namespace SoldierStates
                 npc.NextShotTime = Time.time + npc.TimeBetweenShots;
             }
 
+            // Salve komplett → Nachladen
             if (npc.ShotsFiredInSalvo >= npc.ShotsPerSalvo)
                 return new Reloading();
 
@@ -170,6 +207,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
+            npc.IsAiming = false;  // Bone-Rotation deaktivieren beim Nachladen
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetTrigger("Reload");
@@ -199,6 +237,7 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.StopMovement();
+            npc.IsAiming = false;  // Bone-Rotation deaktivieren
             
             if (npc.NpcAnimator != null)
             {

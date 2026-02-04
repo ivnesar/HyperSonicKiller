@@ -834,39 +834,36 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoldierNpc
   behaviorMode: 1
-  playerTransform: {fileID: 0}
   maxHealth: 100
   moveSpeed: 4
-  rotationSpeed: 10
   stoppingDistance: 0.5
-  detectionRange: 25
-  lineOfSightMask:
-    serializedVersion: 2
-    m_Bits: 136
-  trackingFOV: 120
-  detectionFOVFar: 60
-  detectionFOVNear: 360
-  detectionNearDistance: 2
-  detectionFarDistance: 15
-  reactionDelay: 0.3
-  blindRotationMultiplier: 0.3
+  maxRotationSpeed: 240
   hitSound: {fileID: 0}
   useRagdollOnDeath: 1
   destroyDelay: 10
   showDebugInfo: 1
-  preferredShootingRange: 6
   minShootingRange: 3
   maxShootingRange: 12
+  preferredRange: 12
   aimDuration: 0.6
   timeBetweenShots: 0.06
   shotsPerSalvo: 31
   reloadDuration: 2
-  repositionCheckInterval: 0.5
   baseAccuracy: 0.85
   accuracySpreadAngle: 5
   damagePerShot: 10
   muzzlePoint: {fileID: 2080795029759614631}
   bulletPrefab: {fileID: 8718130687482727725, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
+  lineOfSightMask:
+    serializedVersion: 2
+    m_Bits: 448
+  aimBone: {fileID: 8052137596577771941}
+  pitchAxis: {x: 1, y: -1, z: 0}
+  invertPitch: 0
+  maxPitchUp: 70
+  maxPitchDown: 50
+  pitchSmoothSpeed: 8
+  aimBlendSpeed: 6
   fireSound: {fileID: 0}
   reloadSound: {fileID: 0}
   muzzleFlash: {fileID: 0}
@@ -906,28 +903,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aa64e76d9deb88449974112c59975987, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcDebugInspector
-  npcType: 0
   currentState: "\u2014"
-  stateID: 0
   behaviorMode: 0
   currentHealth: 0
-  maxHealth: 0
   isDead: 0
   isStunned: 0
-  remainingStunTime: 0
-  canSeePlayer: 0
-  canDetectPlayer: 0
-  canReactToPlayerLoss: 0
-  lastKnownPlayerPosition: {x: 0, y: 0, z: 0}
-  distanceToPlayer: 0
-  hasValidPathToPlayer: 0
-  hasReachedDestination: 0
-  shotsFiredInSalvo: 0
-  shotsPerSalvo: 0
-  isInShootingRange: 0
-  approachDistance: 0
-  reengageDistance: 0
-  isInApproachRange: 0
+  distanceToTarget: 0
+  canReachPlayer: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0
@@ -937,6 +919,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2828544880027105670}
+  - component: {fileID: 745518431541090414}
   m_Layer: 0
   m_Name: root
   m_TagString: Untagged
@@ -960,6 +943,28 @@ Transform:
   - {fileID: 343433161700788555}
   m_Father: {fileID: 614902531416003641}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &745518431541090414
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472908500150121730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2d8418b0b9634b1892b0268dd9c2743, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Animation.Rigging::UnityEngine.Animations.Rigging.BoneRenderer
+  boneShape: 1
+  drawBones: 1
+  drawTripods: 1
+  boneSize: 3.34
+  tripodSize: 1
+  boneColor: {r: 0, g: 0, b: 1, a: 0.5}
+  m_Transforms:
+  - {fileID: 343433161700788555}
+  - {fileID: 8052137596577771941}
+  - {fileID: 1590548316490049355}
 --- !u!1 &2596113663104778173
 GameObject:
   m_ObjectHideFlags: 0

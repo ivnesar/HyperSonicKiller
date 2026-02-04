@@ -254,7 +254,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: a56b2b79f521fa74cbb2084565660847, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3415283527969894265, guid: a56b2b79f521fa74cbb2084565660847, type: 3}
       propertyPath: showDebugInfo
@@ -1932,8 +1932,20 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: maxPitchUp
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: pitchAxis.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: behaviorMode
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: maxPitchDown
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: showDebugInfo
@@ -1942,6 +1954,10 @@ PrefabInstance:
     - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: detectionRange
       value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: maxShootingRange
+      value: 25
       objectReference: {fileID: 0}
     - target: {fileID: 99368030979546760, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: accuracySpreadAngle
@@ -2541,7 +2557,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: a56b2b79f521fa74cbb2084565660847, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3415283527969894265, guid: a56b2b79f521fa74cbb2084565660847, type: 3}
       propertyPath: behaviorMode
