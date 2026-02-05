@@ -42,6 +42,9 @@ public class GenOneNpc : NpcBase
     [Tooltip("Geschwindigkeit des GenOne-Dash (sollte schneller als Spieler sein)")]
     [SerializeField] private float dashSpeed = 60f;
 
+    [Tooltip("Geschwindigkeits-Multiplikator während Spieler-Dash (0.3 = 30% Geschwindigkeit)")]
+    [SerializeField] private float slowMotionSpeedMultiplier = 0.3f;
+
     [Tooltip("Stärke der Homing-Korrektur (höher = aggressiver)")]
     [SerializeField] private float homingStrength = 12f;
 
@@ -111,6 +114,7 @@ public class GenOneNpc : NpcBase
 
     public float ActivationRange => activationRange;
     public float DashSpeed => dashSpeed;
+    public float SlowMotionSpeedMultiplier => slowMotionSpeedMultiplier;
     public float HomingStrength => homingStrength;
     public float HitRadius => hitRadius;
     public float PostDashCooldown => postDashCooldown;
@@ -301,6 +305,15 @@ public class GenOneNpc : NpcBase
     }
 
     /// <summary>
+    /// Prüft ob Slow-Motion aktiv ist (Time.timeScale deutlich unter 1).
+    /// Wird für Geschwindigkeitsberechnung verwendet.
+    /// </summary>
+    private bool IsSlowMotionActive()
+    {
+        return playerCore.CurrentState == PlayerCore.PlayerState.Dashing;
+    }
+
+    /// <summary>
     /// Prüft ob der Spieler in Aktivierungsreichweite ist.
     /// </summary>
     public bool IsPlayerInRange()
@@ -374,16 +387,31 @@ public class GenOneNpc : NpcBase
     /// <summary>
     /// Bewegt GenOne während des Dash mit Homing.
     /// Wird jeden Frame vom Dashing-State aufgerufen.
-    /// Verwendet unscaledDeltaTime für konsistente Bewegung bei TimeScale-Änderungen.
+    /// Verwendet unscaledDeltaTime für konsistente Basis-Bewegung.
+    /// Wendet slowMotionSpeedMultiplier an wenn Slow-Motion aktiv ist.
+    /// Homing ist nur aktiv solange der Spieler selbst im Dash ist.
     /// </summary>
     public void UpdateDashMovement()
     {
         if (playerTransform == null) return;
 
-        // Homing: Richtung zum Spieler anpassen (in unscaled time)
-        Vector3 toPlayer = (playerTransform.position - transform.position).normalized;
-        dashDirection = Vector3.Slerp(dashDirection, toPlayer, homingStrength * Time.unscaledDeltaTime);
-        dashDirection.Normalize();
+        // Geschwindigkeits-Multiplikator: langsamer wenn Slow-Motion aktiv
+        // (unabhängig vom genauen Spieler-State)
+        bool slowMoActive = IsSlowMotionActive();
+        float speedMultiplier = slowMoActive ? slowMotionSpeedMultiplier : 1f;
+        
+        // DEBUG: Entfernen nach Diagnose
+        Debug.Log($"[GenOneNpc] UpdateDashMovement - TimeScale: {Time.timeScale:F3}, SlowMo: {slowMoActive}, Multiplier: {speedMultiplier:F2}");
+
+        // Homing NUR wenn Spieler noch im Dash ist
+        // Sonst fliegt GenOne geradeaus weiter (verhindert U-Turn nach Verfehlen)
+        if (IsPlayerDashing())
+        {
+            Vector3 toPlayer = (playerTransform.position - transform.position).normalized;
+            // Homing auch verlangsamt während Slow-Motion
+            dashDirection = Vector3.Slerp(dashDirection, toPlayer, homingStrength * speedMultiplier * Time.unscaledDeltaTime);
+            dashDirection.Normalize();
+        }
 
         // Rotation zur Flugrichtung
         if (dashDirection.sqrMagnitude > 0.01f)
@@ -391,8 +419,8 @@ public class GenOneNpc : NpcBase
             transform.rotation = Quaternion.LookRotation(dashDirection);
         }
 
-        // Bewegung (unscaled time)
-        Vector3 movement = dashDirection * dashSpeed * Time.unscaledDeltaTime;
+        // Bewegung (unscaled time * Multiplikator)
+        Vector3 movement = dashDirection * dashSpeed * speedMultiplier * Time.unscaledDeltaTime;
         transform.position += movement;
     }
 
@@ -401,8 +429,9 @@ public class GenOneNpc : NpcBase
     /// </summary>
     public bool CheckSurfaceCollision(out RaycastHit hit)
     {
-        // SphereCast in Bewegungsrichtung
-        float checkDistance = dashSpeed * Time.unscaledDeltaTime + 0.5f;
+        // SphereCast in Bewegungsrichtung (mit Multiplikator passend zur Bewegung)
+        float speedMultiplier = IsSlowMotionActive() ? slowMotionSpeedMultiplier : 1f;
+        float checkDistance = dashSpeed * speedMultiplier * Time.unscaledDeltaTime + 0.5f;
 
         if (Physics.SphereCast(
             transform.position,
@@ -520,11 +549,19 @@ public class GenOneNpc : NpcBase
 
     /// <summary>
     /// Verarbeitet Treffer mit dem Spieler.
+    /// Spieler im Airborne-State nimmt keinen Schaden (Ausweich-Mechanik).
     /// Prüft ob frontal (Spieler stirbt) oder von hinten/seitlich (GenOne nimmt Schaden).
     /// </summary>
     public void ProcessPlayerHit()
     {
         if (playerCore == null) return;
+
+        // Spieler im Airborne-State nimmt keinen Schaden - erfolgreiches Ausweichen!
+        if (playerCore.CurrentState == PlayerCore.PlayerState.Airborne)
+        {
+            Debug.Log("[GenOneNpc] Player is airborne - attack passes through!");
+            return;
+        }
 
         // Richtung vom Spieler zu GenOne
         Vector3 playerToGenOne = (transform.position - playerTransform.position).normalized;
