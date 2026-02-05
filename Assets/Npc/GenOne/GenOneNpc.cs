@@ -371,7 +371,7 @@ public class GenOneNpc : NpcBase
         isDashing = true;
 
         // Initiale Richtung zum Spieler
-        dashDirection = (playerTransform.position - transform.position).normalized;
+        dashDirection = (playerTransform.position  - transform.position).normalized;
 
         // Feedback
         PlayFeedback(dashStartSound, dashTrailEffect);

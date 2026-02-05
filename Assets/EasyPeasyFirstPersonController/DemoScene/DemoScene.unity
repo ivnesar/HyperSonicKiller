@@ -2734,11 +2734,23 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
       propertyPath: dashSpeed
-      value: 5
+      value: 120
+      objectReference: {fileID: 0}
+    - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
+      propertyPath: hitRadius
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
       propertyPath: homingStrength
-      value: 3
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
+      propertyPath: postDashCooldown
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
+      propertyPath: slowMotionSpeedMultiplier
+      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
       propertyPath: m_LocalPosition.x
