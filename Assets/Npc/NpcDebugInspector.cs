@@ -2,12 +2,13 @@ using UnityEngine;
 
 /// <summary>
 /// Debug-Komponente für NPC-Werte im Inspector.
-/// Erweitert mit Forward-Raycast Visualisierung für GenOne.
+/// Unterstützt GenOne (Forward-Raycast) und GenTwo (Intercept-Visualisierung).
 /// </summary>
 public class NpcDebugInspector : MonoBehaviour
 {
     private NpcBase npc;
-    private GenOneNpc genOne; // Spezifisch für GenOne-Features
+    private GenOneNpc genOne;
+    private GenTwoNpc genTwo;
 
     [Header("General")]
     [SerializeField] private string currentState;
@@ -23,10 +24,10 @@ public class NpcDebugInspector : MonoBehaviour
     [SerializeField] private bool canReachPlayer;
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Forward Raycast Debug
+    #region Forward Raycast Debug (GenOne)
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Forward Raycast Debug")]
+    [Header("Forward Raycast Debug (GenOne)")]
     [Tooltip("Aktiviert die Visualisierung des Forward-Raycasts")]
     [SerializeField] private bool showForwardRaycast = true;
 
@@ -39,12 +40,12 @@ public class NpcDebugInspector : MonoBehaviour
     [Tooltip("Größe der Kollisionspunkt-Sphere")]
     [SerializeField] private float hitPointSphereSize = 0.5f;
 
-    [Header("Debug Colors")]
+    [Header("Debug Colors (GenOne)")]
     [SerializeField] private Color rayColor = Color.cyan;
     [SerializeField] private Color hitPointColor = Color.magenta;
     [SerializeField] private Color noHitRayColor = Color.red;
 
-    // Cached hit info für Gizmos
+    // Cached hit info für Gizmos (GenOne)
     private bool hasHit;
     private Vector3 hitPoint;
     private Vector3 rayOrigin;
@@ -52,10 +53,42 @@ public class NpcDebugInspector : MonoBehaviour
 
     #endregion
 
+    // ════════════════════════════════════════════════════════════════════════
+    #region Intercept Debug (GenTwo)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Header("Intercept Debug (GenTwo)")]
+    [Tooltip("Aktiviert die Visualisierung der Intercept-Berechnung")]
+    [SerializeField] private bool showInterceptDebug = true;
+
+    [Tooltip("Farbe des Intercept-Rays (GenTwo → Abfangpunkt)")]
+    [SerializeField] private Color interceptRayColor = Color.yellow;
+
+    [Tooltip("Farbe des Dash-Richtungs-Rays während des Dashes")]
+    [SerializeField] private Color genTwoDashRayColor = Color.red;
+
+    [Tooltip("Farbe des Abfangpunkt-Gizmos")]
+    [SerializeField] private Color interceptPointColor = new Color(1f, 0.5f, 0f); // Orange
+
+    [Tooltip("Größe der Abfangpunkt-Sphere")]
+    [SerializeField] private float interceptPointSize = 0.6f;
+
+    [Header("GenTwo State (Read Only)")]
+    [SerializeField] private bool genTwoIsDashing;
+    [SerializeField] private bool genTwoHasValidIntercept;
+    [SerializeField] private bool genTwoPlayerInRange;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Unity Lifecycle
+    // ════════════════════════════════════════════════════════════════════════
+
     private void Awake()
     {
         npc = GetComponent<NpcBase>();
         genOne = GetComponent<GenOneNpc>();
+        genTwo = GetComponent<GenTwoNpc>();
 
         if (npc == null) enabled = false;
     }
@@ -73,21 +106,29 @@ public class NpcDebugInspector : MonoBehaviour
         distanceToTarget = npc.DistanceToTarget;
         canReachPlayer = npc.CanReachPlayer;
 
-        // Forward Raycast für GenOne
+        // GenOne Forward Raycast
         if (showForwardRaycast && genOne != null)
         {
             UpdateForwardRaycast();
         }
+
+        // GenTwo Intercept Debug
+        if (showInterceptDebug && genTwo != null)
+        {
+            UpdateGenTwoDebug();
+        }
     }
 
-    /// <summary>
-    /// Führt den Forward-Raycast aus und cached die Ergebnisse für Gizmos.
-    /// </summary>
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region GenOne - Forward Raycast
+    // ════════════════════════════════════════════════════════════════════════
+
     private void UpdateForwardRaycast()
     {
         rayOrigin = transform.position;
 
-        // Während Dash: dashDirection nutzen, sonst transform.forward
         if (genOne.IsDashing)
         {
             rayDirection = genOne.DashDirection;
@@ -97,48 +138,90 @@ public class NpcDebugInspector : MonoBehaviour
             rayDirection = transform.forward;
         }
 
-        // Raycast ausführen
         if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, raycastDistance, solidLayerMask))
         {
             hasHit = true;
             hitPoint = hit.point;
+            Debug.DrawRay(rayOrigin, rayDirection * hit.distance, rayColor);
         }
         else
         {
             hasHit = false;
             hitPoint = rayOrigin + rayDirection * raycastDistance;
-        }
-
-        // Debug.DrawRay für Scene View (auch ohne Gizmos-Button aktiv)
-        if (hasHit)
-        {
-            Debug.DrawRay(rayOrigin, rayDirection * hit.distance, rayColor);
-        }
-        else
-        {
             Debug.DrawRay(rayOrigin, rayDirection * raycastDistance, noHitRayColor);
         }
     }
 
-    /// <summary>
-    /// Zeichnet Gizmos im Scene View.
-    /// </summary>
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region GenTwo - Intercept Visualization
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void UpdateGenTwoDebug()
+    {
+        genTwoIsDashing = genTwo.IsDashing;
+        genTwoHasValidIntercept = genTwo.HasValidIntercept;
+        genTwoPlayerInRange = genTwo.IsPlayerInRange;
+
+        Vector3 origin = transform.position + Vector3.up;
+
+        if (genTwo.IsDashing)
+        {
+            // Während Dash: zeige Dash-Richtung als Ray
+            Debug.DrawRay(origin, genTwo.DashDirection * 20f, genTwoDashRayColor);
+        }
+
+        if (genTwo.HasValidIntercept)
+        {
+            // Zeige Linie zum Abfangpunkt
+            Vector3 interceptTarget = genTwo.LastInterceptPoint + Vector3.up;
+            Debug.DrawLine(origin, interceptTarget, interceptRayColor);
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Gizmos
+    // ════════════════════════════════════════════════════════════════════════
+
     private void OnDrawGizmos()
     {
-        // Nur zeichnen wenn aktiviert und GenOne vorhanden
-        if (!showForwardRaycast) return;
         if (!Application.isPlaying) return;
-        if (genOne == null) return;
 
-        // Kollisionspunkt als Sphere
-        if (hasHit)
+        // GenOne: Kollisionspunkt
+        if (showForwardRaycast && genOne != null && hasHit)
         {
             Gizmos.color = hitPointColor;
             Gizmos.DrawSphere(hitPoint, hitPointSphereSize);
 
-            // Optional: Kleine WireSphere für bessere Sichtbarkeit
             Gizmos.color = Color.white;
             Gizmos.DrawWireSphere(hitPoint, hitPointSphereSize * 1.2f);
         }
+
+        // GenTwo: Abfangpunkt
+        if (showInterceptDebug && genTwo != null && genTwo.HasValidIntercept)
+        {
+            Vector3 interceptPos = genTwo.LastInterceptPoint;
+
+            // Solider Punkt am Abfangort
+            Gizmos.color = interceptPointColor;
+            Gizmos.DrawSphere(interceptPos, interceptPointSize);
+
+            // WireSphere für bessere Sichtbarkeit
+            Gizmos.color = Color.white;
+            Gizmos.DrawWireSphere(interceptPos, interceptPointSize * 1.3f);
+
+            // Linie von GenTwo zum Abfangpunkt
+            Gizmos.color = interceptRayColor;
+            Gizmos.DrawLine(transform.position + Vector3.up, interceptPos + Vector3.up);
+
+            // Vertikale Markierung am Abfangpunkt (Säule)
+            Gizmos.color = new Color(interceptPointColor.r, interceptPointColor.g, interceptPointColor.b, 0.4f);
+            Gizmos.DrawLine(interceptPos, interceptPos + Vector3.up * 3f);
+        }
     }
+
+    #endregion
 }

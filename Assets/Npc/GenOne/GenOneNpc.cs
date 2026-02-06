@@ -12,6 +12,12 @@ using UnityEngine;
 // 5. Nach Dash: Klebt an Wand oder steht auf Boden
 // 6. Kann nur im Idle-State gestunnt werden (Dash-Immunität)
 //
+// DASH-ENDPUNKT-LOGIK:
+// - Raycast von GenOne durch Spielerkopf (pos + Vector3.up) zur Wand dahinter
+// - GenOne stoppt erst an dieser Oberfläche, nicht vorher
+// - Verhindert frühzeitiges Steckenbleiben an Boden/Wänden vor dem Spieler
+// - Sweep-SphereCast über die volle Frame-Distanz verhindert Tunneling
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -56,6 +62,12 @@ public class GenOneNpc : NpcBase
 
     [Tooltip("Layer für Spieler-Erkennung")]
     [SerializeField] private LayerMask playerLayer;
+
+    [Tooltip("Höhen-Offset für das Dash-Ziel am Spieler (1 = Kopfhöhe)")]
+    [SerializeField] private float playerHeadOffset = 1f;
+
+    [Tooltip("Maximale Raycast-Distanz für den Endpunkt hinter dem Spieler")]
+    [SerializeField] private float maxEndpointRaycastDistance = 200f;
 
     #endregion
 
@@ -146,6 +158,10 @@ public class GenOneNpc : NpcBase
     private bool isStuckToWall;
     private float cooldownEndTime;
 
+    // Dash endpoint (berechnet jeden Frame)
+    private Vector3 currentDashEndpoint;
+    private bool hasDashEndpoint;
+
     // Dash immunity flag
     private bool isDashing;
 
@@ -178,6 +194,12 @@ public class GenOneNpc : NpcBase
 
     /// <summary>Reference zum PlayerDash.</summary>
     public PlayerDash PlayerDash => playerDash;
+
+    /// <summary>Aktueller berechneter Endpunkt des Dashes.</summary>
+    public Vector3 CurrentDashEndpoint => currentDashEndpoint;
+
+    /// <summary>True wenn ein gültiger Endpunkt existiert.</summary>
+    public bool HasDashEndpoint => hasDashEndpoint;
 
     #endregion
 
@@ -369,9 +391,14 @@ public class GenOneNpc : NpcBase
         if (playerTransform == null) return;
 
         isDashing = true;
+        hasDashEndpoint = false;
 
-        // Initiale Richtung zum Spieler
-        dashDirection = (playerTransform.position  - transform.position).normalized;
+        // Initiale Richtung zum Spielerkopf
+        Vector3 playerHead = playerTransform.position + Vector3.up * playerHeadOffset;
+        dashDirection = (playerHead - transform.position).normalized;
+
+        // Initalen Endpunkt berechnen
+        CalculateDashEndpoint();
 
         // Feedback
         PlayFeedback(dashStartSound, dashTrailEffect);
@@ -381,70 +408,150 @@ public class GenOneNpc : NpcBase
             animator.SetBool("IsDashing", true);
         }
 
-        Debug.Log($"[GenOneNpc] Dash started towards player!");
+        Debug.Log($"[GenOneNpc] Dash started towards player! Endpoint valid: {hasDashEndpoint}");
+    }
+
+    /// <summary>
+    /// Berechnet den Dash-Endpunkt: Raycast von GenOne durch Spielerkopf zur Wand dahinter.
+    /// Wird jeden Frame im Dashing-State aufgerufen (Homing = Endpunkt bewegt sich mit).
+    /// </summary>
+    public void CalculateDashEndpoint()
+    {
+        if (playerTransform == null)
+        {
+            hasDashEndpoint = false;
+            return;
+        }
+
+        Vector3 playerHead = playerTransform.position + Vector3.up * playerHeadOffset;
+        Vector3 directionThroughPlayer = (playerHead - transform.position).normalized;
+
+        // Raycast von GenOne durch Spielerkopf hindurch
+        if (Physics.Raycast(
+            transform.position,
+            directionThroughPlayer,
+            out RaycastHit hit,
+            maxEndpointRaycastDistance,
+            collisionLayers))
+        {
+            currentDashEndpoint = hit.point;
+            hasDashEndpoint = true;
+        }
+        else
+        {
+            // Kein Treffer → kein gültiger Endpunkt
+            hasDashEndpoint = false;
+        }
     }
 
     /// <summary>
     /// Bewegt GenOne während des Dash mit Homing.
     /// Wird jeden Frame vom Dashing-State aufgerufen.
-    /// Verwendet unscaledDeltaTime für konsistente Basis-Bewegung.
-    /// Wendet slowMotionSpeedMultiplier an wenn Slow-Motion aktiv ist.
-    /// Homing ist nur aktiv solange der Spieler selbst im Dash ist.
+    /// 
+    /// Ablauf pro Frame:
+    /// 1. Homing-Richtung durch Spielerkopf berechnen
+    /// 2. Endpunkt hinter Spieler neu berechnen
+    /// 3. Sweep-SphereCast über volle Frame-Distanz (Anti-Tunneling)
+    /// 4. Position updaten
     /// </summary>
     public void UpdateDashMovement()
     {
         if (playerTransform == null) return;
 
-        // Geschwindigkeits-Multiplikator: langsamer wenn Slow-Motion aktiv
-        // (unabhängig vom genauen Spieler-State)
+        // ── 1. Geschwindigkeits-Multiplikator ──
         bool slowMoActive = IsSlowMotionActive();
         float speedMultiplier = slowMoActive ? slowMotionSpeedMultiplier : 1f;
-        
-        // DEBUG: Entfernen nach Diagnose
-        Debug.Log($"[GenOneNpc] UpdateDashMovement - TimeScale: {Time.timeScale:F3}, SlowMo: {slowMoActive}, Multiplier: {speedMultiplier:F2}");
 
-        // Homing NUR wenn Spieler noch im Dash ist
-        // Sonst fliegt GenOne geradeaus weiter (verhindert U-Turn nach Verfehlen)
+        // ── 2. Homing: Richtung durch Spielerkopf ──
+        // Nur wenn Spieler noch im Dash, sonst geradeaus weiter
         if (IsPlayerDashing())
         {
-            Vector3 toPlayer = (playerTransform.position - transform.position).normalized;
-            // Homing auch verlangsamt während Slow-Motion
-            dashDirection = Vector3.Slerp(dashDirection, toPlayer, homingStrength * speedMultiplier * Time.unscaledDeltaTime);
+            Vector3 playerHead = playerTransform.position + Vector3.up * playerHeadOffset;
+            Vector3 toPlayerHead = (playerHead - transform.position).normalized;
+
+            dashDirection = Vector3.Slerp(
+                dashDirection,
+                toPlayerHead,
+                homingStrength * speedMultiplier * Time.unscaledDeltaTime
+            );
             dashDirection.Normalize();
         }
 
-        // Rotation zur Flugrichtung
+        // ── 3. Endpunkt jeden Frame neu berechnen (Homing) ──
+        CalculateDashEndpoint();
+
+        // ── 4. Rotation zur Flugrichtung ──
         if (dashDirection.sqrMagnitude > 0.01f)
         {
             transform.rotation = Quaternion.LookRotation(dashDirection);
         }
 
-        // Bewegung (unscaled time * Multiplikator)
-        Vector3 movement = dashDirection * dashSpeed * speedMultiplier * Time.unscaledDeltaTime;
+        // ── 5. Bewegung berechnen (noch nicht anwenden!) ──
+        float frameDistance = dashSpeed * speedMultiplier * Time.unscaledDeltaTime;
+        Vector3 movement = dashDirection * frameDistance;
+
+        // ── 6. Position anwenden ──
+        // (Kollisionsprüfung erfolgt separat in CheckSurfaceCollision)
         transform.position += movement;
     }
 
     /// <summary>
-    /// Prüft Kollision mit Oberflächen während des Dash.
+    /// Prüft Kollision mit Oberflächen während des Dash via Sweep-SphereCast.
+    /// 
+    /// Der SphereCast läuft über die volle Frame-Bewegungsdistanz und verhindert Tunneling.
+    /// Die Kollision wird nur akzeptiert, wenn der Treffer in der Nähe des berechneten
+    /// Endpunkts liegt (hinter dem Spieler), NICHT wenn er vor dem Spieler liegt.
     /// </summary>
     public bool CheckSurfaceCollision(out RaycastHit hit)
     {
-        // SphereCast in Bewegungsrichtung (mit Multiplikator passend zur Bewegung)
         float speedMultiplier = IsSlowMotionActive() ? slowMotionSpeedMultiplier : 1f;
-        float checkDistance = dashSpeed * speedMultiplier * Time.unscaledDeltaTime + 0.5f;
+        float frameDistance = dashSpeed * speedMultiplier * Time.unscaledDeltaTime;
+
+        // Sweep-SphereCast von der Position VOR der Bewegung
+        // (wir casten von der aktuellen Position rückwärts um die Frame-Distanz,
+        //  plus etwas Puffer, um die gerade zurückgelegte Strecke abzudecken)
+        Vector3 sweepOrigin = transform.position - dashDirection * frameDistance;
+        float sweepDistance = frameDistance + 0.5f; // kleiner Puffer
+        float sphereRadius = hitRadius * 0.5f;
 
         if (Physics.SphereCast(
-            transform.position,
-            hitRadius * 0.5f,
+            sweepOrigin,
+            sphereRadius,
             dashDirection,
             out hit,
-            checkDistance,
+            sweepDistance,
             collisionLayers))
         {
-            return true;
+            // ── Prüfe: Liegt der Treffer HINTER dem Spieler? ──
+            if (IsHitBeyondPlayer(hit.point))
+            {
+                // Treffer liegt hinter dem Spieler → gültige Kollision
+                return true;
+            }
+
+            // Treffer liegt VOR dem Spieler → ignorieren, weiterfliegen
         }
 
+        // Kein (gültiger) Treffer
+        hit = default;
         return false;
+    }
+
+    /// <summary>
+    /// Prüft ob ein Punkt "hinter dem Spieler" liegt (aus Sicht des GenOne).
+    /// Nutzt Dot-Product: Wenn der Vektor vom Spielerkopf zum Punkt
+    /// in gleicher Richtung wie der Dash zeigt, liegt er dahinter.
+    /// </summary>
+    private bool IsHitBeyondPlayer(Vector3 point)
+    {
+        if (playerTransform == null) return true; // Safety: im Zweifel akzeptieren
+
+        Vector3 playerHead = playerTransform.position + Vector3.up * playerHeadOffset;
+        Vector3 playerHeadToHit = point - playerHead;
+
+        // Positiver Dot = Punkt liegt in Dash-Richtung hinter dem Spieler
+        float dot = Vector3.Dot(playerHeadToHit, dashDirection);
+        return dot > 0f;
     }
 
     /// <summary>
@@ -473,6 +580,7 @@ public class GenOneNpc : NpcBase
     public void EndDash(RaycastHit surfaceHit)
     {
         isDashing = false;
+        hasDashEndpoint = false;
 
         // Position mit Offset von der Oberfläche
         stuckPosition = surfaceHit.point + surfaceHit.normal * wallStickOffset;
@@ -505,13 +613,14 @@ public class GenOneNpc : NpcBase
     }
 
     /// <summary>
-    /// Beendet den Dash ohne Oberflächenkontakt (z.B. nach Spieler-Treffer).
-    /// GenOne fällt dann zur nächsten Oberfläche.
+    /// Beendet den Dash ohne Oberflächenkontakt (z.B. kein Endpunkt gefunden).
+    /// GenOne bleibt an aktueller Position stehen.
     /// </summary>
     public void EndDashInAir()
     {
         isDashing = false;
         isStuckToWall = false;
+        hasDashEndpoint = false;
 
         // Cooldown starten
         cooldownEndTime = Time.unscaledTime + postDashCooldown;
@@ -526,6 +635,8 @@ public class GenOneNpc : NpcBase
         {
             dashTrailEffect.Stop();
         }
+
+        Debug.Log("[GenOneNpc] Dash ended in air - no endpoint found!");
     }
 
     /// <summary>
@@ -584,11 +695,7 @@ public class GenOneNpc : NpcBase
         else
         {
             // HINTEN/SEITLICH: Spieler hat ausgewichen → GenOne nimmt Dash-Damage
-            // Der Schaden wird über den normalen Melee-Damage-Weg verarbeitet
             Debug.Log($"[GenOneNpc] SIDE/BACK HIT! Angle: {angle:F1}° - GenOne vulnerable!");
-
-            // Spieler's Dash-Attack sollte GenOne hier treffen
-            // Das wird über PlayerDash.CheckAndDamageEnemiesInRadius() gehandhabt
         }
     }
 
@@ -677,6 +784,7 @@ public class GenOneNpc : NpcBase
     {
         isDashing = false;
         isStuckToWall = false;
+        hasDashEndpoint = false;
 
         if (dashTrailEffect != null)
         {
@@ -707,6 +815,14 @@ public class GenOneNpc : NpcBase
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawRay(transform.position, dashDirection * 5f);
+
+            // Endpunkt anzeigen
+            if (hasDashEndpoint)
+            {
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawSphere(currentDashEndpoint, 0.5f);
+                Gizmos.DrawLine(transform.position, currentDashEndpoint);
+            }
         }
 
         // Wall-Stick Position und Normal

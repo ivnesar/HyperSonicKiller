@@ -2752,6 +2752,10 @@ PrefabInstance:
       propertyPath: slowMotionSpeedMultiplier
       value: 0.1
       objectReference: {fileID: 0}
+    - target: {fileID: 611888935517928424, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
+      propertyPath: maxEndpointRaycastDistance
+      value: 999
+      objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: 4043251b8f90f6f419e5fa3854e4651f, type: 3}
       propertyPath: m_LocalPosition.x
       value: -6.75

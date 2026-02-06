@@ -430,6 +430,7 @@ GameObject:
   - component: {fileID: 6295242138573287136}
   - component: {fileID: 4948156137820876829}
   - component: {fileID: 7005038953154893743}
+  - component: {fileID: 9190051213164589030}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -603,10 +604,13 @@ MonoBehaviour:
   shieldLayer:
     serializedVersion: 2
     m_Bits: 256
+  enemyHitAngle: 60
+  shieldHitAngle: 25
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
   swordDashRotationDuration: 0.12
+  swordDashMaxAngle: 9
 --- !u!114 &8462264894812746746
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -682,6 +686,40 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 10
   currentHP: 0
+--- !u!114 &9190051213164589030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06d352b93b6a43342a62f92356debcd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDebugInspector
+  currentState: 
+  isDead: 0
+  isInvulnerable: 0
+  currentHP: 0
+  maxHP: 0
+  combatState: 
+  blockHP: 0
+  isExhausted: 0
+  hasSword: 0
+  dashCharges: 0
+  isDashing: 0
+  isSwordDashing: 0
+  isStuckToSurface: 0
+  isGrounded: 0
+  verticalVelocity: 0
+  showDashRay: 1
+  dashRayColor: {r: 0, g: 1, b: 1, a: 1}
+  swordDashRayColor: {r: 1, g: 0, b: 1, a: 1}
+  lookDirectionRayLength: 10
+  showLookDirection: 1
+  lookDirectionColor: {r: 0.5, g: 0.5, b: 1, a: 0.5}
+  showScreenOverlay: 1
 --- !u!1 &4042422906420918628
 GameObject:
   m_ObjectHideFlags: 0

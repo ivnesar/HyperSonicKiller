@@ -22,7 +22,8 @@ public enum NpcType
 {
     Soldier,
     Defender,
-    GenOne
+    GenOne, 
+    GenTwo 
 }
 
 public abstract class NpcBase : MonoBehaviour, IEnemy

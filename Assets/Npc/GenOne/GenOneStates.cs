@@ -11,14 +11,20 @@ using UnityEngine;
 //   │    Idle ──(Spieler dasht + in Range + LOS)──▶ Dashing    │
 //   │      ▲                                           │        │
 //   │      │                                           │        │
-//   │      │ Cooldown complete                         │        │
-//   │      │                                           ▼        │
-//   │      └────────────────────────────────── WallStuck       │
-//   │                                            /Grounded      │
-//   │                                                           │
+//   │      │ Cooldown complete              ┌──────────┤        │
+//   │      │                                │          │        │
+//   │      │                                ▼          ▼        │
+//   │      ├─────────────────────── WallStuck    Kein Endpunkt  │
+//   │      │                        /Grounded    → zurück Idle  │
+//   │      │                                                    │
 //   │    Stunned ◀── nur aus Idle erreichbar                   │
 //   │                                                           │
 //   └───────────────────────────────────────────────────────────┘
+//
+// Dash-Endpunkt-Logik:
+//   GenOne castet durch Spielerkopf (pos + up) zur Wand dahinter.
+//   Kollision mit Oberflächen wird nur akzeptiert wenn sie HINTER
+//   dem Spieler liegt. Kein Endpunkt = Dash wird abgebrochen.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -57,7 +63,7 @@ namespace GenOneStates
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DASHING - Fliegt zum Spieler mit Homing
+    // DASHING - Fliegt zum Spieler mit Homing, stoppt an Wand hinter Spieler
     // ─────────────────────────────────────────────────────────────────────────
     public class Dashing : NpcStateBase<GenOneNpc>
     {
@@ -67,24 +73,32 @@ namespace GenOneStates
         public override void Enter(GenOneNpc npc)
         {
             npc.StartDash();
+
+            // Sofort-Check: Wenn schon beim Start kein Endpunkt → nicht dashen
+            // (wird im ersten Update abgefangen)
         }
 
         public override INpcState<GenOneNpc> Update(GenOneNpc npc)
         {
-            // Bewegung mit Homing (unscaled time)
+            // ── 1. Bewegung mit Homing + Endpunkt-Neuberechnung ──
             npc.UpdateDashMovement();
 
-            // 1. Prüfe Spieler-Kollision
-            if (npc.CheckPlayerCollision(out Collider playerCollider))
+            // ── 2. Fallback: Kein gültiger Endpunkt → Dash abbrechen ──
+            if (!npc.HasDashEndpoint)
             {
-                // Treffer verarbeiten (frontal vs seitlich/hinten)
-                npc.ProcessPlayerHit();
-
-                // GenOne fliegt weiter bis zur nächsten Oberfläche
-                // (ProcessPlayerHit entscheidet ob Spieler oder GenOne Schaden nimmt)
+                Debug.Log("[GenOneStates.Dashing] No valid endpoint - aborting dash!");
+                npc.EndDashInAir();
+                return new Idle();
             }
 
-            // 2. Prüfe Oberflächen-Kollision
+            // ── 3. Prüfe Spieler-Kollision (stoppt Dash NICHT) ──
+            if (npc.CheckPlayerCollision(out Collider playerCollider))
+            {
+                npc.ProcessPlayerHit();
+                // GenOne fliegt weiter bis zur Oberfläche hinter dem Spieler
+            }
+
+            // ── 4. Prüfe Oberflächen-Kollision (nur hinter Spieler) ──
             if (npc.CheckSurfaceCollision(out RaycastHit hit))
             {
                 npc.EndDash(hit);
