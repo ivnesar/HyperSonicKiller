@@ -823,6 +823,8 @@ MonoBehaviour:
   chargeDuration: 1
   dashSpeed: 60
   dashSpeedMultiplier: 0.3
+  playerDashSpeed: 10
+  playerDashMaxDistance: 999
   playerHitRadius: 1.2
   collisionDamage: 999
   surfaceLayerMask:
@@ -885,6 +887,14 @@ MonoBehaviour:
   rayColor: {r: 0, g: 1, b: 1, a: 1}
   hitPointColor: {r: 1, g: 0, b: 1, a: 1}
   noHitRayColor: {r: 1, g: 0, b: 0, a: 1}
+  showInterceptDebug: 1
+  interceptRayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  genTwoDashRayColor: {r: 1, g: 0, b: 0, a: 1}
+  interceptPointColor: {r: 1, g: 0.5, b: 0, a: 1}
+  interceptPointSize: 0.6
+  genTwoIsDashing: 0
+  genTwoHasValidIntercept: 0
+  genTwoPlayerInRange: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

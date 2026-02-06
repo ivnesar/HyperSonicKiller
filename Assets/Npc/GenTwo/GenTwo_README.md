@@ -30,18 +30,24 @@ public enum NpcType
 
 2. **Configure Inspector Values:**
    - `Detection Range`: 30 (default) — how far GenTwo reacts to player dashes
-   - `Charge Duration`: 1.0 — warning time before dashing
+   - `Charge Duration`: 1.0 — warning time before dashing (runs in unscaled time)
    - `Dash Speed`: 25 — base speed
    - `Dash Speed Multiplier`: 1.3 — only active while player is dashing
+   - `Player Dash Speed`: 20 — **must match PlayerDash.dashSpeed!**
+   - `Player Dash Max Distance`: 15 — **must match PlayerDash.dashMaxDistance!**
    - `Player Hit Radius`: 1.2 — collision radius for hitting the player
    - `Surface Layer Mask`: Set to your "Solid" / wall/floor layer
-   - `Recovery Duration`: 1.5 — time stuck after impact
+   - `Recovery Duration`: 1.5 — time stuck after impact (runs in unscaled time)
 
 3. **Important Layer Setup:**
    - `Surface Layer Mask` must include all walls and floors GenTwo can collide with
    - The Player must have the "Player" tag (already used by NpcBase)
 
 ## How It Works
+
+**IMPORTANT — Timing:** GenTwo uses `Time.unscaledDeltaTime` for ALL timing (charge, dash, recovery).
+This is critical because the player sets `Time.timeScale = 0.1f` during their dash.
+Without unscaled time, GenTwo's 1s charge would take 10 real seconds.
 
 ```
 [Idle] ──(player dashes in range)──> [Charging] ──(1s)──> [Dashing] ──(hits wall)──> [Recovery] ──(1.5s)──> [Idle]

@@ -64,7 +64,7 @@ namespace GenTwoStates
 
         public override void Enter(GenTwoNpc npc)
         {
-            npc.SetStateTimer(npc.ChargeDuration);
+            npc.SetUnscaledTimer(npc.ChargeDuration);
             npc.PlayChargeSound();
 
             if (npc.NpcAnimator != null)
@@ -98,7 +98,7 @@ namespace GenTwoStates
             }
 
             // Timer done → calculate intercept and dash!
-            if (npc.UpdateStateTimer())
+            if (npc.UpdateUnscaledTimer())
             {
                 return new Dashing();
             }
@@ -187,7 +187,7 @@ namespace GenTwoStates
 
         public override void Enter(GenTwoNpc npc)
         {
-            npc.SetStateTimer(npc.RecoveryDuration);
+            npc.SetUnscaledTimer(npc.RecoveryDuration);
 
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetTrigger("Impact");
@@ -198,9 +198,9 @@ namespace GenTwoStates
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
         {
             // Stuck in place - no movement, no rotation
-            // Just wait for timer
+            // Just wait for timer (unscaled so it works during slow-mo)
 
-            if (npc.UpdateStateTimer())
+            if (npc.UpdateUnscaledTimer())
             {
                 return new Idle();
             }

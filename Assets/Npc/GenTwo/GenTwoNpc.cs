@@ -41,6 +41,12 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Speed multiplier applied ONLY while the player is in Dashing state")]
     [SerializeField] private float dashSpeedMultiplier = 1.3f;
 
+    [Tooltip("Estimated player dash speed (should match PlayerDash.dashSpeed)")]
+    [SerializeField] private float playerDashSpeed = 20f;
+
+    [Tooltip("Max distance the player dash can cover (should match PlayerDash.dashMaxDistance)")]
+    [SerializeField] private float playerDashMaxDistance = 15f;
+
     [Tooltip("Radius for detecting collision with the player during dash")]
     [SerializeField] private float playerHitRadius = 1.2f;
 
@@ -81,6 +87,10 @@ public class GenTwoNpc : NpcBase
     // Debug: cached intercept point from last calculation
     private Vector3 lastInterceptPoint;
     private bool hasValidIntercept;
+
+    // Unscaled timer — independent of Time.timeScale
+    // Needed because the player slows time during their dash
+    private float unscaledTimer;
 
     #endregion
 
@@ -254,12 +264,12 @@ public class GenTwoNpc : NpcBase
     /// Returns the direction GenTwo should dash toward, or Vector3.zero if no valid intercept exists.
     /// 
     /// Uses proper intercept geometry:
-    ///   Player moves along: P(t) = playerPos + playerSpeed * playerDir * t
+    ///   Player moves along: P(t) = playerPos + playerDashSpeed * playerDir * t
     ///   GenTwo must reach P(t) in the same time t:
     ///     |P(t) - genTwoPos| = genTwoSpeed * t
     /// 
-    /// This produces a quadratic equation. If no solution exists (GenTwo too slow
-    /// or too far away), falls back to closest-point-on-line.
+    /// The intercept point is clamped to the player's maximum dash distance
+    /// to prevent GenTwo from aiming at a point the player will never reach.
     /// 
     /// Additionally checks LOS to the intercept point — returns Vector3.zero
     /// if a wall blocks the path.
@@ -273,19 +283,18 @@ public class GenTwoNpc : NpcBase
         Vector3 playerDir = playerCore.CameraTransform.forward.normalized;
         Vector3 genTwoPos = transform.position;
 
-        // Player dash speed (from PlayerDash inspector value — we read it via the component)
-        // Approximate: player dash uses unscaledDeltaTime at dashSpeed
-        // We use our own speed with multiplier as our intercept speed
-        float playerSpeed = 20f; // Reasonable approximation of player dash speed
-        float genTwoSpeed = dashSpeed * dashSpeedMultiplier;
+        float pSpeed = playerDashSpeed;
+        float gSpeed = dashSpeed * dashSpeedMultiplier;
 
-        // Relative position
+        // Maximum time the player will be dashing (distance / speed)
+        float maxPlayerDashTime = playerDashMaxDistance / pSpeed;
+
+        // Relative position: player relative to GenTwo
         Vector3 relPos = playerPos - genTwoPos;
 
-        // Quadratic equation: |relPos + playerSpeed * playerDir * t|² = (genTwoSpeed * t)²
-        // Expanding: (playerSpeed² - genTwoSpeed²) * t² + 2 * dot(relPos, playerDir) * playerSpeed * t + |relPos|² = 0
-        float a = (playerSpeed * playerSpeed) - (genTwoSpeed * genTwoSpeed);
-        float b = 2f * Vector3.Dot(relPos, playerDir) * playerSpeed;
+        // Quadratic: (pSpeed² - gSpeed²)t² + 2·pSpeed·dot(relPos, playerDir)·t + |relPos|² = 0
+        float a = (pSpeed * pSpeed) - (gSpeed * gSpeed);
+        float b = 2f * Vector3.Dot(relPos, playerDir) * pSpeed;
         float c = relPos.sqrMagnitude;
 
         float discriminant = b * b - 4f * a * c;
@@ -293,11 +302,11 @@ public class GenTwoNpc : NpcBase
 
         if (discriminant >= 0f && Mathf.Abs(a) > 0.001f)
         {
-            // Solve quadratic — we want the smallest positive t
             float sqrtDisc = Mathf.Sqrt(discriminant);
             float t1 = (-b - sqrtDisc) / (2f * a);
             float t2 = (-b + sqrtDisc) / (2f * a);
 
+            // Pick smallest positive t
             float t = -1f;
             if (t1 > 0.01f && t2 > 0.01f) t = Mathf.Min(t1, t2);
             else if (t1 > 0.01f) t = t1;
@@ -305,22 +314,28 @@ public class GenTwoNpc : NpcBase
 
             if (t > 0f)
             {
-                // Valid intercept time found
-                interceptPoint = playerPos + playerDir * playerSpeed * t;
+                // Clamp to player's max dash time — player stops at the wall
+                t = Mathf.Min(t, maxPlayerDashTime);
+                interceptPoint = playerPos + playerDir * pSpeed * t;
             }
             else
             {
-                // No positive solution — fallback to closest point
                 interceptPoint = FallbackClosestPoint(genTwoPos, playerPos, playerDir);
             }
         }
         else
         {
-            // No solution (speeds equal or GenTwo too slow) — fallback
             interceptPoint = FallbackClosestPoint(genTwoPos, playerPos, playerDir);
         }
 
-        // Check if path to intercept point is clear (no wall in the way)
+        // Clamp fallback to max dash distance too
+        float interceptDistAlongPath = Vector3.Dot(interceptPoint - playerPos, playerDir);
+        if (interceptDistAlongPath > playerDashMaxDistance)
+        {
+            interceptPoint = playerPos + playerDir * playerDashMaxDistance;
+        }
+
+        // Check if path to intercept point is clear
         if (!HasClearPathTo(interceptPoint))
         {
             hasValidIntercept = false;
@@ -333,6 +348,13 @@ public class GenTwoNpc : NpcBase
         hasValidIntercept = true;
 
         Vector3 direction = (interceptPoint - genTwoPos).normalized;
+
+        // Debug: log timing info
+        float genTwoTravelDist = Vector3.Distance(genTwoPos, interceptPoint);
+        float genTwoTravelTime = genTwoTravelDist / gSpeed;
+        float playerTravelTime = interceptDistAlongPath / pSpeed;
+        Debug.Log($"[GenTwo] {name}: Intercept calculated — GenTwo arrives in {genTwoTravelTime:F2}s, Player in {playerTravelTime:F2}s");
+
         return direction;
     }
 
@@ -449,6 +471,25 @@ public class GenTwoNpc : NpcBase
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
     public new void RotateTowardTarget() => base.RotateTowardTarget();
     public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
+
+    /// <summary>
+    /// Set the unscaled timer. Use this instead of SetStateTimer for timing
+    /// that must be independent of Time.timeScale (e.g., charge and recovery).
+    /// </summary>
+    public void SetUnscaledTimer(float duration)
+    {
+        unscaledTimer = duration;
+    }
+
+    /// <summary>
+    /// Update the unscaled timer using Time.unscaledDeltaTime.
+    /// Returns true when the timer has expired.
+    /// </summary>
+    public bool UpdateUnscaledTimer()
+    {
+        unscaledTimer -= Time.unscaledDeltaTime;
+        return unscaledTimer <= 0f;
+    }
 
     public void PlayChargeSound() => PlaySound(chargeSound);
     public void PlayDashSound() => PlaySound(dashSound);
