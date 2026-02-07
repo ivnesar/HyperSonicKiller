@@ -33,7 +33,7 @@ public class SoldierNpc : NpcBase
     [SerializeField] private Transform muzzlePoint;
     [SerializeField] private SoldierBullet bulletPrefab;
     [Tooltip("Layer für Line-of-Sight Check (sollte Player + Hindernisse enthalten)")]
-    [SerializeField] private LayerMask lineOfSightMask;
+    [SerializeField] private LayerMask bulletHitMask;
     
     [Tooltip("FOV-Winkel der Mündung in Grad. Wenn Spieler innerhalb dieses Winkels ist, wird direkt auf ihn gezielt.")]
     [SerializeField] private float muzzleAimAssistFOV = 5f;
@@ -251,7 +251,7 @@ public class SoldierNpc : NpcBase
         float distance = direction.magnitude;
 
         // Raycast: Trifft er etwas auf dem Weg zum Spieler?
-        if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, lineOfSightMask))
+        if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, bulletHitMask))
         {
             // Freie Sicht nur wenn wir den Spieler direkt treffen
             return hit.collider.CompareTag("Player");
@@ -278,7 +278,7 @@ public class SoldierNpc : NpcBase
 
         var bullet = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
         if (bullet != null)
-            bullet.Initialize(direction, damagePerShot, transform, lineOfSightMask);
+            bullet.Initialize(direction, damagePerShot, transform, bulletHitMask);
 
         if (animator != null)
             animator.SetTrigger("Fire");
