@@ -854,7 +854,7 @@ MonoBehaviour:
   damagePerShot: 5
   muzzlePoint: {fileID: 2080795029759614631}
   bulletPrefab: {fileID: 8718130687482727725, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
-  lineOfSightMask:
+  bulletHitMask:
     serializedVersion: 2
     m_Bits: 456
   muzzleAimAssistFOV: 5
