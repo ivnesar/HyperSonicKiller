@@ -31,6 +31,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.IsAiming = false;
+            npc.LockedTargetPosition = null;  // Sicherheit: Lock immer aufheben außerhalb Firing
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
@@ -167,7 +168,14 @@ namespace SoldierStates
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            npc.RotateTowardTarget();
+            // ── Dash-Lock: Position einfrieren wenn Spieler zu dashen beginnt ──
+            if (npc.LockedTargetPosition == null && npc.IsPlayerDashing)
+            {
+                npc.LockedTargetPosition = npc.TargetPosition;
+            }
+
+            // Zur effektiven Zielposition drehen (gelockt oder live)
+            npc.RotateTowardPosition(npc.EffectiveTargetPosition);
 
             // LOS verloren → Salve abbrechen, sofort nachladen
             if (!npc.HasLineOfSight())
@@ -208,6 +216,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
             npc.IsAiming = false;  // Bone-Rotation deaktivieren beim Nachladen
+            npc.LockedTargetPosition = null;  // Dash-Lock aufheben → Spieler wieder verfolgen
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetTrigger("Reload");

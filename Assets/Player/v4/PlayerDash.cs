@@ -408,7 +408,7 @@ public class PlayerDash : MonoBehaviour
         
         OnDashStarted?.Invoke();
         
-        Debug.Log($"[PlayerDash] Attack dash started - Target is {(dashTargetIsWall ? "WALL" : "FLOOR")}");
+        //Debug.Log($"[PlayerDash] Attack dash started - Target is {(dashTargetIsWall ? "WALL" : "FLOOR")}");
     }
 
     private void ProcessAttackDashMovement()
@@ -565,11 +565,11 @@ public class PlayerDash : MonoBehaviour
         if (hitSurface && dashTargetIsWall && !core.Controller.isGrounded)
         {
             ActivateWallStick(transform.position);
-            Debug.Log("[PlayerDash] Dash completed - sticking to WALL");
+            //Debug.Log("[PlayerDash] Dash completed - sticking to WALL");
         }
         else
         {
-            Debug.Log($"[PlayerDash] Dash completed - landing on {(dashTargetIsWall ? "wall but grounded" : "FLOOR")}");
+            //Debug.Log($"[PlayerDash] Dash completed - landing on {(dashTargetIsWall ? "wall but grounded" : "FLOOR")}");
         }
 
         OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall);

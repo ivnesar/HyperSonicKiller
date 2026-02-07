@@ -100,6 +100,15 @@ public class SoldierNpc : NpcBase
     /// </summary>
     public bool IsAiming { get; set; }
 
+    // ── Target Lock (Dash-Reaktion) ──
+    private PlayerCore playerCore;
+    
+    /// <summary>
+    /// Wenn gesetzt, schießt/zielt der Soldier auf diese Position statt auf die Live-Position.
+    /// Wird aktiviert wenn der Spieler während Firing dasht, und beim Reloading zurückgesetzt.
+    /// </summary>
+    public Vector3? LockedTargetPosition { get; set; }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -108,6 +117,10 @@ public class SoldierNpc : NpcBase
 
     protected override void OnStart()
     {
+        // PlayerCore-Referenz cachen für Dash-Erkennung
+        if (playerTransform != null)
+            playerCore = playerTransform.GetComponent<PlayerCore>();
+        
         ChangeState(new SoldierStates.Idle());
     }
 
@@ -175,8 +188,8 @@ public class SoldierNpc : NpcBase
     {
         if (playerTransform == null || aimBone == null) return 0f;
 
-        // Richtung vom Bone zum Spieler (Brusthöhe)
-        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
+        // Richtung vom Bone zum Ziel (Brusthöhe) — nutzt gelockte Position falls aktiv
+        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
         Vector3 toTarget = targetPoint - aimBone.position;
 
         // Horizontale Distanz (XZ-Ebene)
@@ -286,20 +299,20 @@ public class SoldierNpc : NpcBase
         // Mündungsrichtung (Lauf-Forward)
         Vector3 muzzleForward = muzzlePoint.forward;
         
-        // Richtung zum Spieler (Brusthöhe)
-        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
-        Vector3 directionToPlayer = (targetPoint - muzzlePoint.position).normalized;
+        // Richtung zum Ziel (Brusthöhe) — nutzt gelockte Position falls aktiv
+        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
+        Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
         
-        // Winkel zwischen Mündung und Spieler berechnen
-        float angleToPlayer = Vector3.Angle(muzzleForward, directionToPlayer);
+        // Winkel zwischen Mündung und Ziel berechnen
+        float angleToTarget = Vector3.Angle(muzzleForward, directionToTarget);
         
-        // Spieler innerhalb FOV → direkt auf ihn zielen (Aim-Assist)
-        if (angleToPlayer <= muzzleAimAssistFOV)
+        // Ziel innerhalb FOV → direkt drauf zielen (Aim-Assist)
+        if (angleToTarget <= muzzleAimAssistFOV)
         {
-            return directionToPlayer;
+            return directionToTarget;
         }
         
-        // Spieler außerhalb FOV → in Laufrichtung schießen
+        // Ziel außerhalb FOV → in Laufrichtung schießen
         return muzzleForward;
     }
 
@@ -331,6 +344,32 @@ public class SoldierNpc : NpcBase
     public new void SetStateTimer(float t) => base.SetStateTimer(t);
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
     public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
+
+    // ── Target Lock Helpers ──
+
+    /// <summary>
+    /// Gibt die effektive Zielposition zurück:
+    /// Gelockte Position (während Dash-Lock) oder Live-Spielerposition.
+    /// </summary>
+    public Vector3 EffectiveTargetPosition => LockedTargetPosition ?? TargetPosition;
+
+    /// <summary>
+    /// True wenn der Spieler gerade dasht (Attack-Dash oder Sword-Dash).
+    /// </summary>
+    public bool IsPlayerDashing
+    {
+        get
+        {
+            if (playerCore == null) return false;
+            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing
+                || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+        }
+    }
+
+    /// <summary>
+    /// Rotiert den NPC zu einer beliebigen Weltposition (statt immer zum Spieler).
+    /// </summary>
+    public void RotateTowardPosition(Vector3 worldPosition) => RotateToward(worldPosition);
 
     #endregion
 

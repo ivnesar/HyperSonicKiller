@@ -669,7 +669,7 @@ MonoBehaviour:
   throwLayerMask:
     serializedVersion: 2
     m_Bits: 448
-  swordRemovalDamage: 100
+  swordRemovalDamage: 50
   postRemovalStunDuration: 2
   throwActionName: ThrowSword
 --- !u!114 &7005038953154893743

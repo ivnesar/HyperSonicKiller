@@ -834,7 +834,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoldierNpc
   behaviorMode: 1
-  maxHealth: 100
+  maxHealth: 50
   moveSpeed: 4
   stoppingDistance: 0.5
   maxRotationSpeed: 240
@@ -843,20 +843,21 @@ MonoBehaviour:
   destroyDelay: 10
   showDebugInfo: 1
   minShootingRange: 3
-  maxShootingRange: 12
+  maxShootingRange: 24
   preferredRange: 12
-  aimDuration: 0.6
+  aimDuration: 2
   timeBetweenShots: 0.06
   shotsPerSalvo: 31
   reloadDuration: 2
   baseAccuracy: 0.85
   accuracySpreadAngle: 5
-  damagePerShot: 10
+  damagePerShot: 5
   muzzlePoint: {fileID: 2080795029759614631}
   bulletPrefab: {fileID: 8718130687482727725, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
   lineOfSightMask:
     serializedVersion: 2
-    m_Bits: 448
+    m_Bits: 456
+  muzzleAimAssistFOV: 5
   aimBone: {fileID: 8052137596577771941}
   pitchAxis: {x: 1, y: -1, z: 0}
   invertPitch: 0
@@ -910,6 +911,23 @@ MonoBehaviour:
   isStunned: 0
   distanceToTarget: 0
   canReachPlayer: 0
+  showForwardRaycast: 1
+  solidLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  raycastDistance: 999
+  hitPointSphereSize: 0.5
+  rayColor: {r: 0, g: 1, b: 1, a: 1}
+  hitPointColor: {r: 1, g: 0, b: 1, a: 1}
+  noHitRayColor: {r: 1, g: 0, b: 0, a: 1}
+  showInterceptDebug: 1
+  interceptRayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  genTwoDashRayColor: {r: 1, g: 0, b: 0, a: 1}
+  interceptPointColor: {r: 1, g: 0.5, b: 0, a: 1}
+  interceptPointSize: 0.6
+  genTwoIsDashing: 0
+  genTwoHasValidIntercept: 0
+  genTwoPlayerInRange: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,7 +17,7 @@ public class SoldierBullet : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────────────
 
     [Header("Bullet Physics")]
-    [SerializeField] private float bulletSpeed = 50f;
+    [SerializeField] private float bulletSpeed = 400f;
     [SerializeField] private float maxLifetime = 5f;
     [SerializeField] private float bulletRadius = 0.05f;
 

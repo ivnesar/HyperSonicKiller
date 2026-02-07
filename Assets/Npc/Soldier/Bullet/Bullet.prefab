@@ -46,11 +46,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 177975ed31de23e4f94ed53e64f726aa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoldierBullet
-  bulletSpeed: 50
+  bulletSpeed: 350
   maxLifetime: 5
   bulletRadius: 0.05
   maxSegmentsPerFrame: 10
-  segmentLength: 1
+  segmentLength: 2
   impactEffectPrefab: {fileID: 0}
   trailRenderer: {fileID: 877083383349012279}
   showDebugRays: 1
