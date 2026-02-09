@@ -908,13 +908,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 91b02b114bddfbe4284726c1ff226379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyMarkerTracker
-  markerAnchorOffset: {x: 0, y: 0.5, z: 0}
+  markerAnchorOffset: {x: 0, y: 1, z: 0}
   deathLingerDuration: 1
-  iconIdle: {fileID: 2800000, guid: cde2ca5b502fce049b43439b54dfbb69, type: 3}
-  iconCharging: {fileID: 2800000, guid: 1bfd92e27bb36624992668ca5d99a58d, type: 3}
-  iconAttacking: {fileID: 2800000, guid: 2e357b72142104649a298764347d1ea3, type: 3}
-  iconStunned: {fileID: 2800000, guid: 73c618ca4bc6acd41bbbebe9da583276, type: 3}
-  iconDead: {fileID: 2800000, guid: af22f52b8667648499db5cc2b89b01d5, type: 3}
+  iconIdle: {fileID: 2800000, guid: 655ea520d83ac3a41894aa76d6f2d43c, type: 3}
+  iconCharging: {fileID: 2800000, guid: d527c5e9fb3338f41a2a76e9c37756d4, type: 3}
+  iconAttacking: {fileID: 2800000, guid: bf657b0007e6ef742ba4824fd10644ed, type: 3}
+  iconStunned: {fileID: 2800000, guid: 39a8ac9c85ad9324fa4455340468c541, type: 3}
+  iconDead: {fileID: 2800000, guid: 783bc1a82ff47364cb367a738afd4f8d, type: 3}
+  secondaryIconIdle: {fileID: 2800000, guid: 16e5bcab9f17df54796c22a587067fb2, type: 3}
+  secondaryIconCharging: {fileID: 2800000, guid: 2c66fa63405c1634dbd35e04fc636dd0, type: 3}
+  secondaryIconAttacking: {fileID: 2800000, guid: c213535c1468dc843bded9582d25be4b, type: 3}
+  secondaryIconStunned: {fileID: 2800000, guid: 400e08b962c70d74184c09d1d63de278, type: 3}
+  secondaryIconDead: {fileID: 2800000, guid: f0a6647b5efa8fc4480a476dc80e0d76, type: 3}
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

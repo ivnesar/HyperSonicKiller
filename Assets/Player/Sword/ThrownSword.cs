@@ -34,6 +34,8 @@ public class ThrownSword : MonoBehaviour
 
     [Header("Visuals")]
     [SerializeField] private TrailRenderer trail;
+    [SerializeField] private ParticleSystem flyingParticles;
+    [SerializeField] private ParticleSystem impactParticles;
 
     #endregion
 
@@ -136,6 +138,10 @@ public class ThrownSword : MonoBehaviour
         // Orient sword to fly forward
         transform.rotation = Quaternion.LookRotation(flyDirection);
 
+        // Start flying particles
+        if (flyingParticles != null) flyingParticles.Play();
+        if (impactParticles != null) impactParticles.Stop();
+
         // Enable trail if present
         if (trail != null)
         {
@@ -160,6 +166,10 @@ public class ThrownSword : MonoBehaviour
 
         // Detach from any parent (was stuck to something)
         transform.SetParent(null);
+
+        // Stop all particles during return
+        if (flyingParticles != null) flyingParticles.Stop();
+        if (impactParticles != null) impactParticles.Stop();
 
         // Notify embedded enemy that sword is being removed and deal damage
         if (embeddedEnemy != null)
@@ -232,6 +242,10 @@ public class ThrownSword : MonoBehaviour
         // Clear enemy reference (shouldn't be any, but just in case)
         embeddedEnemy = null;
         hitObject = null;
+
+        // Stop all particles during return
+        if (flyingParticles != null) flyingParticles.Stop();
+        if (impactParticles != null) impactParticles.Stop();
 
         // Find the player to return to
         GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -368,6 +382,10 @@ public class ThrownSword : MonoBehaviour
 
         // Parent to the hit object so we move with it
         transform.SetParent(surface);
+
+        // Switch particles: stop flying, start impact
+        if (flyingParticles != null) flyingParticles.Play(); //Stop();
+        if (impactParticles != null) impactParticles.Play();
 
         // Disable trail while stuck
         if (trail != null)

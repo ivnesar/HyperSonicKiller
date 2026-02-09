@@ -28,6 +28,7 @@ Material:
   - _DITHERMODE_SCREEN
   - _FILTERMODE_POINT
   - _LIGHTMODE_LIT
+  - _RECEIVESHADOWSMODE_ON
   - _SNAPMODE_VIEW
   m_InvalidKeywords:
   - _USE_VERTEX_COLORS_OFF
@@ -107,6 +108,7 @@ Material:
     - _DitherMode: 0
     - _FilterMode: 1
     - _LightMode: 0
+    - _ReceiveShadowsMode: 0
     - _ResolutionLimit: 64
     - _SnapMode: 2
     - _SnapsPerUnit: 64
@@ -145,6 +147,7 @@ Material:
     - _SrcBlendAlpha: 1
     - _Surface: 0
     - _USE_AMBIENT_OVERRIDE: 0
+    - _USE_FLAT_SHADING: 0
     - _USE_REFLECTION_CUBEMAP: 0
     - _USE_SPECULAR_LIGHT: 0
     - _USE_VERTEX_COLORS: 0

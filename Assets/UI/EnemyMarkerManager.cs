@@ -10,11 +10,14 @@ using TMPro;
 // SETUP:
 // 1. Create an empty GameObject as child of your HUD Canvas
 // 2. Attach this script to it
-// 3. Assign the state icon sprites in the Inspector
-// 4. Make sure each NPC has an EnemyMarkerTracker component
+// 3. Make sure each NPC has an EnemyMarkerTracker component
 //
-// The manager creates marker UI elements at runtime (no prefab needed).
-// Markers are children of this GameObject's RectTransform.
+// DUAL MARKER SYSTEM:
+// - Primary marker: Full marker (icon + labels), shown when NPC is
+//   on-screen and within the inner radius.
+// - Secondary marker: Compact icon only, shown on a fixed outer ring
+//   when the NPC is outside the inner radius or behind the camera.
+//   Points in the direction of the NPC.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -50,43 +53,35 @@ public class EnemyMarkerManager : MonoBehaviour
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Radial Layout")]
-    [Tooltip("Inner radius as percentage of screen height (0-1). Markers inside this circle sit over the NPC.")]
+    [Header("Primary Marker — Radius")]
+    [Tooltip("Inner radius as percentage of screen height (0-1). " +
+             "NPCs inside this circle get the full primary marker over them.")]
     [Range(0.05f, 0.8f)]
     [SerializeField] private float innerRadiusPercent = 0.30f;
 
-    [Tooltip("Outer radius as percentage of screen height (0-1). Farthest markers are placed here.")]
+    [Header("Secondary Marker — Ring")]
+    [Tooltip("Fixed ring radius as percentage of screen height (0-1). " +
+             "Compact markers are placed on this ring when the NPC is outside the inner radius.")]
     [Range(0.1f, 0.95f)]
-    [SerializeField] private float outerRadiusPercent = 0.45f;
+    [SerializeField] private float secondaryRingPercent = 0.45f;
 
-    [Header("Distance Mapping")]
-    [Tooltip("NPCs closer than this distance are placed at the inner radius")]
-    [SerializeField] private float minNpcDistance = 5f;
+    [Tooltip("Size of the secondary (compact) icon in pixels.")]
+    [SerializeField] private Vector2 secondaryIconSize = new Vector2(20f, 20f);
 
-    [Tooltip("NPCs farther than this distance are placed at the outer radius")]
-    [SerializeField] private float maxNpcDistance = 50f;
-
-    [Header("Marker Scaling")]
-    [Tooltip("Scale of markers at the inner radius (close NPCs)")]
-    [SerializeField] private float markerScaleClose = 1.0f;
-
-    [Tooltip("Scale of markers at the outer radius (far NPCs)")]
-    [SerializeField] private float markerScaleFar = 0.5f;
-
-    [Header("Marker Appearance")]
-    [Tooltip("Size of the state icon in pixels")]
+    [Header("Primary Marker — Appearance")]
+    [Tooltip("Size of the primary state icon in pixels.")]
     [SerializeField] private Vector2 iconSize = new Vector2(40f, 40f);
 
-    [Tooltip("Font size for the type label")]
+    [Tooltip("Font size for the type label.")]
     [SerializeField] private float typeFontSize = 14f;
 
-    [Tooltip("Font size for the state label")]
+    [Tooltip("Font size for the state label.")]
     [SerializeField] private float stateFontSize = 11f;
 
-    [Tooltip("Color of the type label text")]
+    [Tooltip("Color of the type label text.")]
     [SerializeField] private Color typeLabelColor = Color.white;
 
-    [Tooltip("Color of the state label text")]
+    [Tooltip("Color of the state label text.")]
     [SerializeField] private Color stateLabelColor = new Color(0.8f, 0.8f, 0.8f, 1f);
 
     #endregion
@@ -96,7 +91,8 @@ public class EnemyMarkerManager : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private readonly List<EnemyMarkerTracker> trackers = new List<EnemyMarkerTracker>();
-    private readonly Dictionary<EnemyMarkerTracker, EnemyMarkerUI> markerMap = new Dictionary<EnemyMarkerTracker, EnemyMarkerUI>();
+    private readonly Dictionary<EnemyMarkerTracker, EnemyMarkerUI> markerMap
+        = new Dictionary<EnemyMarkerTracker, EnemyMarkerUI>();
 
     private Camera mainCam;
 
@@ -121,9 +117,8 @@ public class EnemyMarkerManager : MonoBehaviour
 
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
         float innerRadiusPx = Screen.height * innerRadiusPercent;
-        float outerRadiusPx = Screen.height * outerRadiusPercent;
+        float secondaryRingPx = Screen.height * secondaryRingPercent;
 
-        // Update all active markers
         foreach (var kvp in markerMap)
         {
             var tracker = kvp.Key;
@@ -136,11 +131,7 @@ public class EnemyMarkerManager : MonoBehaviour
                 mainCam,
                 screenCenter,
                 innerRadiusPx,
-                outerRadiusPx,
-                minNpcDistance,
-                maxNpcDistance,
-                markerScaleFar,
-                markerScaleClose
+                secondaryRingPx
             );
         }
 
@@ -159,7 +150,6 @@ public class EnemyMarkerManager : MonoBehaviour
 
         trackers.Add(tracker);
 
-        // Create marker UI element
         var markerUI = CreateMarkerUI(tracker);
         markerMap[tracker] = markerUI;
     }
@@ -192,24 +182,26 @@ public class EnemyMarkerManager : MonoBehaviour
         markerGO.transform.SetParent(transform, false);
 
         RectTransform markerRect = markerGO.AddComponent<RectTransform>();
-        markerRect.sizeDelta = new Vector2(iconSize.x, iconSize.y + 30f); // icon + labels
+        markerRect.sizeDelta = new Vector2(iconSize.x, iconSize.y + 30f);
         markerRect.pivot = new Vector2(0.5f, 0.5f);
 
         CanvasGroup cg = markerGO.AddComponent<CanvasGroup>();
 
-        // ── State Icon ──
+        // ────────────────────────────────────────────────────────────────
+        // PRIMARY elements (icon + two labels)
+        // ────────────────────────────────────────────────────────────────
+
         GameObject iconGO = new GameObject("StateIcon");
         iconGO.transform.SetParent(markerGO.transform, false);
 
         RectTransform iconRect = iconGO.AddComponent<RectTransform>();
         iconRect.sizeDelta = iconSize;
-        iconRect.anchoredPosition = new Vector2(0f, 10f); // slightly above center
+        iconRect.anchoredPosition = new Vector2(0f, 10f);
 
         Image iconImage = iconGO.AddComponent<Image>();
         iconImage.raycastTarget = false;
         iconImage.preserveAspect = true;
 
-        // ── Type Label (above icon) ──
         GameObject typeLabelGO = new GameObject("TypeLabel");
         typeLabelGO.transform.SetParent(markerGO.transform, false);
 
@@ -225,7 +217,6 @@ public class EnemyMarkerManager : MonoBehaviour
         typeText.enableWordWrapping = false;
         typeText.overflowMode = TextOverflowModes.Overflow;
 
-        // ── State Label (below icon) ──
         GameObject stateLabelGO = new GameObject("StateLabel");
         stateLabelGO.transform.SetParent(markerGO.transform, false);
 
@@ -241,12 +232,34 @@ public class EnemyMarkerManager : MonoBehaviour
         stateText.enableWordWrapping = false;
         stateText.overflowMode = TextOverflowModes.Overflow;
 
-        // ── Assemble EnemyMarkerUI component ──
+        // ────────────────────────────────────────────────────────────────
+        // SECONDARY element (compact icon only)
+        // ────────────────────────────────────────────────────────────────
+
+        GameObject secondaryIconGO = new GameObject("SecondaryIcon");
+        secondaryIconGO.transform.SetParent(markerGO.transform, false);
+
+        RectTransform secIconRect = secondaryIconGO.AddComponent<RectTransform>();
+        secIconRect.sizeDelta = secondaryIconSize;
+        secIconRect.anchoredPosition = Vector2.zero;
+
+        Image secondaryImage = secondaryIconGO.AddComponent<Image>();
+        secondaryImage.raycastTarget = false;
+        secondaryImage.preserveAspect = true;
+
+        // Starts hidden — only shown when outside inner radius
+        secondaryIconGO.SetActive(false);
+
+        // ────────────────────────────────────────────────────────────────
+        // Assemble EnemyMarkerUI component
+        // ────────────────────────────────────────────────────────────────
+
         EnemyMarkerUI markerUI = markerGO.AddComponent<EnemyMarkerUI>();
         markerUI.stateIcon = iconImage;
         markerUI.typeLabel = typeText;
         markerUI.stateLabel = stateText;
         markerUI.canvasGroup = cg;
+        markerUI.secondaryIcon = secondaryImage;
 
         markerUI.Initialize(tracker);
 
@@ -260,25 +273,39 @@ public class EnemyMarkerManager : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Remove entries where the tracker was destroyed without proper unregister
-    /// (e.g. scene reload, forced Destroy).
+    /// Remove entries where the tracker was destroyed without proper unregister.
     /// </summary>
     private void CleanupNullTrackers()
     {
+        // Clean up the list
         for (int i = trackers.Count - 1; i >= 0; i--)
         {
             if (trackers[i] == null)
-            {
-                var tracker = trackers[i];
                 trackers.RemoveAt(i);
+        }
 
-                if (markerMap.TryGetValue(tracker, out var markerUI))
-                {
-                    if (markerUI != null)
-                        Destroy(markerUI.gameObject);
-                    markerMap.Remove(tracker);
-                }
+        // Clean up dictionary entries whose key (tracker) was destroyed.
+        // A destroyed UnityEngine.Object becomes a "fake null" — the reference
+        // still exists as a dictionary key but compares equal to null.
+        List<EnemyMarkerTracker> deadKeys = null;
+
+        foreach (var kvp in markerMap)
+        {
+            if (kvp.Key == null)
+            {
+                deadKeys ??= new List<EnemyMarkerTracker>();
+                deadKeys.Add(kvp.Key);
             }
+        }
+
+        if (deadKeys == null) return;
+
+        foreach (var key in deadKeys)
+        {
+            if (markerMap.TryGetValue(key, out var markerUI) && markerUI != null)
+                Destroy(markerUI.gameObject);
+
+            markerMap.Remove(key);
         }
     }
 
@@ -291,14 +318,12 @@ public class EnemyMarkerManager : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        // Draw inner/outer radius circles in Scene view (approximation)
         if (!Application.isPlaying) return;
 
-        // This is just a Scene view hint — the actual circles are screen-space
         UnityEditor.Handles.color = new Color(0f, 1f, 0f, 0.3f);
         UnityEditor.Handles.Label(
             transform.position,
-            $"Markers: {trackers.Count} | Inner: {innerRadiusPercent:P0} | Outer: {outerRadiusPercent:P0}"
+            $"Markers: {trackers.Count} | Inner: {innerRadiusPercent:P0} | Ring: {secondaryRingPercent:P0}"
         );
     }
 #endif

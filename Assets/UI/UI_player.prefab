@@ -532,12 +532,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82b008aca9d02d443942d23957c795ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyMarkerManager
-  innerRadiusPercent: 0.3
-  outerRadiusPercent: 0.4
-  minNpcDistance: 5
-  maxNpcDistance: 50
-  markerScaleClose: 1
-  markerScaleFar: 0.5
+  innerRadiusPercent: 0.4
+  secondaryRingPercent: 0.4
+  secondaryIconSize: {x: 64, y: 64}
   iconSize: {x: 128, y: 128}
   typeFontSize: 14
   stateFontSize: 11

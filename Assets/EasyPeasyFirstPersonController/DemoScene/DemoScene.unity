@@ -8540,6 +8540,34 @@ PrefabInstance:
       propertyPath: m_Name
       value: UI_player
       objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: iconSize.x
+      value: 256
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: iconSize.y
+      value: 256
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: markerScaleFar
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: innerRadiusPercent
+      value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: outerRadiusPercent
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: secondaryIconSize.x
+      value: 128
+      objectReference: {fileID: 0}
+    - target: {fileID: 4147759094242988328, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: secondaryIconSize.y
+      value: 128
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

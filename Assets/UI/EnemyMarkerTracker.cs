@@ -8,10 +8,12 @@ using UnityEngine;
 // - Self-registers with EnemyMarkerManager on enable
 // - Self-unregisters on disable (or after death delay)
 // - Provides marker-relevant data to the UI (type, state, alive, position)
+// - Holds two icon sets: primary (full marker) and secondary (compact ring marker)
 //
 // SETUP:
 // 1. Add this component to every NPC prefab (next to NpcBase)
 // 2. markerAnchorOffset adjusts the world-space height above the NPC
+// 3. Assign both primary and secondary icon sets in the Inspector
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -29,7 +31,7 @@ public class EnemyMarkerTracker : MonoBehaviour
     [Tooltip("How long the marker stays visible after the NPC dies (seconds)")]
     [SerializeField] private float deathLingerDuration = 1f;
 
-    [Header("State Icons (Texture2D)")]
+    [Header("Primary State Icons (Texture2D)")]
     [Tooltip("Icon for Idle state (also used for walking, reloading, etc.)")]
     [SerializeField] private Texture2D iconIdle;
 
@@ -45,6 +47,22 @@ public class EnemyMarkerTracker : MonoBehaviour
     [Tooltip("Icon for Dead state")]
     [SerializeField] private Texture2D iconDead;
 
+    [Header("Secondary State Icons (Texture2D)")]
+    [Tooltip("Compact icon for Idle state")]
+    [SerializeField] private Texture2D secondaryIconIdle;
+
+    [Tooltip("Compact icon for Charging/Aiming state")]
+    [SerializeField] private Texture2D secondaryIconCharging;
+
+    [Tooltip("Compact icon for Attacking/Firing state")]
+    [SerializeField] private Texture2D secondaryIconAttacking;
+
+    [Tooltip("Compact icon for Stunned state")]
+    [SerializeField] private Texture2D secondaryIconStunned;
+
+    [Tooltip("Compact icon for Dead state")]
+    [SerializeField] private Texture2D secondaryIconDead;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -55,6 +73,7 @@ public class EnemyMarkerTracker : MonoBehaviour
     private bool hasRegistered;
     private bool deathTriggered;
     private Sprite[] cachedStateIcons;
+    private Sprite[] cachedSecondaryStateIcons;
 
     #endregion
 
@@ -122,7 +141,7 @@ public class EnemyMarkerTracker : MonoBehaviour
     /// <summary>Distance from this NPC to the player (cached from NpcBase).</summary>
     public float DistanceToPlayer => npc != null ? npc.DistanceToTarget : float.MaxValue;
 
-    /// <summary>Icon sprites indexed by MarkerState. Converted from Texture2D once and cached.</summary>
+    /// <summary>Primary icon sprites indexed by MarkerState.</summary>
     public Sprite[] StateIcons
     {
         get
@@ -139,6 +158,26 @@ public class EnemyMarkerTracker : MonoBehaviour
                 };
             }
             return cachedStateIcons;
+        }
+    }
+
+    /// <summary>Secondary (compact) icon sprites indexed by MarkerState.</summary>
+    public Sprite[] SecondaryStateIcons
+    {
+        get
+        {
+            if (cachedSecondaryStateIcons == null)
+            {
+                cachedSecondaryStateIcons = new Sprite[]
+                {
+                    TextureToSprite(secondaryIconIdle),       // MarkerState.Idle = 0
+                    TextureToSprite(secondaryIconCharging),   // MarkerState.Charging = 1
+                    TextureToSprite(secondaryIconAttacking),  // MarkerState.Attacking = 2
+                    TextureToSprite(secondaryIconStunned),    // MarkerState.Stunned = 3
+                    TextureToSprite(secondaryIconDead)        // MarkerState.Dead = 4
+                };
+            }
+            return cachedSecondaryStateIcons;
         }
     }
 
