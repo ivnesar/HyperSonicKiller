@@ -142,6 +142,22 @@ namespace RetroShadersPro.URP
         private readonly GUIContent contrastInfo = new("Contrast",
             "Global contrast modifier. 1 represents no change.");
 
+        private MaterialProperty colorRampModeProp;
+        private const string colorRampModeName = "_ColorRampMode";
+        private readonly GUIContent colorRampModeInfo = new("Color Ramp Mode",
+            "Should the shader apply a color mapping based on a supplied ramp texture?" +
+            "\nIn Luminance mode, the brightness of the input color maps to a single output color." +
+            "\nIn RGB mode, each color channel of the input color maps to separate output RGB values.");
+
+        private MaterialProperty colorRampTexProp;
+        private const string colorRampTexName = "_ColorRampTex";
+        private readonly GUIContent colorRampTexInfo = new("Color Ramp Texture",
+            "A texture which encodes the color mapping from a normal screen output to your chosen color palette." +
+            "\n\nMost of the settings automatically retrieve a texture map from the Resources folder." +
+            "\n\nIn Custom Luminance mode, the input color's luminance value is used as a coordinate along the x-axis to sample the color ramp." +
+            "\n\nIn Custom RGB mode, the red, green, and blue input color values are used as three coordinates along the x-axis to sample the color ramp three times, for independent." +
+            "\n\nIn Custom RGB+Intensity mode, the input color's luminance is used to sample the alpha channel of the color ramp. That value multiplies the output color.");
+
         private MaterialProperty alphaClipProp = null;
         private const string alphaClipName = "_AlphaClip";
         private readonly GUIContent alphaClipInfo = new("Alpha Clip",
@@ -165,6 +181,21 @@ namespace RetroShadersPro.URP
 
         private static readonly string[] surfaceTypeNames = Enum.GetNames(typeof(SurfaceType));
         private static readonly string[] renderFaceNames = Enum.GetNames(typeof(RenderFace));
+
+        private const string gbTextureFilepath = "Textures/CR_Lum_GameBoy";
+        private const string gbaTextureFilepath = "Textures/CR_RGB_GBA";
+        private const string dsTextureFilepath = "Textures/CR_RGB_DS";
+        private const string nesTextureFilepath = "Textures/CR_RGB_NES";
+        private const string snesTextureFilepath = "Textures/CR_RGB_SNES";
+        private const string msx2TextureFilepath = "Textures/CR_RGB_MSX2";
+        private const string greyscaleTextureFilepath = "Textures/CR_Lum_Greyscale";
+        private const string amstradTextureFilepath = "Textures/CR_RGB_Amstrad";
+        private const string teletextTextureFilepath = "Textures/CR_RGB_Teletext";
+        private const string zxSpectrumTextureFilepath = "Textures/CR_RGBI_ZXSpectrum";
+        private const string masterSystemTextureFilepath = "Textures/CR_RGB_MasterSystem";
+        private const string genesisTextureFilepath = "Textures/CR_RGB_Genesis";
+        private const string gameGearTextureFilepath = "Textures/CR_RGB_GameGear";
+        private const string ibmPS2TextureFilepath = "Textures/CR_RGB_XGA";
 
         private enum SurfaceType
         {
@@ -213,6 +244,8 @@ namespace RetroShadersPro.URP
             trackingLinesColorProp = FindProperty(trackingLinesColorName, props, true);
             brightnessProp = FindProperty(brightnessName, props, true);
             contrastProp = FindProperty(contrastName, props, true);
+            colorRampModeProp = FindProperty(colorRampModeName, props, true);
+            colorRampTexProp = FindProperty(colorRampTexName, props, true);
 
             //surfaceTypeProp = FindProperty(kSurfaceTypeProp, props, false);
             cullProp = FindProperty(cullName, props, true);
@@ -446,6 +479,134 @@ namespace RetroShadersPro.URP
         {
             materialEditor.ShaderProperty(brightnessProp, brightnessInfo);
             materialEditor.ShaderProperty(contrastProp, contrastInfo);
+
+            ColorRampMode rampMode = ColorRampMode.None;
+            int rampInt = material.GetInteger(colorRampModeName);
+
+            if (Enum.IsDefined(typeof(ColorRampMode), rampInt))
+            {
+                rampMode = (ColorRampMode)rampInt;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            materialEditor.ShaderProperty(colorRampModeProp, colorRampModeInfo);
+            if (EditorGUI.EndChangeCheck())
+            {
+                materialEditor.SaveChanges();
+
+                rampInt = material.GetInteger(colorRampModeName);
+
+                if (Enum.IsDefined(typeof(ColorRampMode), rampInt))
+                {
+                    rampMode = (ColorRampMode)rampInt;
+                }
+
+                switch (rampMode)
+                {
+                    case ColorRampMode.GB:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(gbTextureFilepath);
+                        break;
+                    case ColorRampMode.GBA:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(gbaTextureFilepath);
+                        break;
+                    case ColorRampMode.DS:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(dsTextureFilepath);
+                        break;
+                    case ColorRampMode.NES:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(nesTextureFilepath);
+                        break;
+                    case ColorRampMode.SNES:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(snesTextureFilepath);
+                        break;
+                    case ColorRampMode.MSX2:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(msx2TextureFilepath);
+                        break;
+                    case ColorRampMode.IBMPS2:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(ibmPS2TextureFilepath);
+                        break;
+                    case ColorRampMode.Amstrad:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(amstradTextureFilepath);
+                        break;
+                    case ColorRampMode.Teletext:
+                    case ColorRampMode.GameAndWatch:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(teletextTextureFilepath);
+                        break;
+                    case ColorRampMode.ZXSpectrum:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(zxSpectrumTextureFilepath);
+                        break;
+                    case ColorRampMode.MasterSystem:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(masterSystemTextureFilepath);
+                        break;
+                    case ColorRampMode.Genesis:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(genesisTextureFilepath);
+                        break;
+                    case ColorRampMode.GameGear:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(gameGearTextureFilepath);
+                        break;
+                    case ColorRampMode.Greyscale:
+                        colorRampTexProp.textureValue = Resources.Load<Texture>(greyscaleTextureFilepath);
+                        break;
+                    case ColorRampMode.None:
+                        break;
+                }
+
+                material.SetTexture("_ColorRampTex", colorRampTexProp.textureValue);
+
+                switch (rampMode)
+                {
+                    case ColorRampMode.GameAndWatch:
+                    case ColorRampMode.GB:
+                    case ColorRampMode.Greyscale:
+                    case ColorRampMode.CustomLuminance:
+                        material.EnableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.GBA:
+                    case ColorRampMode.DS:
+                    case ColorRampMode.NES:
+                    case ColorRampMode.SNES:
+                    case ColorRampMode.MSX2:
+                    case ColorRampMode.IBMPS2:
+                    case ColorRampMode.Amstrad:
+                    case ColorRampMode.Teletext:
+                    case ColorRampMode.MasterSystem:
+                    case ColorRampMode.Genesis:
+                    case ColorRampMode.GameGear:
+                    case ColorRampMode.CustomRGB:
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.EnableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.ZXSpectrum:
+                    case ColorRampMode.CustomIntensity:
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.EnableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.None:
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.EnableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                }
+            }
+
+            if (rampMode == ColorRampMode.CustomLuminance || rampMode == ColorRampMode.CustomRGB ||
+                rampMode == ColorRampMode.CustomIntensity)
+            {
+                materialEditor.ShaderProperty(colorRampTexProp, colorRampTexInfo);            
+            }
+            else
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                materialEditor.ShaderProperty(colorRampTexProp, colorRampTexInfo);
+                EditorGUI.EndDisabledGroup();
+            }
         }
     }
 }

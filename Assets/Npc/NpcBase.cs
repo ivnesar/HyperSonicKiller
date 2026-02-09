@@ -243,7 +243,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         direction.y = 0f;
 
         if (direction.sqrMagnitude < 0.01f) return;
-
+        Debug.Log("rotate");
         Quaternion targetRotation = Quaternion.LookRotation(direction);
         float maxAngle = maxRotationSpeed * Time.deltaTime;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
@@ -254,6 +254,25 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (playerTransform != null)
             RotateToward(playerTransform.position);
     }
+    
+    
+    /// <summary>
+    /// Rotates toward target using unscaled time (works during slow-mo).
+    /// </summary>
+    public void RotateTowardTargetUnscaled()
+    {
+        if (isStunned || playerTransform == null) return;
+
+        Vector3 direction = playerTransform.position - transform.position;
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.01f) return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+        float maxAngle = maxRotationSpeed * Time.unscaledDeltaTime;
+        transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
+    }
+    
 
     protected Vector3 GetDirectionToTarget()
     {
@@ -614,20 +633,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
     }
 
-    protected virtual void OnGUI()
-    {
-        if (!showDebugInfo || Camera.main == null) return;
 
-        Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2.5f);
-        if (screenPos.z > 0)
-        {
-            string mode = behaviorMode == BehaviorMode.Stationary ? "S" : "P";
-            GUI.Label(
-                new Rect(screenPos.x - 50, Screen.height - screenPos.y, 120, 50),
-                $"{GetNpcType()}[{mode}]\n{GetCurrentStateName()}\nHP:{currentHealth}"
-            );
-        }
-    }
 
     #endregion
 }

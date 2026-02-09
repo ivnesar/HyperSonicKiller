@@ -32,7 +32,7 @@ namespace RetroShadersPro.URP
                 renderer.EnqueuePass(pass);
             }
 
-            if(settings == null || !settings.showInSceneView.value || !settings.IsActive())
+            if (settings == null || !settings.showInSceneView.value || !settings.IsActive())
             {
                 Shader.SetGlobalInteger("_RetroPixelSize", 1);
             }
@@ -156,7 +156,7 @@ namespace RetroShadersPro.URP
                 material.SetFloat("_RandomWear", settings.randomWear.value);
                 material.SetFloat("_AberrationStrength", settings.aberrationStrength.value);
 
-                if(settings.useTracking.value)
+                if (settings.useTracking.value)
                 {
                     material.EnableKeyword("_TRACKING_ON");
 
@@ -214,6 +214,59 @@ namespace RetroShadersPro.URP
                 else
                 {
                     material.DisableKeyword("_CHROMATIC_ABERRATION_ON");
+                }
+
+                var rampMode = settings.colorRampMode.value;
+
+                if (settings.colorRampTex.value == null)
+                {
+                    rampMode = ColorRampMode.None;
+                }
+
+                switch (rampMode)
+                {
+                    case ColorRampMode.GameAndWatch:
+                    case ColorRampMode.GB:
+                    case ColorRampMode.Greyscale:
+                    case ColorRampMode.CustomLuminance:
+                        material.SetTexture("_ColorRampTex", settings.colorRampTex.value);
+                        material.EnableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.GBA:
+                    case ColorRampMode.DS:
+                    case ColorRampMode.NES:
+                    case ColorRampMode.SNES:
+                    case ColorRampMode.MSX2:
+                    case ColorRampMode.IBMPS2:
+                    case ColorRampMode.Amstrad:
+                    case ColorRampMode.Teletext:
+                    case ColorRampMode.MasterSystem:
+                    case ColorRampMode.Genesis:
+                    case ColorRampMode.GameGear:
+                    case ColorRampMode.CustomRGB:
+                        material.SetTexture("_ColorRampTex", settings.colorRampTex.value);
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.EnableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.ZXSpectrum:
+                    case ColorRampMode.CustomIntensity:
+                        material.SetTexture("_ColorRampTex", settings.colorRampTex.value);
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.EnableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.None:
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.EnableKeyword("_COLOR_RAMP_NONE");
+                        break;
                 }
 
                 Shader.SetGlobalInteger("_RetroPixelSize", settings.pixelSize.value);
@@ -284,8 +337,6 @@ namespace RetroShadersPro.URP
             {
                 public Material material;
                 public TextureHandle inputTexture;
-                public TextureHandle interlacingTexture;
-                public int targetHeight;
             }
 
             private class InterlacePassData
@@ -294,25 +345,24 @@ namespace RetroShadersPro.URP
                 public bool useBilinear;
             }
 
-            private void ExecuteCopyPass(RasterCommandBuffer cmd, RTHandle source, bool useBilinear)
+            private static void ExecuteCopyPass(RasterCommandBuffer cmd, RTHandle source, bool useBilinear)
             {
                 Blitter.BlitTexture(cmd, source, new Vector4(1, 1, 0, 0), 0.0f, useBilinear);
             }
 
-            private void ExecuteMainPass(RasterCommandBuffer cmd, RTHandle source, RTHandle interlacingTexture, int targetHeight, Material material)
+            private static void ExecuteMainPass(RasterCommandBuffer cmd, RTHandle source, Material material)
             {
-                SetMaterialProperties(interlacingTexture, targetHeight, material);
                 Blitter.BlitTexture(cmd, source, new Vector4(1, 1, 0, 0), material, 0);
             }
 
-            private void ExecuteInterlacePass(RasterCommandBuffer cmd, RTHandle source, bool useBilinear)
+            private static void ExecuteInterlacePass(RasterCommandBuffer cmd, RTHandle source, bool useBilinear)
             {
                 Blitter.BlitTexture(cmd, source, new Vector4(1, 1, 0, 0), 0.0f, useBilinear);
             }
 
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
             {
-               if (material == null)
+                if (material == null)
                 {
                     CreateMaterial();
                 }
@@ -332,18 +382,19 @@ namespace RetroShadersPro.URP
                     return;
                 }
 
+                SetMaterialProperties(interlaceTexHandle, cameraData.cameraTargetDescriptor.height, material);
+
                 var colorCopyDescriptor = GetCopyPassDescriptor(cameraData.cameraTargetDescriptor);
                 var interlacingDescriptor = GetInterlaceDescriptor(cameraData.cameraTargetDescriptor);
-                TextureHandle copiedColor = TextureHandle.nullHandle;
+
+                // Perform the intermediate copy pass (source -> temp).
+                TextureHandle copiedColor = UniversalRenderer.CreateRenderGraphTexture(renderGraph, colorCopyDescriptor, "_CRTColorCopy", false);
                 TextureHandle interlacingTexture = TextureHandle.nullHandle;
 
-                if(interlaceTexHandle != null)
+                if (interlaceTexHandle != null)
                 {
                     interlacingTexture = renderGraph.ImportTexture(interlaceTexHandle);
                 }
-
-                // Perform the intermediate copy pass (source -> temp).
-                copiedColor = UniversalRenderer.CreateRenderGraphTexture(renderGraph, colorCopyDescriptor, "_CRTColorCopy", false);
 
                 using (var builder = renderGraph.AddRasterRenderPass<CopyPassData>("CRT_CopyColor", out var passData, profilingSampler))
                 {
@@ -352,7 +403,7 @@ namespace RetroShadersPro.URP
 
                     builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Read);
                     builder.SetRenderAttachment(copiedColor, 0, AccessFlags.Write);
-                    builder.SetRenderFunc((CopyPassData data, RasterGraphContext context) => ExecuteCopyPass(context.cmd, data.inputTexture, data.useBilinear));
+                    builder.SetRenderFunc(static (CopyPassData data, RasterGraphContext context) => ExecuteCopyPass(context.cmd, data.inputTexture, data.useBilinear));
                 }
 
                 // Perform main pass (temp -> source).
@@ -360,8 +411,6 @@ namespace RetroShadersPro.URP
                 {
                     passData.material = material;
                     passData.inputTexture = copiedColor;
-                    passData.interlacingTexture = interlacingTexture;
-                    passData.targetHeight = cameraData.cameraTargetDescriptor.height;
 
                     builder.UseTexture(copiedColor, AccessFlags.Read);
                     if(interlacingTexture.IsValid())
@@ -370,19 +419,19 @@ namespace RetroShadersPro.URP
                     }
                     
                     builder.SetRenderAttachment(resourceData.activeColorTexture, 0, AccessFlags.Write);
-                    builder.SetRenderFunc((MainPassData data, RasterGraphContext context) => ExecuteMainPass(context.cmd, data.inputTexture, data.interlacingTexture, data.targetHeight, data.material));
+                    builder.SetRenderFunc(static (MainPassData data, RasterGraphContext context) => ExecuteMainPass(context.cmd, data.inputTexture, data.material));
                 }
 
                 if(settings.enableInterlacing.value && interlacingTexture.IsValid())
                 {
-                    using (var builder = renderGraph.AddRasterRenderPass<InterlacePassData>("CRT_CopyInterlacingTexture", out var passData, profilingSampler))
+                    using (var builder = renderGraph.AddRasterRenderPass<CopyPassData>("CRT_CopyInterlacingTexture", out var passData, profilingSampler))
                     {
                         passData.inputTexture = resourceData.activeColorTexture;
                         passData.useBilinear = !settings.forcePointFiltering.value;
 
                         builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Read);
                         builder.SetRenderAttachment(interlacingTexture, 0, AccessFlags.Write);
-                        builder.SetRenderFunc((InterlacePassData data, RasterGraphContext context) => ExecuteInterlacePass(context.cmd, data.inputTexture, data.useBilinear));
+                        builder.SetRenderFunc(static (CopyPassData data, RasterGraphContext context) => ExecuteCopyPass(context.cmd, data.inputTexture, data.useBilinear));
                     }
                 }
             }

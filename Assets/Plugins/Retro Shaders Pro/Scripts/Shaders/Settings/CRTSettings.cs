@@ -14,7 +14,10 @@ namespace RetroShadersPro.URP
         public ClampedFloatParameter distortionStrength = new ClampedFloatParameter(0.0f, 0.0f, 1.0f);
         public ClampedFloatParameter distortionSmoothing = new ClampedFloatParameter(0.01f, 0.0f, 0.1f);
 
-        public ColorParameter tintColor = new ColorParameter(Color.white);
+        public ColorRampModeParameter colorRampMode = new ColorRampModeParameter(ColorRampMode.None);
+        public TextureParameter colorRampTex = new TextureParameter(null);
+
+        public ColorParameter tintColor = new ColorParameter(Color.white, true, false, true);
         public ColorParameter backgroundColor = new ColorParameter(Color.black);
         public BoolParameter scaleParameters = new BoolParameter(false);
         public IntParameter verticalReferenceResolution = new IntParameter(1080);
@@ -39,8 +42,8 @@ namespace RetroShadersPro.URP
         public ClampedFloatParameter trackingLinesThreshold = new ClampedFloatParameter(0.9f, 0.0f, 1.0f);
         public ColorParameter trackingLinesColor = new ColorParameter(new Color(1.0f, 1.0f, 1.0f, 0.5f));
 
-        public ClampedFloatParameter brightness = new ClampedFloatParameter(1.0f, 0.0f, 3.0f);
-        public ClampedFloatParameter contrast = new ClampedFloatParameter(1.0f, 0.0f, 3.0f);
+        public ClampedFloatParameter brightness = new ClampedFloatParameter(1.0f, 0.0f, 5.0f);
+        public ClampedFloatParameter contrast = new ClampedFloatParameter(1.0f, 0.0f, 5.0f);
         public BoolParameter enableInterlacing = new BoolParameter(false);
 
         public bool IsActive()
@@ -56,8 +59,31 @@ namespace RetroShadersPro.URP
 
     public enum PostProcessRenderPassEvent
     {
-        BeforeURPPostProcessing,
-        AfterURPPostProcessing
+        [InspectorName("Before URP Post Processing")] BeforeURPPostProcessing,
+        [InspectorName("After URP Post Processing")]  AfterURPPostProcessing
+    }
+
+    public enum ColorRampMode
+    {
+        None,
+        [InspectorName("Game and Watch")] GameAndWatch,
+        [InspectorName("Game Boy")] GB,
+        [InspectorName("Game Boy Advance")] GBA,
+        [InspectorName("Nintendo DS")] DS,
+        Greyscale,
+        NES,
+        SNES,
+        MSX2,
+        [InspectorName("IBM PS-2")] IBMPS2,
+        [InspectorName("Amstrad CPC")] Amstrad, 
+        Teletext,
+        [InspectorName("ZX Spectrum")] ZXSpectrum,
+        [InspectorName("Sega Master System")] MasterSystem,
+        [InspectorName("Sega Genesis")] Genesis,
+        [InspectorName("Sega Game Gear")] GameGear,
+        [InspectorName("Custom Luminance")] CustomLuminance,
+        [InspectorName("Custom RGB")] CustomRGB,
+        [InspectorName("Custom RGB+Intensity")] CustomIntensity
     }
 
     // Allow each volume settings object to track the render pass event.
@@ -65,6 +91,12 @@ namespace RetroShadersPro.URP
     public sealed class RenderPassEventParameter : VolumeParameter<PostProcessRenderPassEvent>
     {
         public RenderPassEventParameter(PostProcessRenderPassEvent value, bool overrideState = false) : base(value, overrideState) { }
+    }
+
+    [Serializable]
+    public sealed class ColorRampModeParameter : VolumeParameter<ColorRampMode>
+    {
+        public ColorRampModeParameter(ColorRampMode value, bool overrideState = false) : base(value, overrideState) { }
     }
 
     public static class ParameterTypeExtensions

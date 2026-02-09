@@ -729,6 +729,7 @@ GameObject:
   - component: {fileID: 1372208063378678593}
   - component: {fileID: 6186774399956183736}
   - component: {fileID: 2930481116022071444}
+  - component: {fileID: 5190870395421373352}
   m_Layer: 6
   m_Name: Npc_GenTwo
   m_TagString: Enemy
@@ -895,6 +896,25 @@ MonoBehaviour:
   genTwoIsDashing: 0
   genTwoHasValidIntercept: 0
   genTwoPlayerInRange: 0
+--- !u!114 &5190870395421373352
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91b02b114bddfbe4284726c1ff226379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyMarkerTracker
+  markerAnchorOffset: {x: 0, y: 0.5, z: 0}
+  deathLingerDuration: 1
+  iconIdle: {fileID: 2800000, guid: cde2ca5b502fce049b43439b54dfbb69, type: 3}
+  iconCharging: {fileID: 2800000, guid: 1bfd92e27bb36624992668ca5d99a58d, type: 3}
+  iconAttacking: {fileID: 2800000, guid: 2e357b72142104649a298764347d1ea3, type: 3}
+  iconStunned: {fileID: 2800000, guid: 73c618ca4bc6acd41bbbebe9da583276, type: 3}
+  iconDead: {fileID: 2800000, guid: af22f52b8667648499db5cc2b89b01d5, type: 3}
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

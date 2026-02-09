@@ -192,6 +192,12 @@ public class PlayerDash : MonoBehaviour
     
     /// <summary>Current attack dash radius (for external systems).</summary>
     public float AttackDashRadius => attackDashRadius;
+    
+    /// <summary>
+    /// The locked-in dash direction, set once at dash start.
+    /// Use this instead of CameraTransform.forward to get the actual flight path.
+    /// </summary>
+    public Vector3 DashDirection => dashDirection;
 
     #endregion
 

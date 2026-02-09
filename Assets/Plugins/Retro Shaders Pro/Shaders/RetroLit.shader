@@ -19,11 +19,13 @@ Shader "Retro Shaders Pro/Retro Lit"
 		[KeywordEnum(Bilinear, Point, N64)] _FilterMode("Filtering Mode", Integer) = 1
 		[KeywordEnum(Screen, Texture, Off)] _DitherMode("Dithering Mode", Integer) = 0
 		[KeywordEnum(Object, World, View, Off)] _SnapMode("Snapping Mode", Integer) = 2
+		[KeywordEnum(On, Off)] _ReceiveShadowsMode("Receive Shadows Mode", Integer) = 0
 
 		[Toggle] _USE_AMBIENT_OVERRIDE("Ambient Light Override", Float) = 0
 		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
 		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
 		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
+		[Toggle] _USE_FLAT_SHADING("Use Flat Shading", Float) = 0
 
 		[ToggleUI] _AlphaClip("Alpha Clip", Float) = 0.0
 		[HideInInspector] _Cutoff("Alpha Clip Threshold", Range(0.0, 1.0)) = 0.5
@@ -127,6 +129,8 @@ Shader "Retro Shaders Pro/Retro Lit"
 			#pragma shader_feature_local_fragment _USE_VERTEX_COLORS
 			#pragma shader_feature_local _USE_SPECULAR_LIGHT
 			#pragma shader_feature_local_fragment _USE_REFLECTION_CUBEMAP
+			#pragma shader_feature_local _USE_FLAT_SHADING
+			#pragma shader_feature_local _RECEIVESHADOWSMODE_ON _RECEIVESHADOWSMODE_OFF
 
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -138,12 +142,26 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float3 ambientLight = _AmbientLight;
 #endif
 
+				float3 lightColor;
+				float lightAmount;
+				float3 totalLighting;
+
 				Light light = GetMainLight(inputData.shadowCoord);
 
-				// Main light diffuse calculation.
-				float3 lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
-				float lightAmount = saturate(dot(inputData.normalWS, light.direction));
-				float3 totalLighting = lightAmount * lightColor + ambientLight;
+#ifdef _LIGHT_LAYERS
+				uint meshRenderingLayers = GetMeshRenderingLayer();
+				if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+				{
+					// Main light diffuse calculation.
+					lightColor = light.color * light.distanceAttenuation;
+
+#if _RECEIVESHADOWSMODE_ON
+					lightColor *= light.shadowAttenuation;
+#endif
+					lightAmount = saturate(dot(inputData.normalWS, light.direction));
+					totalLighting = lightAmount * lightColor + ambientLight;
+				}
 
 #if defined(_ADDITIONAL_LIGHTS)
 				uint pixelLightCount = GetAdditionalLightsCount();
@@ -152,9 +170,19 @@ Shader "Retro Shaders Pro/Retro Lit"
 				LIGHT_LOOP_BEGIN(pixelLightCount)
 					light = GetAdditionalLight(lightIndex, inputData.positionWS, inputData.shadowMask);
 
-					// Secondary light diffuse calculation.
-					lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
-					totalLighting += saturate(dot(light.direction, inputData.normalWS)) * lightColor;
+#ifdef _LIGHT_LAYERS
+					if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+					{
+						// Secondary light diffuse calculation.
+						lightColor = light.color * light.distanceAttenuation;
+
+#if _RECEIVESHADOWSMODE_ON
+						lightColor *= light.shadowAttenuation;
+#endif
+
+						totalLighting += saturate(dot(light.direction, inputData.normalWS)) * lightColor;
+					}
 				LIGHT_LOOP_END
 #endif
 
@@ -170,13 +198,25 @@ Shader "Retro Shaders Pro/Retro Lit"
 #ifndef _USE_SPECULAR_LIGHT
 				return 0.0f;
 #else
-				Light light = GetMainLight(inputData.shadowCoord);
-				float3 lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
 
-				// Main light specular calculation.
+				float3 lightColor;
+				float3 reflectedVector;
+				float3 specularLighting;
 				float glossPower = pow(2.0f, _Glossiness);
-				float3 reflectedVector = reflect(-light.direction, inputData.normalWS);
-				float3 specularLighting = pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+
+				Light light = GetMainLight(inputData.shadowCoord);
+
+#ifdef _LIGHT_LAYERS
+				uint meshRenderingLayers = GetMeshRenderingLayer();
+				if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+				{
+					lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
+
+					// Main light specular calculation.
+					reflectedVector = reflect(-light.direction, inputData.normalWS);
+					specularLighting = pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+				}
 
 #if defined(_ADDITIONAL_LIGHTS)
 				uint pixelLightCount = GetAdditionalLightsCount();
@@ -184,11 +224,17 @@ Shader "Retro Shaders Pro/Retro Lit"
 				// Loop through all secondary lights.
 				LIGHT_LOOP_BEGIN(pixelLightCount)
 					light = GetAdditionalLight(lightIndex, inputData.positionWS, inputData.shadowMask);
-					lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
 
-					// Secondary light specular calculation.
-					reflectedVector = reflect(-light.direction, inputData.normalWS);
-					specularLighting += pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+#ifdef _LIGHT_LAYERS
+					if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+					{
+						lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
+
+						// Secondary light specular calculation.
+						reflectedVector = reflect(-light.direction, inputData.normalWS);
+						specularLighting += pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+					}
 				LIGHT_LOOP_END
 #endif			
 				return specularLighting;
@@ -212,7 +258,11 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float4 color : COLOR;
 				float2 uv : TEXCOORD0;
 				float4 affineUVAndFog : TEXCOORD1;
+#ifdef _USE_FLAT_SHADING
+				nointerpolation float3 normalWS : TEXCOORD2;
+#else
 				float3 normalWS : TEXCOORD2;
+#endif
 				float3 positionWS : TEXCOORD3;
 				DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 4);
 				float2 dynamicLightmapUV : TEXCOORD5;
@@ -287,7 +337,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				return (1.0f / det) * float2x2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
 			}
 
-			float4 frag(v2f i, float facing : VFACE) : SV_TARGET
+			float4 frag(v2f i) : SV_TARGET
 			{
 				UNITY_SETUP_INSTANCE_ID(i);
 				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
@@ -380,7 +430,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				// Find an offset vector in world space to snap lighting calcs to texel grid.
 				// With massive thanks to: https://discussions.unity.com/t/the-quest-for-efficient-per-texel-lighting/700574
 #ifdef _LIGHTMODE_TEXELLIT
-				float2 actualTexelSize = min(_ResolutionLimit, _BaseMap_TexelSize.zw);
+				float2 actualTexelSize = pow(2, min(targetResolution, actualResolution));
 				float2 texelUV = floor(uv * actualTexelSize) / actualTexelSize + (0.5f / actualTexelSize);
 				float2 dUV = (texelUV - uv);
 
@@ -404,7 +454,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
 				float4 shadowMask = SAMPLE_SHADOWMASK(i.dynamicLightmapUV);
 
-				float3 normalWS = normalize(i.normalWS * facing);
+				float3 normalWS = normalize(i.normalWS);
 
 				float3 viewWS = GetWorldSpaceNormalizeViewDir(positionWS);
 

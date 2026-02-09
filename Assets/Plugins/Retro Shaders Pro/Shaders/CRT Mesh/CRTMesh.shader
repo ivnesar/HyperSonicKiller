@@ -28,6 +28,8 @@ Shader "Retro Shaders Pro/CRT (Mesh)"
 		_Brightness("Brightness", Range(0.0, 3.0)) = 1.0
 		_Contrast("Contrast", Range(0.0, 3.0)) = 1.0
 		[Toggle] _POINT_FILTERING("Force Point Filtering", Float) = 0.0
+		[HideInInspector] [Enum(RetroShadersPro.URP.ColorRampMode)] _ColorRampMode("Color Ramp Mode", Integer) = 0
+		_ColorRampTex("Color Ramp Texture", 2D) = "white" {}
 
         [ToggleUI] _AlphaClip("Alpha Clip", Float) = 0.0
 		[HideInInspector] _Cutoff("Alpha Clip Threshold", Range(0.0, 1.0)) = 0.5
@@ -49,6 +51,7 @@ Shader "Retro Shaders Pro/CRT (Mesh)"
 
         HLSLINCLUDE
 		#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
         #include "CRTSurfaceInput.hlsl"
 		
@@ -75,6 +78,7 @@ Shader "Retro Shaders Pro/CRT (Mesh)"
 			#pragma multi_compile_local_fragment _ _CHROMATIC_ABERRATION_ON
 			#pragma multi_compile_local_fragment _ _TRACKING_ON
 			#pragma multi_compile_local_fragment _ _POINT_FILTERING_ON
+			#pragma multi_compile_local_fragment _COLOR_RAMP_NONE _COLOR_RAMP_RGB _COLOR_RAMP_LUMINANCE _COLOR_RAMP_INTENSITY
             #pragma shader_feature_local_fragment _ALPHATEST_ON
 
             // Code 'liberated' from Shader Graph's Simple Noise node.
@@ -211,6 +215,28 @@ Shader "Retro Shaders Pro/CRT (Mesh)"
                 // Apply brightness and contrast modifiers.
 				col = saturate(col * _Brightness);
 				col = col - _Contrast * (col - 1.0f) * col * (col - 0.5f);
+
+				// Apply global color ramps if enabled.
+#if defined(_COLOR_RAMP_RGB)
+				float r = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.r, 0.5f)).r;
+				float g = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.g, 0.5f)).g;
+				float b = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.b, 0.5f)).b;
+
+				col.rgb = float3(r, g, b);
+#elif defined(_COLOR_RAMP_LUMINANCE)
+				float l = Luminance(col.rgb);
+				col.rgb = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(l, 0.5f)).rgb;
+#elif defined(_COLOR_RAMP_INTENSITY)
+				float l = Luminance(col.rgb);
+
+				float r = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.r, 0.5f)).r;
+				float g = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.g, 0.5f)).g;
+				float b = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.b, 0.5f)).b;
+				float intensity = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(l, 0.5f)).a;
+
+				col.rgb = float3(r, g, b);
+				col.rgb *= intensity;
+#endif
 
 #ifdef _TRACKING_ON
 				// Apply tracking lines.

@@ -44,9 +44,23 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 		[HideInInspector] _SnapsPerUnit("Snapping Points per Meter", Integer) = 128
 		[HideInInspector] _ColorBitDepth("Bit Depth", Integer) = 32
 		[HideInInspector] _ColorBitDepthOffset("Bit Depth Offset", Range(0.0, 1.0)) = 0.0
-        [Toggle] _USE_POINT_FILTER("Use Point Filtering", Float) = 1
-        [Toggle] _USE_DITHERING("Use Dithering", Float) = 0
-        [Toggle] _USE_PIXEL_LIGHTING("Use Pixel Lighting", Float) = 1
+        [HideInInspector] _AmbientLight("Ambient Light Strength", Range(0.0, 1.0)) = 0.02
+		[HideInInspector] _Glossiness("Glossiness", Range(1.0, 20.0)) = 5.0
+		[HideInInspector] _ReflectionCubemap("Reflection Cubemap", Cube) = "black" {}
+		[HideInInspector] _CubemapColor("Cubemap Color", Color) = (1, 1, 1, 1)
+		[HideInInspector] _CubemapRotation("Cubemap Rotation", Range(0.0, 360.0)) = 0
+
+        [KeywordEnum(Lit, TexelLit, VertexLit, Unlit)] _LightMode("Lighting Mode", Integer) = 1
+		[KeywordEnum(Bilinear, Point, N64)] _FilterMode("Filtering Mode", Integer) = 1
+		[KeywordEnum(Screen, Texture, Off)] _DitherMode("Dithering Mode", Integer) = 0
+		[KeywordEnum(Object, World, View, Off)] _SnapMode("Snapping Mode", Integer) = 2
+		[KeywordEnum(On, Off)] _ReceiveShadowsMode("Receive Shadows Mode", Integer) = 0
+
+        [Toggle] _USE_AMBIENT_OVERRIDE("Ambient Light Override", Float) = 0
+		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
+		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
+		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
+
     }
 
     HLSLINCLUDE
@@ -73,11 +87,11 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 
             Tags 
             { 
-                "LightMode" = "UniversalForward"
+                "LightMode" = "UniversalForwardOnly"
             }
 
             HLSLPROGRAM
-            #pragma target 3.0
+            #pragma target 3.5
 
             #pragma vertex SplatmapVert
             #pragma fragment SplatmapFragment
@@ -117,9 +131,16 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             // Sample normal in pixel shader when doing instancing
             #pragma shader_feature_local _TERRAIN_INSTANCED_PERPIXEL_NORMAL
 
-            #pragma shader_feature_local_fragment _USE_POINT_FILTER_ON
-            #pragma shader_feature_local_fragment _USE_DITHERING
-            #pragma shader_feature_local_fragment _USE_PIXEL_LIGHTING
+            #pragma shader_feature_local _LIGHTMODE_LIT _LIGHTMODE_TEXELLIT _LIGHTMODE_VERTEXLIT _LIGHTMODE_UNLIT
+			#pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+			#pragma shader_feature_local_fragment _DITHERMODE_SCREEN _DITHERMODE_TEXTURE _DITHERMODE_OFF
+			#pragma shader_feature_local_vertex _SNAPMODE_OBJECT _SNAPMODE_WORLD _SNAPMODE_VIEW _SNAPMODE_OFF
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
+			#pragma shader_feature_local _USE_AMBIENT_OVERRIDE
+			#pragma shader_feature_local_fragment _USE_VERTEX_COLORS
+			#pragma shader_feature_local _USE_SPECULAR_LIGHT
+			#pragma shader_feature_local_fragment _USE_REFLECTION_CUBEMAP
+			#pragma shader_feature_local _RECEIVESHADOWSMODE_ON _RECEIVESHADOWSMODE_OFF
 
             #include "RetroTerrainLitInput.hlsl"
             #include "RetroTerrainLitPasses.hlsl"
@@ -139,7 +160,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.5
 
             #pragma vertex ShadowPassVertex
             #pragma fragment ShadowPassFragment
@@ -153,69 +174,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             // This is used during shadow map generation to differentiate between directional and punctual light shadows, as they use different formulas to apply Normal Bias
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
-
-			#include "RetroTerrainLitInput.hlsl"
-			#include "RetroTerrainLitPasses.hlsl"
-            ENDHLSL
-        }
-
-        Pass
-        {
-            Name "GBuffer"
-
-            Tags
-            {
-                "LightMode" = "UniversalGBuffer"
-            }
-
-            HLSLPROGRAM
-            #pragma target 4.5
-
-            // Deferred Rendering Path does not support the OpenGL-based graphics API:
-            // Desktop OpenGL, OpenGL ES 3.0, WebGL 2.0.
-            #pragma exclude_renderers gles3 glcore
-
-            #pragma vertex SplatmapVert
-            #pragma fragment SplatmapFragment
-
-            #define _METALLICSPECGLOSSMAP 1
-            #define _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A 1
-
-            // -------------------------------------
-            // Universal Pipeline keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            //#pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
-            #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
-            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
-
-            // -------------------------------------
-            // Unity defined keywords
-            #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
-            #pragma multi_compile _ SHADOWS_SHADOWMASK
-            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
-            #pragma multi_compile _ LIGHTMAP_ON
-            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
-            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
-            #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
-
-            //#pragma multi_compile_fog
-            #pragma multi_compile_instancing
-            #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
-
-            #pragma shader_feature_local _TERRAIN_BLEND_HEIGHT
-            #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local _MASKMAP
-            // Sample normal in pixel shader when doing instancing
-            #pragma shader_feature_local _TERRAIN_INSTANCED_PERPIXEL_NORMAL
-            #define TERRAIN_GBUFFER 1
-
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
-            #pragma shader_feature_local _USE_DITHERING
+            #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
 
 			#include "RetroTerrainLitInput.hlsl"
 			#include "RetroTerrainLitPasses.hlsl"
@@ -235,7 +194,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             ColorMask R
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.5
 
             #pragma vertex DepthOnlyVertex
             #pragma fragment DepthOnlyFragment
@@ -243,7 +202,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
+            #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
 
 			#include "RetroTerrainLitInput.hlsl"
 			#include "RetroTerrainLitPasses.hlsl"
@@ -263,7 +222,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.5
             #pragma vertex DepthNormalOnlyVertex
             #pragma fragment DepthNormalOnlyFragment
 
@@ -273,7 +232,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
+            #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
 
 			#include "RetroTerrainLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitDepthNormalsPass.hlsl"
@@ -290,7 +249,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             }
 
             HLSLPROGRAM
-            #pragma target 2.0
+            #pragma target 3.5
 
             #pragma vertex DepthOnlyVertex
             #pragma fragment DepthOnlyFragment
@@ -326,8 +285,8 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #define _METALLICSPECGLOSSMAP 1
             #define _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A 1
 
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
-            #pragma shader_feature_local _USE_DITHERING
+            #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+			#pragma shader_feature_local_fragment _DITHERMODE_SCREEN _DITHERMODE_TEXTURE _DITHERMODE_OFF
 
 			#include "RetroTerrainLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitMetaPass.hlsl"

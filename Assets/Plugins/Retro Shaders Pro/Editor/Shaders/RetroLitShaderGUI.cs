@@ -86,6 +86,16 @@ namespace RetroShadersPro.URP
             "\n  Vertex Lit: Use per-vertex lighting and interpolate light values for pixels." +
             "\n  Unlit: Don't use lighting calculations (everything is always fully lit).");
 
+        private MaterialProperty useFlatShadingProp = null;
+        private const string useFlatShadingName = "_USE_FLAT_SHADING";
+        private readonly GUIContent useFlatShadingInfo = new("Use Flat Shading",
+            "Should the shader flatten each triangle of the mesh when shading?");
+
+        private MaterialProperty receiveShadowsModeProp = null;
+        private const string receiveShadowsModeName = "_ReceiveShadowsMode";
+        private readonly GUIContent receiveShadowsModeInfo = new("Receive Shadows",
+            "Should the object receive shadows from other objects?");
+
         private MaterialProperty ambientToggleProp = null;
         private const string ambientToggleName = "_USE_AMBIENT_OVERRIDE";
         private readonly GUIContent ambientToggleInfo = new("Ambient Light Override",
@@ -206,6 +216,8 @@ namespace RetroShadersPro.URP
             filteringModeProp = FindProperty(filteringModeName, props, true);
             ditheringModeProp = FindProperty(ditheringModeName, props, true);
             lightingModeProp = FindProperty(lightingModeName, props, true);
+            useFlatShadingProp = FindProperty(useFlatShadingName, props, true);
+            receiveShadowsModeProp = FindProperty(receiveShadowsModeName, props, true);
             useVertexColorProp = FindProperty(useVertexColorName, props, true);
             useSpecularLightProp = FindProperty(useSpecularLightName, props, true);
             glossinessProp = FindProperty(glossinessName, props, true);
@@ -373,8 +385,20 @@ namespace RetroShadersPro.URP
             EditorGUILayout.Space(5);
             materialEditor.ShaderProperty(colorBitDepthProp, colorBitDepthInfo);
             materialEditor.ShaderProperty(colorBitDepthOffsetProp, colorBitDepthOffsetInfo);
-            EditorGUILayout.Space(5);
-            materialEditor.ShaderProperty(resolutionLimitProp, resolutionLimitInfo);
+            
+            if(baseTexProp.textureValue != null)
+            {
+                EditorGUILayout.Space(5);
+                materialEditor.ShaderProperty(resolutionLimitProp, resolutionLimitInfo);
+
+                if (resolutionLimitProp.intValue < baseTexProp.textureValue.width &&
+                resolutionLimitProp.intValue < baseTexProp.textureValue.height &&
+                baseTexProp.textureValue.mipmapCount < 2)
+                {
+                    EditorGUILayout.HelpBox("Please enable mipmaps on the Base Texture to limit its resolution to a lower value.", MessageType.Warning);
+                }
+            }
+
             EditorGUILayout.Space(5);
             materialEditor.ShaderProperty(affineTextureStrengthProp, affineTextureStrengthInfo);
             EditorGUILayout.Space(5);
@@ -427,6 +451,20 @@ namespace RetroShadersPro.URP
 
             if (lightMode != 3) // Unlit.
             {
+                materialEditor.ShaderProperty(useFlatShadingProp, useFlatShadingInfo);
+
+                bool flatShading = material.GetFloat(useFlatShadingName) >= 0.5f;
+
+                if (flatShading)
+                {
+                    material.EnableKeyword(useFlatShadingName);
+                }
+                else
+                {
+                    material.DisableKeyword(useFlatShadingName);
+                }
+
+                materialEditor.ShaderProperty(receiveShadowsModeProp, receiveShadowsModeInfo);
                 materialEditor.ShaderProperty(ambientToggleProp, ambientToggleInfo);
 
                 bool ambient = material.GetFloat(ambientToggleName) >= 0.5f;

@@ -34,7 +34,7 @@ v2f depthNormalsVert(appdata v)
 	return o;
 }
 
-float4 depthNormalsFrag(v2f i) : SV_TARGET0
+float4 depthNormalsFrag(v2f i) : SV_TARGET
 {
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 

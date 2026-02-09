@@ -52,43 +52,135 @@ namespace RetroShadersPro.URP
         const string kHeightTransition = "_HeightTransition";
 
         // Retro parameters.
-        MaterialProperty resolutionLimit = null;
+        MaterialProperty colorBitDepthProp = null;
+        const string colorBitDepthName = "_ColorBitDepth";
+        readonly GUIContent colorBitDepthInfo = new("Color Depth",
+            "Limits the total number of values used for each color channel.");
+
+        MaterialProperty colorBitDepthOffsetProp = null;
+        const string colorBitDepthOffsetName = "_ColorBitDepthOffset";
+        readonly GUIContent colorBitDepthOffsetInfo = new("Color Depth Offset",
+            "Increase this value if the bit depth offset makes your object too dark.");
+
+        MaterialProperty resolutionLimitProp = null;
         const string resolutionLimitName = "_ResolutionLimit";
         readonly GUIContent resolutionLimitInfo = new("Resolution Limit",
             "Limits the resolution of the texture to this value." +
             "\nNote that this setting only snaps the resolution to powers of two." +
             "\nAlso, make sure the Base Texture has mipmaps enabled.");
 
-        MaterialProperty snapsPerUnit = null;
+        private MaterialProperty filteringModeProp = null;
+        private const string filteringModeName = "_FilterMode";
+        private readonly GUIContent filteringModeInfo = new("Filtering Mode",
+            "Which kind of filtering should the shader use while sampling the base texture?" +
+            "\n  Bilinear: Blend between the nearest 4 pixels, which appears smooth." +
+            "\n  Point: Use nearest neighbor sampling, which appears blocky." +
+            "\n  N64: Use the limited 3-point sampling method from the Nintendo 64.");
+
+        private MaterialProperty ditheringModeProp = null;
+        private const string ditheringModeName = "_DitherMode";
+        private readonly GUIContent ditheringModeInfo = new("Dithering Mode",
+            "How should the shader dither colors which fall between color bit values?" +
+            "\n  Screen: Use screen-space coordinates for dithering." +
+            "\n    Note that this mode is driven by the pixel size in the CRT post process." +
+            "\n  Texture: Use the texture coordinates for dithering." +
+            "\n  Off: Don't use any dithering.");
+
+        private MaterialProperty useVertexColorProp = null;
+        private const string useVertexColorName = "_USE_VERTEX_COLORS";
+        private readonly GUIContent useVertexColorInfo = new("Use Vertex Colors",
+            "Should the base color of the object use vertex coloring?");
+
+        private MaterialProperty snappingModeProp = null;
+        private const string snappingModeName = "_SnapMode";
+        private readonly GUIContent snappingModeInfo = new("Snapping Mode",
+            "Should the shader snap vertices to a limited number of points in space?" +
+            "\n  Object: Snap vertices relative to model coordinates." +
+            "\n  World: Snap vertices relative to the scene coordinates." +
+            "\n  View: Snap vertices relative to the camera coordinates." +
+            "\n  Off: Don't do any snapping.");
+
+        MaterialProperty snapsPerUnitProp = null;
         const string snapsPerUnitName = "_SnapsPerUnit";
         readonly GUIContent snapsPerUnitInfo = new("Snaps Per Meter",
             "The mesh vertices snap to a limited number of points in space." +
             "\nThis uses view space, so the mesh may jitter when the camera rotates.");
 
-        MaterialProperty colorBitDepth = null;
-        const string colorBitDepthName = "_ColorBitDepth";
-        readonly GUIContent colorBitDepthInfo = new("Color Depth",
-            "Limits the total number of values used for each color channel.");
+        private MaterialProperty lightingModeProp = null;
+        private const string lightingModeName = "_LightMode";
+        private readonly GUIContent lightingModeInfo = new("Lighting Mode",
+            "Choose how the object should be lit." +
+            "\n  Lit: Use per-pixel lighting as standard." +
+            "\n  Texel Lit: Snap lighting and shadows to the closest texel on the object's texture." +
+            "\n  Vertex Lit: Use per-vertex lighting and interpolate light values for pixels." +
+            "\n  Unlit: Don't use lighting calculations (everything is always fully lit)." +
+            "\n\nNote that for the terrain shader, in Texel Lit mode, lighting only snaps to the first texture layer - for best results, use the same texture resolution for all layers.");
 
-        MaterialProperty colorBitDepthOffset = null;
-        const string colorBitDepthOffsetName = "_ColorBitDepthOffset";
-        readonly GUIContent colorBitDepthOffsetInfo = new("Color Depth Offset",
-            "Increase this value if the bit depth offset makes your object too dark.");
+        private MaterialProperty receiveShadowsModeProp = null;
+        private const string receiveShadowsModeName = "_ReceiveShadowsMode";
+        private readonly GUIContent receiveShadowsModeInfo = new("Receive Shadows",
+            "Should the object receive shadows from other objects?");
 
-        MaterialProperty usePointFilteringProp = null;
-        const string usePointFilteringName = "_USE_POINT_FILTER";
-        readonly GUIContent usePointFilteringInfo = new("Point Filtering",
-            "Should the shader use nearest neighbor (point) filtering?");
+        private MaterialProperty ambientToggleProp = null;
+        private const string ambientToggleName = "_USE_AMBIENT_OVERRIDE";
+        private readonly GUIContent ambientToggleInfo = new("Ambient Light Override",
+            "Should the object use Unity's default ambient light, or a custom override amount?");
 
-        MaterialProperty useDitheringProp = null;
-        const string useDitheringName = "_USE_DITHERING";
-        readonly GUIContent useDitheringInfo = new("Enable Dithering",
-            "Should the shader use color dithering?");
+        private MaterialProperty ambientLightProp = null;
+        private const string ambientLightName = "_AmbientLight";
+        private readonly GUIContent ambientLightInfo = new("Ambient Light Strength",
+            "When the ambient light override is used, apply this much ambient light.");
 
-        MaterialProperty usePixelLightingProp = null;
-        const string usePixelLightingName = "_USE_PIXEL_LIGHTING";
-        readonly GUIContent usePixelLightingInfo = new("Texel-aligned Lighting",
-            "Should lighting and shadow calculations snap to the closest texel on the object's texture?");
+        private MaterialProperty useSpecularLightProp = null;
+        private const string useSpecularLightName = "_USE_SPECULAR_LIGHT";
+        private readonly GUIContent useSpecularLightInfo = new("Use Specular Lighting",
+            "Should the shader apply a specular highlight to the object?");
+
+        private MaterialProperty glossinessProp = null;
+        private const string glossinessName = "_Glossiness";
+        private readonly GUIContent glossinessInfo = new("Glossiness",
+            "Gloss power value to use for specular lighting. The higher this value is, the smaller the highlight appears on the surface of the object.");
+
+        private MaterialProperty useReflectionCubemapProp = null;
+        private const string useReflectionCubemapName = "_USE_REFLECTION_CUBEMAP";
+        private readonly GUIContent useReflectionCubemapInfo = new("Use Reflection Cubemap",
+            "Should the shader overlay a cubemap which contains environmental reflections?");
+
+        private MaterialProperty reflectionCubemapProp = null;
+        private const string reflectionCubemapName = "_ReflectionCubemap";
+        private readonly GUIContent reflectionCubemapInfo = new("Reflection Cubemap",
+            "A cubemap which contains environmental reflections.");
+
+        private MaterialProperty cubemapColorProp = null;
+        private const string cubemapColorName = "_CubemapColor";
+        private readonly GUIContent cubemapColorInfo = new("Cubemap Color",
+            "A color tint applied to the cubemap. The alpha channel acts as a strength multiplier.");
+
+        private MaterialProperty cubemapRotationProp = null;
+        private const string cubemapRotationName = "_CubemapRotation";
+        private readonly GUIContent cubemapRotationInfo = new("Cubemap Rotation",
+            "How much to rotate the reflection cubemap around the Y-axis, in degrees.");
+
+        private static GUIStyle _boxStyle;
+        private static GUIStyle BoxStyle
+        {
+            get
+            {
+                return _boxStyle ?? (_boxStyle = new GUIStyle(EditorStyles.helpBox)
+                {
+                    padding = new RectOffset(10, 10, 5, 10)
+                });
+            }
+        }
+
+        private static GUIStyle _labelStyle;
+        private static GUIStyle LabelStyle
+        {
+            get
+            {
+                return _labelStyle ?? (_labelStyle = new GUIStyle(EditorStyles.boldLabel));
+            }
+        }
 
         // Per-pixel Normal (while instancing)
         MaterialProperty enableInstancedPerPixelNormal = null;
@@ -116,14 +208,26 @@ namespace RetroShadersPro.URP
         {
             enableHeightBlend = FindProperty(kEnableHeightBlend, props, false);
             heightTransition = FindProperty(kHeightTransition, props, false);
-            resolutionLimit = FindProperty(resolutionLimitName, props, false);
-            snapsPerUnit = FindProperty(snapsPerUnitName, props, false);
-            colorBitDepth = FindProperty(colorBitDepthName, props, false);
-            colorBitDepthOffset = FindProperty(colorBitDepthOffsetName, props, false);
-            usePointFilteringProp = FindProperty(usePointFilteringName, props, false);
-            useDitheringProp = FindProperty(useDitheringName, props, false);
-            usePixelLightingProp = FindProperty(usePixelLightingName, props, false);
             enableInstancedPerPixelNormal = FindProperty(kEnableInstancedPerPixelNormal, props, false);
+
+            resolutionLimitProp = FindProperty(resolutionLimitName, props, true);
+            snappingModeProp = FindProperty(snappingModeName, props, true);
+            snapsPerUnitProp = FindProperty(snapsPerUnitName, props, true);
+            colorBitDepthProp = FindProperty(colorBitDepthName, props, true);
+            colorBitDepthOffsetProp = FindProperty(colorBitDepthOffsetName, props, true);
+            ambientLightProp = FindProperty(ambientLightName, props, true);
+            ambientToggleProp = FindProperty(ambientToggleName, props, true);
+            filteringModeProp = FindProperty(filteringModeName, props, true);
+            ditheringModeProp = FindProperty(ditheringModeName, props, true);
+            lightingModeProp = FindProperty(lightingModeName, props, true);
+            receiveShadowsModeProp = FindProperty(receiveShadowsModeName, props, true);
+            useVertexColorProp = FindProperty(useVertexColorName, props, true);
+            useSpecularLightProp = FindProperty(useSpecularLightName, props, true);
+            glossinessProp = FindProperty(glossinessName, props, true);
+            useReflectionCubemapProp = FindProperty(useReflectionCubemapName, props, true);
+            reflectionCubemapProp = FindProperty(reflectionCubemapName, props, true);
+            cubemapColorProp = FindProperty(cubemapColorName, props, true);
+            cubemapRotationProp = FindProperty(cubemapRotationName, props, true);
         }
 
         static public void SetupMaterialKeywords(Material material)
@@ -200,47 +304,121 @@ namespace RetroShadersPro.URP
             EditorGUILayout.Space();
 
             EditorGUI.indentLevel++;
-            materialEditorIn.ShaderProperty(resolutionLimit, resolutionLimitInfo);
-            materialEditorIn.ShaderProperty(snapsPerUnit, snapsPerUnitInfo);
-            materialEditorIn.ShaderProperty(colorBitDepth, colorBitDepthInfo);
-            materialEditorIn.ShaderProperty(colorBitDepthOffset, colorBitDepthOffsetInfo);
 
-            if (usePointFilteringProp != null)
+            EditorGUILayout.BeginVertical(BoxStyle);
+
+            EditorGUILayout.LabelField("Color & Texture Effects", LabelStyle);
+            EditorGUILayout.Space(5);
+
+            EditorGUILayout.Space(5);
+            materialEditorIn.ShaderProperty(colorBitDepthProp, colorBitDepthInfo);
+            materialEditorIn.ShaderProperty(colorBitDepthOffsetProp, colorBitDepthOffsetInfo);
+            EditorGUILayout.Space(5);
+            materialEditorIn.ShaderProperty(resolutionLimitProp, resolutionLimitInfo);
+            EditorGUILayout.Space(5);
+            materialEditorIn.ShaderProperty(filteringModeProp, filteringModeInfo);
+            materialEditorIn.ShaderProperty(ditheringModeProp, ditheringModeInfo);
+            EditorGUILayout.Space(5);
+            materialEditorIn.ShaderProperty(useVertexColorProp, useVertexColorInfo);
+
+            bool vertexColors = material.GetFloat(useVertexColorName) >= 0.5f;
+
+            if (vertexColors)
             {
-                materialEditorIn.ShaderProperty(usePointFilteringProp, usePointFilteringInfo);
+                material.EnableKeyword(useVertexColorName);
+            }
+            else
+            {
+                material.DisableKeyword(useVertexColorName);
             }
 
-            if (useDitheringProp != null)
+            EditorGUILayout.EndVertical();
+
+            EditorGUILayout.Space(5);
+
+            EditorGUILayout.BeginVertical(BoxStyle);
+
+            EditorGUILayout.LabelField("Vertex Snapping", LabelStyle);
+            EditorGUILayout.Space(5);
+
+            materialEditorIn.ShaderProperty(snappingModeProp, snappingModeInfo);
+
+            if (material.GetInteger(snappingModeName) != 3) // Off.
             {
-                materialEditorIn.ShaderProperty(useDitheringProp, useDitheringInfo);
+                EditorGUI.indentLevel++;
+                materialEditorIn.ShaderProperty(snapsPerUnitProp, snapsPerUnitInfo);
+                EditorGUI.indentLevel--;
+            }
 
-                bool dither = material.GetFloat(useDitheringName) >= 0.5f;
+            EditorGUILayout.EndVertical();
 
-                if (dither)
+            EditorGUILayout.Space(5);
+
+            EditorGUILayout.BeginVertical(BoxStyle);
+
+            EditorGUILayout.LabelField("Lighting & Shadows", LabelStyle);
+            EditorGUILayout.Space(5);
+
+            materialEditorIn.ShaderProperty(lightingModeProp, lightingModeInfo);
+
+            int lightMode = material.GetInteger(lightingModeName);
+
+            if (lightMode != 3) // Unlit.
+            {
+                materialEditorIn.ShaderProperty(receiveShadowsModeProp, receiveShadowsModeInfo);
+                materialEditorIn.ShaderProperty(ambientToggleProp, ambientToggleInfo);
+
+                bool ambient = material.GetFloat(ambientToggleName) >= 0.5f;
+
+                if (ambient)
                 {
-                    material.EnableKeyword(useDitheringName);
+                    material.EnableKeyword(ambientToggleName);
+
+                    EditorGUI.indentLevel++;
+                    materialEditorIn.ShaderProperty(ambientLightProp, ambientLightInfo);
+                    EditorGUI.indentLevel--;
                 }
                 else
                 {
-                    material.DisableKeyword(useDitheringName);
+                    material.DisableKeyword(ambientToggleName);
                 }
-            }
 
-            if(usePixelLightingProp != null)
-            {
-                materialEditorIn.ShaderProperty(usePixelLightingProp, usePixelLightingInfo);
+                materialEditorIn.ShaderProperty(useSpecularLightProp, useSpecularLightInfo);
 
-                bool pixelLighting = material.GetFloat(usePixelLightingName) >= 0.5f;
+                bool useSpecularLighting = material.GetFloat(useSpecularLightName) >= 0.5f;
 
-                if (pixelLighting)
+                if (useSpecularLighting)
                 {
-                    material.EnableKeyword(usePixelLightingName);
+                    material.EnableKeyword(useSpecularLightName);
+
+                    EditorGUI.indentLevel++;
+                    materialEditorIn.ShaderProperty(glossinessProp, glossinessInfo);
+                    EditorGUI.indentLevel--;
                 }
                 else
                 {
-                    material.DisableKeyword(usePixelLightingName);
+                    material.DisableKeyword(useSpecularLightName);
+                }
+
+                materialEditorIn.ShaderProperty(useReflectionCubemapProp, useReflectionCubemapInfo);
+
+                if (material.GetFloat(useReflectionCubemapName) >= 0.5f)
+                {
+                    material.EnableKeyword(useReflectionCubemapName);
+
+                    EditorGUI.indentLevel++;
+                    materialEditorIn.TexturePropertyWithHDRColor(reflectionCubemapInfo, reflectionCubemapProp, cubemapColorProp, true);
+                    materialEditorIn.ShaderProperty(cubemapRotationProp, cubemapRotationInfo);
+                    EditorGUI.indentLevel--;
+                }
+                else
+                {
+                    material.DisableKeyword(useReflectionCubemapName);
                 }
             }
+
+            EditorGUILayout.EndVertical();
+
             EditorGUI.indentLevel--;
 
             // We should always do this call at the end

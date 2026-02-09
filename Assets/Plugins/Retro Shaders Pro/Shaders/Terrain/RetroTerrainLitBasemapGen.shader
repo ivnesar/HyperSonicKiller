@@ -27,10 +27,27 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
         [HideInInspector] _DstBlend("DstBlend", Float) = 0.0
 
 		// Retro properties.
-		[HideInInspector] _ResolutionLimit("Resolution Limit (Power of 2)", Integer) = 32
+		[HideInInspector] _ResolutionLimit("Resolution Limit (Power of 2)", Integer) = 256
 		[HideInInspector] _SnapsPerUnit("Snapping Points per Meter", Integer) = 128
-		[HideInInspector] _ColorBitDepth("Bit Depth", Integer) = 16
+		[HideInInspector] _ColorBitDepth("Bit Depth", Integer) = 32
 		[HideInInspector] _ColorBitDepthOffset("Bit Depth Offset", Range(0.0, 1.0)) = 0.0
+        [HideInInspector] _AmbientLight("Ambient Light Strength", Range(0.0, 1.0)) = 0.02
+		[HideInInspector] _Glossiness("Glossiness", Range(1.0, 20.0)) = 5.0
+		[HideInInspector] _ReflectionCubemap("Reflection Cubemap", Cube) = "black" {}
+		[HideInInspector] _CubemapColor("Cubemap Color", Color) = (1, 1, 1, 1)
+		[HideInInspector] _CubemapRotation("Cubemap Rotation", Range(0.0, 360.0)) = 0
+
+        [KeywordEnum(Lit, TexelLit, VertexLit, Unlit)] _LightMode("Lighting Mode", Integer) = 1
+		[KeywordEnum(Bilinear, Point, N64)] _FilterMode("Filtering Mode", Integer) = 1
+		[KeywordEnum(Screen, Texture, Off)] _DitherMode("Dithering Mode", Integer) = 0
+		[KeywordEnum(Object, World, View, Off)] _SnapMode("Snapping Mode", Integer) = 2
+		[KeywordEnum(On, Off)] _ReceiveShadowsMode("Receive Shadows Mode", Integer) = 0
+
+        [Toggle] _USE_AMBIENT_OVERRIDE("Ambient Light Override", Float) = 0
+		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
+		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
+		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
+
     }
 
     Subshader
@@ -83,6 +100,7 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
                 output.uvSplat01.zw = TRANSFORM_TEX(IN.texcoord, _Splat1);
                 output.uvSplat23.xy = TRANSFORM_TEX(IN.texcoord, _Splat2);
                 output.uvSplat23.zw = TRANSFORM_TEX(IN.texcoord, _Splat3);
+                output.positionSS = ComputeScreenPos(output.clipPos);
 
                 return output;
             }
@@ -116,7 +134,7 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
 
             #endif
 
-                SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
+                SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, IN.positionSS, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
 
                 half4 hasMask = half4(_LayerHasMask0, _LayerHasMask1, _LayerHasMask2, _LayerHasMask3);
 
@@ -163,6 +181,7 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
                 output.uvSplat01.zw = TRANSFORM_TEX(IN.texcoord, _Splat1);
                 output.uvSplat23.xy = TRANSFORM_TEX(IN.texcoord, _Splat2);
                 output.uvSplat23.zw = TRANSFORM_TEX(IN.texcoord, _Splat3);
+                output.positionSS = ComputeScreenPos(output.clipPos);
 
                 return output;
             }
@@ -195,7 +214,7 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
             #endif
 
             #endif
-                SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
+                SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, IN.positionSS, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
 
                 half4 hasMask = half4(_LayerHasMask0, _LayerHasMask1, _LayerHasMask2, _LayerHasMask3);
 

@@ -25,6 +25,10 @@ CBUFFER_START(UnityPerMaterial)
 	int _SnapsPerUnit;
 	int _ColorBitDepth;
 	float _ColorBitDepthOffset;
+    float _AmbientLight;
+    float _Glossiness;
+    float4 _CubemapColor;
+    float _CubemapRotation;
 CBUFFER_END
 
 #define _Surface 0.0 // Terrain is always opaque
@@ -56,6 +60,13 @@ CBUFFER_START(_Terrain)
     #endif
 CBUFFER_END
 
+// Pixel Size used for dithering, set by CRT effect (if one is active).
+int _RetroPixelSize = 1;
+
+#ifdef _USE_REFLECTION_CUBEMAP
+TEXTURECUBE(_ReflectionCubemap);
+SAMPLER(sampler_ReflectionCubemap);
+#endif
 
 TEXTURE2D(_Control);    SAMPLER(sampler_Control);
 TEXTURE2D(_Splat0);     SAMPLER(sampler_Splat0);

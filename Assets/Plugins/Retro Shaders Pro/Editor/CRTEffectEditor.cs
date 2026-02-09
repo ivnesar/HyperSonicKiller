@@ -1,6 +1,7 @@
 using UnityEditor.Rendering;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace RetroShadersPro.URP
 {
@@ -141,10 +142,22 @@ namespace RetroShadersPro.URP
             "\nThis setting can be increased if other features like RGB subpixels and scanlines darken your image too much.");
 
         private SerializedDataParameter contrast;
-        const string contrastLabel = "Contrast";
-        const string contrastTooltip = "Global contrast modifier. 1 represents no change.";
         private readonly GUIContent contrastInfo = new("Contrast",
             "Global contrast modifier. 1 represents no change.");
+
+        private SerializedDataParameter colorRampMode;
+        private readonly GUIContent colorRampModeInfo = new("Color Ramp Mode",
+            "Should the shader apply a color mapping based on a supplied ramp texture?" +
+            "\nIn Luminance mode, the brightness of the input color maps to a single output color." +
+            "\nIn RGB mode, each color channel of the input color maps to separate output RGB values.");
+
+        private SerializedDataParameter colorRampTex;
+        private readonly GUIContent colorRampTexInfo = new("Color Ramp Texture",
+            "A texture which encodes the color mapping from a normal screen output to your chosen color palette." +
+            "\n\nMost of the settings automatically retrieve a texture map from the Resources folder." +
+            "\n\nIn Custom Luminance mode, the input color's luminance value is used as a coordinate along the x-axis to sample the color ramp." +
+            "\n\nIn Custom RGB mode, the red, green, and blue input color values are used as three coordinates along the x-axis to sample the color ramp three times, for independent." +
+            "\n\nIn Custom RGB+Intensity mode, the input color's luminance is used to sample the alpha channel of the color ramp. That value multiplies the output color.");
 
         private SerializedDataParameter enableInterlacing;
         private readonly GUIContent enableInterlacingInfo = new("Interlaced Rendering",
@@ -170,6 +183,21 @@ namespace RetroShadersPro.URP
                 return _labelStyle ?? (_labelStyle = new GUIStyle(EditorStyles.boldLabel));
             }
         }
+
+        private const string gbTextureFilepath = "Textures/CR_Lum_GameBoy";
+        private const string gbaTextureFilepath = "Textures/CR_RGB_GBA";
+        private const string dsTextureFilepath = "Textures/CR_RGB_DS";
+        private const string nesTextureFilepath = "Textures/CR_RGB_NES";
+        private const string snesTextureFilepath = "Textures/CR_RGB_SNES";
+        private const string msx2TextureFilepath = "Textures/CR_RGB_MSX2";
+        private const string greyscaleTextureFilepath = "Textures/CR_Lum_Greyscale";
+        private const string amstradTextureFilepath = "Textures/CR_RGB_Amstrad";
+        private const string teletextTextureFilepath = "Textures/CR_RGB_Teletext";
+        private const string zxSpectrumTextureFilepath = "Textures/CR_RGBI_ZXSpectrum";
+        private const string masterSystemTextureFilepath = "Textures/CR_RGB_MasterSystem";
+        private const string genesisTextureFilepath = "Textures/CR_RGB_Genesis";
+        private const string gameGearTextureFilepath = "Textures/CR_RGB_GameGear";
+        private const string ibmPS2TextureFilepath = "Textures/CR_RGB_XGA";
 
         public override void OnEnable()
         {
@@ -204,6 +232,8 @@ namespace RetroShadersPro.URP
             trackingLinesColor = Unpack(o.Find(x => x.trackingLinesColor));
             brightness = Unpack(o.Find(x => x.brightness));
             contrast = Unpack(o.Find(x => x.contrast));
+            colorRampMode = Unpack(o.Find(x => x.colorRampMode));
+            colorRampTex = Unpack(o.Find(x => x.colorRampTex));
             enableInterlacing = Unpack(o.Find(x => x.enableInterlacing));
         }
 
@@ -308,6 +338,81 @@ namespace RetroShadersPro.URP
             PropertyField(tintColor, tintColorInfo);
             PropertyField(brightness, brightnessInfo);
             PropertyField(contrast, contrastInfo);
+
+            var crtTarget = target as CRTSettings;
+            var rampMode = colorRampMode.value.GetEnumValue<ColorRampMode>();
+
+            EditorGUI.BeginChangeCheck();
+            PropertyField(colorRampMode, colorRampModeInfo);
+            if(EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                rampMode = colorRampMode.value.GetEnumValue<ColorRampMode>();
+                crtTarget.colorRampTex.overrideState = true;
+
+                switch (rampMode)
+                {
+                    case ColorRampMode.GB:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(gbTextureFilepath);
+                        break;
+                    case ColorRampMode.GBA:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(gbaTextureFilepath);
+                        break;
+                    case ColorRampMode.DS:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(dsTextureFilepath);
+                        break;
+                    case ColorRampMode.NES:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(nesTextureFilepath);
+                        break;
+                    case ColorRampMode.SNES:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(snesTextureFilepath);
+                        break;
+                    case ColorRampMode.MSX2:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(msx2TextureFilepath);
+                        break;
+                    case ColorRampMode.IBMPS2:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(ibmPS2TextureFilepath);
+                        break;
+                    case ColorRampMode.Amstrad:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(amstradTextureFilepath);
+                        break;
+                    case ColorRampMode.Teletext:
+                    case ColorRampMode.GameAndWatch:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(teletextTextureFilepath);
+                        break;
+                    case ColorRampMode.ZXSpectrum:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(zxSpectrumTextureFilepath);
+                        break;
+                    case ColorRampMode.MasterSystem:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(masterSystemTextureFilepath);
+                        break;
+                    case ColorRampMode.Genesis:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(genesisTextureFilepath);
+                        break;
+                    case ColorRampMode.GameGear:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(gameGearTextureFilepath);
+                        break;
+                    case ColorRampMode.Greyscale:
+                        crtTarget.colorRampTex.value = Resources.Load<Texture>(greyscaleTextureFilepath);
+                        break;
+                    case ColorRampMode.None:
+                        //crtTarget.colorRampTex.value = null;
+                        crtTarget.colorRampTex.overrideState = false;
+                        break;
+                }
+            }
+
+            if(rampMode == ColorRampMode.CustomLuminance || rampMode == ColorRampMode.CustomRGB ||
+                rampMode == ColorRampMode.CustomIntensity)
+            {
+                PropertyField(colorRampTex, colorRampTexInfo);
+            }
+            else
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                PropertyField(colorRampTex, colorRampTexInfo);
+                EditorGUI.EndDisabledGroup();
+            }
 
             EditorGUILayout.EndVertical();
         }

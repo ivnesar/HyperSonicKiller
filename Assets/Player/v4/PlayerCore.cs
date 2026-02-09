@@ -256,6 +256,9 @@ public class PlayerCore : MonoBehaviour
                 break;
 
             case PlayerState.Dead:
+                // Cancel any active dash (this also resets Time.timeScale)
+                Dash?.ForceCancelDash();
+                Time.timeScale = 1f;  // Safety net in case dash cancel didn't cover it
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 break;

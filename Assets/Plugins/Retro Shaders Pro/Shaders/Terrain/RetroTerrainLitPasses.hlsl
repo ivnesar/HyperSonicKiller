@@ -2,7 +2,6 @@
 #define UNIVERSAL_TERRAIN_LIT_PASSES_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DBuffer.hlsl"
 
 #define EPSILON 1e-06
@@ -10,6 +9,7 @@
 struct Attributes
 {
     float4 positionOS : POSITION;
+    float4 color : COLOR;
     float3 normalOS : NORMAL;
     float2 texcoord : TEXCOORD0;
     UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -47,7 +47,15 @@ struct Varyings
 #if defined(DYNAMICLIGHTMAP_ON)
     float2 dynamicLightmapUV        : TEXCOORD9;
 #endif
-
+    
+    float4 positionSS               : TEXCOORD10;
+    
+#ifdef _LIGHTMODE_VERTEXLIT
+    float3 diffuseLightColor        : TEXCOORD11;
+    float3 specularLightColor       : TEXCOORD12;
+#endif
+    
+    float4 color                    : COLOR;
     float4 clipPos                  : SV_POSITION;
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -64,15 +72,15 @@ inline float2x2 invert(float2x2 m)
     return (1.0f / det) * float2x2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
 }
 
-void InitializeInputData(Varyings IN, half3 normalTS, out InputData inputData)
+void InitializeInputData(Varyings IN, half3 normalTS, int targetResolution, int actualResolution, out InputData inputData)
 {
     inputData = (InputData)0;
     
     // Find an offset vector in world space to snap lighting calcs to texel grid.
     // With massive thanks to: https://discussions.unity.com/t/the-quest-for-efficient-per-texel-lighting/700574
-#if _USE_PIXEL_LIGHTING
+#ifdef _LIGHTMODE_TEXELLIT
     float2 uv = IN.uvSplat01.xy;
-    float2 actualTexelSize = min(_ResolutionLimit, _Splat0_TexelSize.zw);
+    float2 actualTexelSize = pow(2, min(targetResolution, actualResolution));
     float2 texelUV = floor(uv * actualTexelSize) / actualTexelSize + (0.5f / actualTexelSize);
     float2 dUV = (texelUV - uv);
 
@@ -193,7 +201,17 @@ float3 dither(float3 col, float2 uv)
     return col - DITHER_THRESHOLDS[index];
 }
 
-float3 DitherLayer(float3 albedo, float2 uv, float2 texelSize)
+// From: https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/DefaultResourcesExtra/Skybox-Cubed.shader
+float3 RotateAroundYInDegrees(float3 vertex, float degrees)
+{
+    float alpha = degrees * PI / 180.0;
+    float sina, cosa;
+    sincos(alpha, sina, cosa);
+    float2x2 m = float2x2(cosa, -sina, sina, cosa);
+    return float3(mul(m, vertex.xz), vertex.y).xzy;
+}
+
+float3 DitherLayer(float3 albedo, float2 uv, float2 texelSize, float4 positionSS)
 {
     // Posterize the base color.
     float colorBitDepth = max(2, _ColorBitDepth);
@@ -203,9 +221,14 @@ float3 DitherLayer(float3 albedo, float2 uv, float2 texelSize)
     float b = max((albedo.b - EPSILON) * colorBitDepth, 0.0f);
 
     float divisor = colorBitDepth - 1.0f;
-
+    
     // Apply dithering between posterized colors.
-#ifdef _USE_DITHERING
+#if defined(_DITHERMODE_SCREEN)
+    float3 remainders = float3(frac(r), frac(g), frac(b));
+    float2 ditherUV = (positionSS.xy / positionSS.w) * _ScreenParams.xy / _RetroPixelSize;
+    float3 ditheredColor = saturate(dither(remainders, ditherUV));
+    ditheredColor = step(0.5f, ditheredColor);
+#elif defined(_DITHERMODE_TEXTURE)
     float3 remainders = float3(frac(r), frac(g), frac(b));
     float3 ditheredColor = saturate(dither(remainders, uv * texelSize));
     ditheredColor = step(0.5f, ditheredColor);
@@ -220,33 +243,75 @@ float3 DitherLayer(float3 albedo, float2 uv, float2 texelSize)
     return posterizedColor;
 }
 
-void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, inout half4 splatControl, out half weight, out half4 mixedDiffuse, out half4 defaultSmoothness, inout half3 mixedNormal)
+// Calculate N64 3-point bilinear filtering for one of the splatmaps
+float4 SampleSplatmapN64(Texture2D tex, float4 texelSize, float2 uv, int lod)
+{
+    float modifier = pow(2.0f, lod);
+    float4 targetTexelSize = float4(texelSize.xy * modifier, texelSize.zw / modifier);
+
+	// With thanks to: https://www.emutalk.net/threads/emulating-nintendo-64-3-sample-bilinear-filtering-using-shaders.54215/
+    float2 uvA = float2(targetTexelSize.x, 0.0f);
+    float2 uvB = float2(0.0f, targetTexelSize.y);
+    float2 uvC = float2(targetTexelSize.x, targetTexelSize.y);
+    float2 uvHalf = uvC * 0.5f;
+    float2 uvCenter = uv - uvHalf;
+
+    float4 baseColorMain = SAMPLE_TEXTURE2D_LOD(tex, sampler_PointRepeat, uvCenter, lod);
+    float4 baseColorA = SAMPLE_TEXTURE2D_LOD(tex, sampler_PointRepeat, uvCenter + uvA, lod);
+    float4 baseColorB = SAMPLE_TEXTURE2D_LOD(tex, sampler_PointRepeat, uvCenter + uvB, lod);
+    float4 baseColorC = SAMPLE_TEXTURE2D_LOD(tex, sampler_PointRepeat, uvCenter + uvC, lod);
+
+    float interpX = modf(uvCenter.x * targetTexelSize.z, targetTexelSize.z);
+    float interpY = modf(uvCenter.y * targetTexelSize.w, targetTexelSize.w);
+
+    if (uvCenter.x < 0.0f)
+    {
+        interpX = 1.0f - (interpX * -1.0f);
+    }
+
+    if (uvCenter.y < 0.0f)
+    {
+        interpY = 1.0f - (interpY * -1.0f);
+    }
+    
+    float4 baseColor = (baseColorMain + interpX * (baseColorA - baseColorMain) + interpY * (baseColorB - baseColorMain)) * (1.0f - step(1.0f, interpX + interpY));
+    baseColor += (baseColorC + (1.0f - interpX) * (baseColorB - baseColorC) + (1.0f - interpY) * (baseColorA - baseColorC)) * step(1.0f, interpX + interpY);
+    
+    return baseColor;
+}
+
+void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, float4 positionSS, inout half4 splatControl, out half weight, out half4 mixedDiffuse, out half4 defaultSmoothness, inout half3 mixedNormal)
 {
     half4 diffAlbedo[4];
 
 	int targetResolution = (int)log2(_ResolutionLimit);
-	int splat0Resolution = (int)log2(_Splat0_TexelSize.zw);
-	int splat1Resolution = (int)log2(_Splat1_TexelSize.zw);
-	int splat2Resolution = (int)log2(_Splat2_TexelSize.zw);
-	int splat3Resolution = (int)log2(_Splat3_TexelSize.zw);
-
-#ifdef _USE_POINT_FILTER_ON
-    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_PointRepeat, uvSplat01.xy, splat0Resolution - targetResolution);
-    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_PointRepeat, uvSplat01.zw, splat1Resolution - targetResolution);
-    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_PointRepeat, uvSplat23.xy, splat2Resolution - targetResolution);
-    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_PointRepeat, uvSplat23.zw, splat3Resolution - targetResolution);
-#else
-    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_LinearRepeat, uvSplat01.xy, splat0Resolution - targetResolution);
-    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_LinearRepeat, uvSplat01.zw, splat1Resolution - targetResolution);
-    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_LinearRepeat, uvSplat23.xy, splat2Resolution - targetResolution);
-    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_LinearRepeat, uvSplat23.zw, splat3Resolution - targetResolution);
-#endif
+    int splat0LOD = int(log2(_Splat0_TexelSize.z)) - targetResolution;
+    int splat1LOD = int(log2(_Splat1_TexelSize.z)) - targetResolution;
+    int splat2LOD = int(log2(_Splat2_TexelSize.z)) - targetResolution;
+    int splat3LOD = int(log2(_Splat3_TexelSize.z)) - targetResolution;
     
-#ifdef _USE_DITHERING
-    diffAlbedo[0].rgb = DitherLayer(diffAlbedo[0].rgb, uvSplat01.xy, _Splat0_TexelSize.zw);
-    diffAlbedo[1].rgb = DitherLayer(diffAlbedo[1].rgb, uvSplat01.zw, _Splat1_TexelSize.zw);
-    diffAlbedo[2].rgb = DitherLayer(diffAlbedo[2].rgb, uvSplat23.xy, _Splat2_TexelSize.zw);
-    diffAlbedo[3].rgb = DitherLayer(diffAlbedo[3].rgb, uvSplat23.zw, _Splat3_TexelSize.zw);
+#if defined(_FILTERMODE_BILINEAR)
+    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_LinearRepeat, uvSplat01.xy, splat0LOD);
+    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_LinearRepeat, uvSplat01.zw, splat1LOD);
+    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_LinearRepeat, uvSplat23.xy, splat2LOD);
+    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_LinearRepeat, uvSplat23.zw, splat3LOD);
+#elif defined(_FILTERMODE_N64)
+    diffAlbedo[0] = SampleSplatmapN64(_Splat0, _Splat0_TexelSize, uvSplat01.xy, splat0LOD);
+    diffAlbedo[1] = SampleSplatmapN64(_Splat1, _Splat1_TexelSize, uvSplat01.zw, splat1LOD);
+    diffAlbedo[2] = SampleSplatmapN64(_Splat2, _Splat2_TexelSize, uvSplat23.xy, splat2LOD);
+    diffAlbedo[3] = SampleSplatmapN64(_Splat3, _Splat3_TexelSize, uvSplat23.zw, splat3LOD);
+#else
+    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_PointRepeat, uvSplat01.xy, splat0LOD);
+    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_PointRepeat, uvSplat01.zw, splat1LOD);
+    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_PointRepeat, uvSplat23.xy, splat2LOD);
+    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_PointRepeat, uvSplat23.zw, splat3LOD);
+#endif
+
+#ifndef _DITHERMODE_OFF
+    diffAlbedo[0].rgb = DitherLayer(diffAlbedo[0].rgb, uvSplat01.xy, _Splat0_TexelSize.zw, positionSS);
+    diffAlbedo[1].rgb = DitherLayer(diffAlbedo[1].rgb, uvSplat01.zw, _Splat1_TexelSize.zw, positionSS);
+    diffAlbedo[2].rgb = DitherLayer(diffAlbedo[2].rgb, uvSplat23.xy, _Splat2_TexelSize.zw, positionSS);
+    diffAlbedo[3].rgb = DitherLayer(diffAlbedo[3].rgb, uvSplat23.zw, _Splat3_TexelSize.zw, positionSS);
 #endif
     
     // This might be a bit of a gamble -- the assumption here is that if the diffuseMap has no
@@ -317,18 +382,88 @@ void HeightBasedSplatModify(inout half4 splatControl, in half4 masks[4])
 }
 #endif
 
+float3 calculateDiffuse(InputData inputData, float4 vertexColor)
+{
+#ifndef _USE_AMBIENT_OVERRIDE
+    float3 ambientLight = SampleSHVertex(inputData.normalWS);
+#else
+    float3 ambientLight = _AmbientLight;
+#endif
+
+    Light light = GetMainLight(inputData.shadowCoord);
+
+    // Main light diffuse calculation.
+    float3 lightColor = light.color * light.distanceAttenuation;
+
+#if _RECEIVESHADOWSMODE_ON
+    lightColor *= light.shadowAttenuation;
+#endif
+    float lightAmount = saturate(dot(inputData.normalWS, light.direction));
+    float3 totalLighting = lightAmount * lightColor + ambientLight;
+
+#if defined(_ADDITIONAL_LIGHTS)
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    // Loop through all secondary lights.
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        light = GetAdditionalLight(lightIndex, inputData.positionWS, inputData.shadowMask);
+
+        // Secondary light diffuse calculation.
+        lightColor = light.color * light.distanceAttenuation;
+
+#if _RECEIVESHADOWSMODE_ON
+        lightColor *= light.shadowAttenuation;
+#endif
+
+        totalLighting += saturate(dot(light.direction, inputData.normalWS)) * lightColor;
+    LIGHT_LOOP_END
+#endif
+
+#if _USE_VERTEX_COLORS
+    totalLighting *= vertexColor.rgb;
+#endif
+
+    return totalLighting;
+}
+
+float3 calculateSpecular(InputData inputData)
+{
+#ifndef _USE_SPECULAR_LIGHT
+    return 0.0f;
+#else
+    Light light = GetMainLight(inputData.shadowCoord);
+    float3 lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
+
+    // Main light specular calculation.
+    float glossPower = pow(2.0f, _Glossiness);
+    float3 reflectedVector = reflect(-light.direction, inputData.normalWS);
+    float3 specularLighting = pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+
+#if defined(_ADDITIONAL_LIGHTS)
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    // Loop through all secondary lights.
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        light = GetAdditionalLight(lightIndex, inputData.positionWS, inputData.shadowMask);
+        lightColor = light.color * light.distanceAttenuation * light.shadowAttenuation;
+
+        // Secondary light specular calculation.
+        reflectedVector = reflect(-light.direction, inputData.normalWS);
+        specularLighting += pow(saturate(dot(reflectedVector, inputData.viewDirectionWS)), glossPower) * lightColor;
+    LIGHT_LOOP_END
+#endif			
+    return specularLighting;
+#endif
+}
+
 void SplatmapFinalColor(inout half4 color, half fogCoord)
 {
     color.rgb *= color.a;
-
-    #ifndef TERRAIN_GBUFFER // Technically we don't need fogCoord, but it is still passed from the vertex shader.
 
     #ifdef TERRAIN_SPLAT_ADDPASS
         color.rgb = MixFogColor(color.rgb, half3(0,0,0), fogCoord);
     #else
         color.rgb = MixFog(color.rgb, fogCoord);
-    #endif
-
     #endif
 }
 
@@ -424,10 +559,37 @@ Varyings SplatmapVert(Attributes v)
     #endif
 
 	o.positionWS = Attributes.positionWS;
+    
+#if defined(_SNAPMODE_OBJECT)
+    float4 positionOS = floor(v.positionOS * _SnapsPerUnit) / _SnapsPerUnit;
+    o.clipPos = TransformObjectToHClip(positionOS.xyz);
+#elif defined(_SNAPMODE_WORLD)
+    float3 positionWS = TransformObjectToWorld(v.positionOS.xyz);
+    positionWS = floor(positionWS * _SnapsPerUnit) / _SnapsPerUnit;
+    o.clipPos = TransformWorldToHClip(positionWS);
+#elif defined(_SNAPMODE_VIEW)
+    float4 positionVS = mul(UNITY_MATRIX_MV, v.positionOS);
+    positionVS = floor(positionVS * _SnapsPerUnit) / _SnapsPerUnit;
+    o.clipPos = mul(UNITY_MATRIX_P, positionVS);
+#else
+    o.clipPos = TransformObjectToHClip(v.positionOS.xyz);
+#endif
+    
+    o.positionSS = ComputeScreenPos(o.clipPos);
+    o.color = v.color;
+    
+    #ifdef _LIGHTMODE_VERTEXLIT
+        float3 viewWS = GetWorldSpaceNormalizeViewDir(o.positionWS);
+        InputData inputData = (InputData)0;
+        inputData.positionWS = o.positionWS;
+        inputData.normalWS = o.normal;
+        inputData.viewDirectionWS = viewWS;
+        inputData.shadowCoord = TransformWorldToShadowCoord(o.positionWS);
+        inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(o.clipPos);
 
-	float4 positionVS = mul(UNITY_MATRIX_MV, v.positionOS);
-	positionVS = floor(positionVS * _SnapsPerUnit) / _SnapsPerUnit;
-	o.clipPos = mul(UNITY_MATRIX_P, positionVS);
+        o.diffuseLightColor = calculateDiffuse(inputData, v.color);
+        o.specularLightColor = calculateSpecular(inputData);
+    #endif
 
     #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
         o.shadowCoord = GetShadowCoord(Attributes);
@@ -461,9 +623,6 @@ void ComputeMasks(out half4 masks[4], half4 hasMask, Varyings IN)
 }
 
 // Used in Standard Terrain shader
-#ifdef TERRAIN_GBUFFER
-FragmentOutput SplatmapFragment(Varyings IN)
-#else
 void SplatmapFragment(
     Varyings IN
     , out half4 outColor : SV_Target0
@@ -471,7 +630,6 @@ void SplatmapFragment(
     , out float4 outRenderingLayers : SV_Target1
 #endif
     )
-#endif
 {
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
 #ifdef _ALPHATEST_ON
@@ -508,7 +666,7 @@ void SplatmapFragment(
     half weight;
     half4 mixedDiffuse;
     half4 defaultSmoothness;
-    SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
+    SplatmapMix(IN.uvMainAndLM, IN.uvSplat01, IN.uvSplat23, IN.positionSS, splatControl, weight, mixedDiffuse, defaultSmoothness, normalTS);
     half3 albedo = mixedDiffuse.rgb;
 
     half4 defaultMetallic = half4(_Metallic0, _Metallic1, _Metallic2, _Metallic3);
@@ -529,7 +687,7 @@ void SplatmapFragment(
 #endif
 
     InputData inputData;
-    InitializeInputData(IN, normalTS, inputData);
+    InitializeInputData(IN, normalTS, targetResolution, actualResolution, inputData);
     SetupTerrainDebugTextureData(inputData, IN.uvMainAndLM.xy);
 
 #if defined(_DBUFFER)
@@ -545,7 +703,7 @@ void SplatmapFragment(
 
 	// Posterize the base color.
     // When dithering is enabled, posterization is handled in SplatmapMix.
-#ifndef _USE_DITHERING
+#if defined(_DITHERMODE_OFF)
     float colorBitDepth = max(2, _ColorBitDepth);
 
     int r = max((albedo.r - EPSILON) * colorBitDepth, 0);
@@ -560,36 +718,39 @@ void SplatmapFragment(
 
 	albedo = posterizedColor;
 #endif
+    
+#ifdef _USE_VERTEX_COLORS
+    albedo *= IN.color;
+#endif
+    
+#if defined(_LIGHTMODE_LIT) || defined(_LIGHTMODE_TEXELLIT)
+    float3 diffuseLightColor = calculateDiffuse(inputData, IN.color);
+    float3 specularLightColor = calculateSpecular(inputData);
 
-#ifdef TERRAIN_GBUFFER
+    diffuseLightColor += inputData.bakedGI;
 
-    BRDFData brdfData;
-    InitializeBRDFData(albedo, metallic, /* specular */ half3(0.0h, 0.0h, 0.0h), smoothness, alpha, brdfData);
-
-    // Baked lighting.
-    half4 color;
-    Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
-    MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI, inputData.shadowMask);
-    color.rgb = GlobalIllumination(brdfData, inputData.bakedGI, occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
-    color.a = alpha;
-    SplatmapFinalColor(color, inputData.fogCoord);
-
-    // Dynamic lighting: emulate SplatmapFinalColor() by scaling gbuffer material properties. This will not give the same results
-    // as forward renderer because we apply blending pre-lighting instead of post-lighting.
-    // Blending of smoothness and normals is also not correct but close enough?
-    brdfData.albedo.rgb *= alpha;
-    brdfData.diffuse.rgb *= alpha;
-    brdfData.specular.rgb *= alpha;
-    brdfData.reflectivity *= alpha;
-    inputData.normalWS = inputData.normalWS * alpha;
-    smoothness *= alpha;
-
-    return BRDFDataToGbuffer(brdfData, inputData, smoothness, color.rgb, occlusion);
-
+#elif defined(_LIGHTMODE_VERTEXLIT)
+    float3 diffuseLightColor = IN.diffuseLightColor;
+    float3 specularLightColor = IN.specularLightColor;
 #else
+    float3 diffuseLightColor = 1.0f;
+    float3 specularLightColor = 0.0f;
+#endif
+    
+#ifdef _USE_REFLECTION_CUBEMAP
+    float3 reflectedVector = reflect(-inputData.viewDirectionWS, inputData.normalWS);
+    reflectedVector = RotateAroundYInDegrees(reflectedVector, _CubemapRotation);
 
-    half4 color = UniversalFragmentPBR(inputData, albedo, metallic, /* specular */ half3(0.0h, 0.0h, 0.0h), smoothness, occlusion, /* emission */ half3(0, 0, 0), alpha);
-
+#ifdef _FILTERMODE_POINT
+	float4 cubemapLighting = SAMPLE_TEXTURECUBE_LOD(_ReflectionCubemap, sampler_PointClamp, reflectedVector, lod);
+#else
+    float4 cubemapLighting = SAMPLE_TEXTURECUBE_LOD(_ReflectionCubemap, sampler_LinearClamp, reflectedVector, lod);
+#endif
+    albedo += cubemapLighting.rgb * cubemapLighting.a * _CubemapColor.rgb * _CubemapColor.a;
+#endif
+    
+    float4 color = float4(albedo * diffuseLightColor + specularLightColor, 1.0f);
+    
     SplatmapFinalColor(color, inputData.fogCoord);
 
     outColor = half4(color.rgb, 1.0h);
@@ -597,7 +758,6 @@ void SplatmapFragment(
 #ifdef _WRITE_RENDERING_LAYERS
     uint renderingLayers = GetMeshRenderingLayer();
     outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
-#endif
 #endif
 }
 

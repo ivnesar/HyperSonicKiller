@@ -7,8 +7,8 @@ using UnityEngine;
 // Idle → Charging → Dashing → Recovery → Idle
 //
 // State flow:
-// - Idle: Watches player, rotates toward them. Waits for player to dash
-//         within detection range.
+// - Idle: Dormant. Does NOT rotate toward player. Waits for player to
+//         dash within detection range. Detection is 360° (occlusion only).
 // - Charging: Player is dashing AND in range. GenTwo charges for ~1s
 //             (visual warning). If player stops dashing during charge,
 //             returns to Idle.
@@ -24,7 +24,7 @@ using UnityEngine;
 namespace GenTwoStates
 {
     // ─────────────────────────────────────────────────────────────────────
-    // IDLE - Watching and waiting for player to dash
+    // IDLE - Dormant, waiting for player to dash
     // ─────────────────────────────────────────────────────────────────────
     public class Idle : NpcStateBase<GenTwoNpc>
     {
@@ -41,10 +41,9 @@ namespace GenTwoStates
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
         {
-            // Always face the player
-            npc.RotateTowardTarget();
+            // No rotation — GenTwo is dormant until player dashes
+            // Detection is 360° (occlusion-based, not directional)
 
-            // Check if player is dashing AND within detection range AND visible
             if (npc.IsPlayerDashing && npc.IsPlayerInRange && npc.HasLineOfSightToPlayer())
             {
                 return new Charging();
@@ -77,7 +76,7 @@ namespace GenTwoStates
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
         {
             // Keep rotating toward the player during charge
-            npc.RotateTowardTarget();
+            npc.RotateTowardTargetUnscaled();
 
             // If player stops dashing during our charge → abort
             if (!npc.IsPlayerDashing)

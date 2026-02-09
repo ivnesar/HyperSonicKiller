@@ -18,6 +18,7 @@
 			#pragma multi_compile_local_fragment _ _TRACKING_ON
 			#pragma multi_compile_local_fragment _ _INTERLACING_ON
 			#pragma multi_compile_local_fragment _ _POINT_FILTERING_ON
+			#pragma multi_compile_local_fragment _COLOR_RAMP_NONE _COLOR_RAMP_RGB _COLOR_RAMP_LUMINANCE _COLOR_RAMP_INTENSITY
 
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
@@ -26,6 +27,7 @@
 			TEXTURE2D(_RGBTex);
 			TEXTURE2D(_ScanlineTex);
 			TEXTURE2D(_TrackingTex);
+			TEXTURE2D(_ColorRampTex);
 
 #if UNITY_VERSION < 600000
 			float4 _BlitTexture_TexelSize;
@@ -149,6 +151,28 @@
 				col = saturate(col * _Brightness);
 				col = col - _Contrast * (col - 1.0f) * col * (col - 0.5f);
 
+				// Apply global color ramps if enabled.
+#if defined(_COLOR_RAMP_RGB)
+				float r = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.r, 0.5f)).r;
+				float g = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.g, 0.5f)).g;
+				float b = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.b, 0.5f)).b;
+
+				col.rgb = float3(r, g, b);
+#elif defined(_COLOR_RAMP_LUMINANCE)
+				float l = Luminance(col.rgb);
+				col.rgb = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(l, 0.5f)).rgb;
+#elif defined(_COLOR_RAMP_INTENSITY)
+				float l = Luminance(col.rgb);
+
+				float r = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.r, 0.5f)).r;
+				float g = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.g, 0.5f)).g;
+				float b = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(col.b, 0.5f)).b;
+				float intensity = SAMPLE_TEXTURE2D(_ColorRampTex, sampler_PointClamp, float2(l, 0.5f)).a;
+
+				col.rgb = float3(r, g, b);
+				col.rgb *= intensity;
+#endif
+
 #ifdef _TRACKING_ON
 				// Apply tracking lines.
 				float t = _Time.x % 1.0f + 2.307f;
@@ -184,9 +208,6 @@
 
 				float2 smoothedEdges = smoothstep(0.0f, _DistortionSmoothing, UVs.xy);
 				smoothedEdges *= (1.0f - smoothstep(1.0f - _DistortionSmoothing, 1.0f, UVs.xy));
-
-				// Apply border to pixels outside barrel distortion 0-1 range.
-				//col = (UVs.x >= 0.0f && UVs.x <= 1.0f && UVs.y >= 0.0f && UVs.y <= 1.0f) ? col : _BackgroundColor;
 
 				col = lerp(_BackgroundColor.rgb, col, min(smoothedEdges.x, smoothedEdges.y));
 

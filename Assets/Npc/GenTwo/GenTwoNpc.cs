@@ -280,7 +280,9 @@ public class GenTwoNpc : NpcBase
             return GetDirectionToTarget();
 
         Vector3 playerPos = playerTransform.position;
-        Vector3 playerDir = playerCore.CameraTransform.forward.normalized;
+        // Use the player's locked-in dash direction, NOT camera forward.
+        // Camera can rotate freely during dash without affecting flight path.
+        Vector3 playerDir = playerDash.DashDirection.normalized;
         Vector3 genTwoPos = transform.position;
 
         float pSpeed = playerDashSpeed;
@@ -612,21 +614,7 @@ public class GenTwoNpc : NpcBase
         }
     }
 
-    protected override void OnGUI()
-    {
-        if (!showDebugInfo || Camera.main == null) return;
 
-        Vector3 screenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2.5f);
-        if (screenPos.z > 0)
-        {
-            string stateInfo = GetCurrentStateName();
-            string playerDashing = IsPlayerDashing ? " [P:DASH]" : "";
-            GUI.Label(
-                new Rect(screenPos.x - 60, Screen.height - screenPos.y, 140, 50),
-                $"GenTwo\n{stateInfo}{playerDashing}\nHP:{currentHealth}"
-            );
-        }
-    }
 
     #endregion
 }
