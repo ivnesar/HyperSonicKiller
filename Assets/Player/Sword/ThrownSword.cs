@@ -148,6 +148,8 @@ public class ThrownSword : MonoBehaviour
             trail.Clear();
             trail.emitting = true;
         }
+        
+        SwordMarkerUI.Instance?.SetSword(this);
     }
 
     /// <summary>
@@ -364,6 +366,7 @@ public class ThrownSword : MonoBehaviour
         }
 
         OnReturnedToPlayer?.Invoke();
+        SwordMarkerUI.Instance?.ClearSword();
         
         // Destroy self
         Destroy(gameObject);

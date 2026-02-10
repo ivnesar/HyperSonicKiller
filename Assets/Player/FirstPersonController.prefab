@@ -1,5 +1,57 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3140235944506419512
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1194030060368761471}
+  - component: {fileID: 9039151803280516464}
+  m_Layer: 3
+  m_Name: Cam_shakeFx
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1194030060368761471
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3140235944506419512}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5622030263805675029}
+  m_Father: {fileID: 4254791061503729056}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9039151803280516464
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3140235944506419512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63062bf6685da124a8f934c48e7b3cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraShakeFx
+  player: {fileID: 0}
+  damageShakeIntensity: 0.15
+  damageShakeDuration: 0.2
+  damageRotationIntensity: 3
+  blockShakeIntensity: 0.06
+  blockShakeDuration: 0.1
+  blockRotationIntensity: 1
 --- !u!1 &3935032124739193074
 GameObject:
   m_ObjectHideFlags: 0
@@ -20,6 +72,7 @@ GameObject:
   - component: {fileID: 4948156137820876829}
   - component: {fileID: 7005038953154893743}
   - component: {fileID: 9190051213164589030}
+  - component: {fileID: 6255646037874087239}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -308,6 +361,22 @@ MonoBehaviour:
   showLookDirection: 1
   lookDirectionColor: {r: 0.5, g: 0.5, b: 1, a: 0.5}
   showScreenOverlay: 1
+--- !u!114 &6255646037874087239
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b78e878de67506e4094cd0c0c88fadcc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDashFOV
+  normalFOV: 90
+  dashFOV: 110
+  swordDashFOV: 140
+  transitionSpeed: 0.3
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
@@ -337,7 +406,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 8366330103362317592}
+  - {fileID: 1194030060368761471}
   m_Father: {fileID: 2083849052892089141}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6875547569957842842
@@ -367,12 +436,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6875547569957842842}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4254791061503729056}
+  m_Father: {fileID: 5622030263805675029}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &8476516627239373863
 Camera:
@@ -567,3 +636,53 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &7742844097856123983
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5622030263805675029}
+  - component: {fileID: 6757602108726355369}
+  m_Layer: 3
+  m_Name: Cam_motionFx
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5622030263805675029
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7742844097856123983}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8366330103362317592}
+  m_Father: {fileID: 1194030060368761471}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6757602108726355369
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7742844097856123983}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32e752766c874c547b6f898e922397ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraMotionFx
+  player: {fileID: 0}
+  attackPunchAngle: {x: -2, y: 0, z: 4}
+  attackPunchDuration: 0.25
+  attackForwardRatio: 0.3
+  randomizeDirection: 1
