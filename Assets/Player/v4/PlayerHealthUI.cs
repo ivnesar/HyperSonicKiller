@@ -29,6 +29,9 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI statusText;
     [SerializeField] private TextMeshProUGUI dashChargesText;
 
+    [Header("Dash Blocked")]
+    [SerializeField] private RawImage dashBlockedIcon;
+
     [Header("Colors")]
     [SerializeField] private Color healthyColor = new Color(0.2f, 0.8f, 0.2f);
     [SerializeField] private Color damagedColor = new Color(0.9f, 0.7f, 0.1f);
@@ -91,6 +94,7 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Dash != null)
         {
             player.Dash.OnChargesChanged += UpdateDashCharges;
+            player.Dash.OnDashBlockedChanged += UpdateDashBlockedIcon;
         }
 
         player.OnPlayerDeath += HandleDeath;
@@ -118,6 +122,7 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Dash != null)
         {
             player.Dash.OnChargesChanged -= UpdateDashCharges;
+            player.Dash.OnDashBlockedChanged -= UpdateDashBlockedIcon;
         }
 
         player.OnPlayerDeath -= HandleDeath;
@@ -147,6 +152,9 @@ public class PlayerHealthUI : MonoBehaviour
         {
             UpdateDashCharges(player.Dash.CurrentCharges);
         }
+
+        if (dashBlockedIcon != null)
+            dashBlockedIcon.gameObject.SetActive(false);
 
         UpdateStatus("");
     }
@@ -204,6 +212,12 @@ public class PlayerHealthUI : MonoBehaviour
         {
             dashChargesText.text = $"Dash: {charges}";
         }
+    }
+
+    private void UpdateDashBlockedIcon(bool isBlocked)
+    {
+        if (dashBlockedIcon != null)
+            dashBlockedIcon.gameObject.SetActive(isBlocked);
     }
 
     private void UpdateCombatStatus(PlayerCombat.CombatState state)

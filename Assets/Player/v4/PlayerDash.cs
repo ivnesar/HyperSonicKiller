@@ -48,6 +48,13 @@ public class PlayerDash : MonoBehaviour
     
     // NEW: Attack dash events
     public event Action<IEnemy> OnEnemyHitDuringDash;  // Fired for each enemy hit
+    
+    /// <summary>
+    /// Fired when dash is externally blocked or unblocked (e.g. by Anti-Dash Drone).
+    /// True = dash is blocked, False = dash is available again.
+    /// Does NOT fire for empty charges — only for external SetDashEnabled() calls.
+    /// </summary>
+    public event Action<bool> OnDashBlockedChanged;
 
     #endregion
 
@@ -865,7 +872,14 @@ public class PlayerDash : MonoBehaviour
 
     public void SetDashEnabled(bool enabled)
     {
+        bool wasDisabled = dashDisabled;
         dashDisabled = !enabled;
+
+        // Only fire event if the state actually changed
+        if (dashDisabled != wasDisabled)
+        {
+            OnDashBlockedChanged?.Invoke(dashDisabled);
+        }
     }
 
     public void ForceCancelDash()
