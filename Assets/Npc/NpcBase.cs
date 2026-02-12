@@ -24,7 +24,8 @@ public enum NpcType
     Defender,
     GenOne, 
     GenTwo,
-    AntiDashDrone 
+    AntiDashDrone,
+    ProxyMine
 }
 
 public abstract class NpcBase : MonoBehaviour, IEnemy
@@ -332,7 +333,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             OnStunEnd();
     }
 
-    private void ApplyPendingSwordDamage()
+    protected  void ApplyPendingSwordDamage()
     {
         if (!hasPendingSwordDamage || pendingSwordRemovalDamage <= 0) return;
 

@@ -52,6 +52,10 @@ public class NpcRagdollController : MonoBehaviour
     [Tooltip("Accumulated bullet impacts are applied on death")]
     [SerializeField] private bool accumulateBulletImpacts = true;
 
+    [Header("Explosion Impact")]
+    [Tooltip("Base force applied when hit by an explosion")]
+    [SerializeField] private float explosionImpactForce = 500f;
+
     [Header("References")]
     [Tooltip("Leave empty to auto-find. The main rigidbody to apply central forces to (usually hips/pelvis)")]
     [SerializeField] private Rigidbody mainRigidbody;
@@ -387,6 +391,24 @@ public class NpcRagdollController : MonoBehaviour
         if (showDebugInfo)
         {
             Debug.Log($"[{gameObject.name}] Registered bullet impact. Total force: {accumulatedImpactForce.magnitude}");
+        }
+    }
+
+    /// <summary>
+    /// Register an explosion impact. Direction is calculated from explosion center to NPC.
+    /// </summary>
+    public void RegisterExplosionImpact(Vector3 explosionCenter)
+    {
+        Vector3 direction = (transform.position - explosionCenter).normalized;
+        direction.y = 0f;
+
+        accumulatedImpactForce = direction * explosionImpactForce;
+        lastImpactPoint = transform.position + Vector3.up;
+        hasAccumulatedImpact = true;
+
+        if (showDebugInfo)
+        {
+            Debug.Log($"[{gameObject.name}] Registered explosion impact from {explosionCenter}, force: {explosionImpactForce}");
         }
     }
 

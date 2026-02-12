@@ -398,8 +398,7 @@ public class AntiDashDroneNpc : NpcBase
 
             if (hasPendingSwordDamage)
             {
-                // Let NpcBase handle pending damage through normal flow
-                // This triggers via the base EndStun → ApplyPendingSwordDamage
+                ApplyPendingSwordDamage();
             }
 
             if (!isDead)

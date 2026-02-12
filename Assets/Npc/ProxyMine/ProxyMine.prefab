@@ -11,8 +11,7 @@ GameObject:
   - component: {fileID: 6012649792320869196}
   - component: {fileID: 4632587267680430264}
   - component: {fileID: 861431672835415883}
-  - component: {fileID: 5473170099856865755}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Cube
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -62,6 +61,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -83,31 +84,12 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &5473170099856865755
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5442517584529038542}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &8062697983538874489
 GameObject:
   m_ObjectHideFlags: 0
@@ -117,8 +99,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3930576023078219359}
-  - component: {fileID: 3290832563260287510}
-  m_Layer: 0
+  - component: {fileID: 3479792666954332692}
+  - component: {fileID: 6214064080325832233}
+  m_Layer: 6
   m_Name: ProxyMine
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -141,7 +124,7 @@ Transform:
   - {fileID: 6012649792320869196}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3290832563260287510
+--- !u!114 &3479792666954332692
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -150,9 +133,45 @@ MonoBehaviour:
   m_GameObject: {fileID: 8062697983538874489}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1deb6b87b0f877b428ec8f8992a03aba, type: 3}
+  m_Script: {fileID: 11500000, guid: 144f028fb7b755a4487a641ae981c0bb, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
-  detectionRange: 3
-  explosionSpherePrefab: {fileID: 5324902190804918707, guid: ad4e42c2de5d05f4c854144a71707f51, type: 3}
-  detonationDelay: 0.5
+  m_EditorClassIdentifier: Assembly-CSharp::ProxyMineNpc
+  behaviorMode: 0
+  maxHealth: 100
+  moveSpeed: 4
+  stoppingDistance: 0.5
+  maxRotationSpeed: 180
+  hitSound: {fileID: 0}
+  useRagdollOnDeath: 1
+  destroyDelay: 10
+  showDebugInfo: 1
+  detectionRadius: 3
+  raycastOffset: {x: 0, y: 0.5, z: 0}
+  lineOfSightBlockers:
+    serializedVersion: 2
+    m_Bits: 128
+  fuseTime: 0.5
+  fuseSound: {fileID: 0}
+  explosionPrefab: {fileID: 5324902190804918707, guid: ad4e42c2de5d05f4c854144a71707f51, type: 3}
+  particlePrefab: {fileID: 7152412606541925850, guid: 76dea386387606940aea3d81524a7fae, type: 3}
+--- !u!65 &6214064080325832233
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8062697983538874489}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 0.2, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
