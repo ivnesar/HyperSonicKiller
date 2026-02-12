@@ -191,6 +191,7 @@ GameObject:
   - component: {fileID: 2125247001574764681}
   - component: {fileID: 6095754128112089886}
   - component: {fileID: 2153867670968635717}
+  - component: {fileID: 6830137619286517480}
   m_Layer: 6
   m_Name: Npc_AntiDashDrone
   m_TagString: Untagged
@@ -264,3 +265,27 @@ MonoBehaviour:
   playerEnterSound: {fileID: 0}
   playerExitSound: {fileID: 0}
   explosionSound: {fileID: 0}
+--- !u!114 &6830137619286517480
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6600842486289554197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91b02b114bddfbe4284726c1ff226379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyMarkerTracker
+  markerAnchorOffset: {x: 0, y: 0, z: 0}
+  deathLingerDuration: 1
+  iconIdle: {fileID: 2800000, guid: bc02ee38c2916eb48b0aa9abad35e775, type: 3}
+  iconCharging: {fileID: 2800000, guid: bc02ee38c2916eb48b0aa9abad35e775, type: 3}
+  iconAttacking: {fileID: 2800000, guid: bc02ee38c2916eb48b0aa9abad35e775, type: 3}
+  iconStunned: {fileID: 2800000, guid: 4a823837322e4ea4d8e31d24b2d23a9d, type: 3}
+  iconDead: {fileID: 2800000, guid: f5bf840993ec1bb4585ea14aaca2b4b7, type: 3}
+  secondaryIconIdle: {fileID: 2800000, guid: 746c70cc51b57d345818e23f2babaa8b, type: 3}
+  secondaryIconCharging: {fileID: 2800000, guid: 746c70cc51b57d345818e23f2babaa8b, type: 3}
+  secondaryIconAttacking: {fileID: 2800000, guid: 746c70cc51b57d345818e23f2babaa8b, type: 3}
+  secondaryIconStunned: {fileID: 2800000, guid: 5999fe383d368384bb6f291c7317b322, type: 3}
+  secondaryIconDead: {fileID: 2800000, guid: e32351a489c3a4745ad6fab8f15754ed, type: 3}

@@ -101,6 +101,8 @@ GameObject:
   - component: {fileID: 3930576023078219359}
   - component: {fileID: 3479792666954332692}
   - component: {fileID: 6214064080325832233}
+  - component: {fileID: 6876869932877058049}
+  - component: {fileID: 2607315247958962060}
   m_Layer: 6
   m_Name: ProxyMine
   m_TagString: Untagged
@@ -175,3 +177,43 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 0.2, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &6876869932877058049
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8062697983538874489}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91b02b114bddfbe4284726c1ff226379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyMarkerTracker
+  markerAnchorOffset: {x: 0, y: 0, z: 0}
+  deathLingerDuration: 1
+  iconIdle: {fileID: 2800000, guid: 0e49c732afe9aac4c9a3d27883a9a10c, type: 3}
+  iconCharging: {fileID: 2800000, guid: 0e49c732afe9aac4c9a3d27883a9a10c, type: 3}
+  iconAttacking: {fileID: 2800000, guid: 0e49c732afe9aac4c9a3d27883a9a10c, type: 3}
+  iconStunned: {fileID: 2800000, guid: 758d1c188b137a243802f2b747fd64df, type: 3}
+  iconDead: {fileID: 2800000, guid: c1cb485d8a4e69943940e29ec8b59789, type: 3}
+  secondaryIconIdle: {fileID: 2800000, guid: 1ba1fafaed4939242a897f31b9dbcb6f, type: 3}
+  secondaryIconCharging: {fileID: 2800000, guid: 1ba1fafaed4939242a897f31b9dbcb6f, type: 3}
+  secondaryIconAttacking: {fileID: 2800000, guid: 1ba1fafaed4939242a897f31b9dbcb6f, type: 3}
+  secondaryIconStunned: {fileID: 2800000, guid: 9d3621cb9e540814baf88e5e94feb620, type: 3}
+  secondaryIconDead: {fileID: 2800000, guid: 2e349a7327f65cd4192250cbfaefeabc, type: 3}
+--- !u!114 &2607315247958962060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8062697983538874489}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dc175f279df8e049a40815970aa3eee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcStunVfx
+  stunParticlePrefab: {fileID: 2857649137318967389, guid: 62068ffdf5996314dad69ab788b503da, type: 3}
+  ignoreLayers:
+    serializedVersion: 2
+    m_Bits: 0
