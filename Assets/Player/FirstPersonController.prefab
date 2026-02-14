@@ -226,7 +226,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
   maxDashCharges: 3
-  dashSpeed: 40
+  dashSpeed: 10
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
@@ -245,8 +245,8 @@ MonoBehaviour:
   shieldLayer:
     serializedVersion: 2
     m_Bits: 256
-  enemyHitAngle: 60
-  shieldHitAngle: 25
+  enemyHitAngle: 50
+  shieldHitAngle: 40
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
@@ -302,10 +302,10 @@ MonoBehaviour:
   heldSwordVisual: {fileID: 6913869377866838784}
   thrownSwordPrefab: {fileID: 6144421989652223553, guid: acd6f8762439e8548b084ca8bed56a7d, type: 3}
   throwOrigin: {fileID: 1354474955978296525}
-  throwSpeed: 500
+  throwSpeed: 300
   returnSpeed: 900
   catchDistance: 2
-  recallDelay: 1
+  recallDelay: 0.5
   maxThrowDistance: 1000
   throwLayerMask:
     serializedVersion: 2
@@ -375,8 +375,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDashFOV
   normalFOV: 90
   dashFOV: 110
-  swordDashFOV: 140
-  transitionSpeed: 0.3
+  swordDashFOV: 130
+  transitionSpeed: 0.2
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
@@ -452,8 +452,8 @@ Camera:
   m_GameObject: {fileID: 6875547569957842842}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0

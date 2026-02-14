@@ -9,15 +9,29 @@ using UnityEngine;
 // State flow:
 // - Idle: Dormant. Does NOT rotate toward player. Waits for player to
 //         dash within detection range. Detection is 360° (occlusion only).
+//         Has Ground/Wall animation variant via IsOnWall bool.
 // - Charging: Player is dashing AND in range. GenTwo charges for ~1s
 //             (visual warning). If player stops dashing during charge,
-//             returns to Idle.
+//             returns to Idle. Has Ground/Wall animation variant.
 // - Dashing: GenTwo flies toward the calculated intercept point.
 //            Uses segmented raycasting for anti-tunneling.
 //            Ends when hitting a wall/floor.
 //            Damages player ONLY if player is in Dashing state.
+//            DashAttack animation triggered on player collision.
 // - Recovery: GenTwo is stuck to surface. Waits before returning to Idle.
+//             Has Ground/Wall animation variant (LandingGround/LandingWall).
 // - Stunned: External stun (sword hit etc). Handled by NpcBase.
+//            Has Ground/Wall animation variant.
+//
+// Animator Parameters used by states:
+//   IsCharging   (Bool)    - Idle ⇄ Charge
+//   DashStart    (Trigger) - Charge → StartDash
+//   IsDashing    (Bool)    - StartDash → Dash loop
+//   DashAttack   (Trigger) - Dash ⇄ DashAttack (set in ProcessDashMovement)
+//   Land         (Trigger) - Dash → Landing
+//   Stunned      (Trigger) - AnyState → Stunned
+//   RecoveryDone (Trigger) - Landing/Stunned → Idle
+//   IsOnWall     (Bool)    - switches Ground/Wall variants (set in DetermineWallOrGround)
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -36,7 +50,10 @@ namespace GenTwoStates
             npc.ClearInterceptData();
 
             if (npc.NpcAnimator != null)
+            {
                 npc.NpcAnimator.SetBool("IsCharging", false);
+                npc.NpcAnimator.SetBool("IsDashing", false);
+            }
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
@@ -69,7 +86,6 @@ namespace GenTwoStates
             if (npc.NpcAnimator != null)
             {
                 npc.NpcAnimator.SetBool("IsCharging", true);
-                npc.NpcAnimator.SetTrigger("Charge");
             }
         }
 
@@ -78,20 +94,8 @@ namespace GenTwoStates
             // Keep rotating toward the player during charge
             npc.RotateTowardTargetUnscaled();
 
-            // If player stops dashing during our charge → abort
-            if (!npc.IsPlayerDashing)
-            {
-                return new Idle();
-            }
-
-            // If player leaves detection range during charge → abort
-            if (!npc.IsPlayerInRange)
-            {
-                return new Idle();
-            }
-
-            // If we lose line of sight during charge → abort
-            if (!npc.HasLineOfSightToPlayer())
+            // If player stops dashing, leaves range, or LOS breaks → abort
+            if (!npc.IsPlayerDashing || !npc.IsPlayerInRange || !npc.HasLineOfSightToPlayer())
             {
                 return new Idle();
             }
@@ -138,13 +142,14 @@ namespace GenTwoStates
             abortDash = false;
             npc.SetDashDirection(interceptDir);
             npc.FaceDirection(interceptDir);
-
             npc.PlayDashSound();
 
             if (npc.NpcAnimator != null)
             {
+                // DashStart trigger: Charge → StartDash transition
+                // IsDashing bool: StartDash → Dash loop transition
+                npc.NpcAnimator.SetTrigger("DashStart");
                 npc.NpcAnimator.SetBool("IsDashing", true);
-                npc.NpcAnimator.SetTrigger("Dash");
             }
 
             Debug.Log($"[GenTwo] {npc.name}: Dash started! Direction: {interceptDir}");
@@ -172,7 +177,13 @@ namespace GenTwoStates
         public override void Exit(GenTwoNpc npc)
         {
             if (npc.NpcAnimator != null)
+            {
                 npc.NpcAnimator.SetBool("IsDashing", false);
+
+                // Land trigger: Dash → LandingGround/LandingWall
+                // (IsOnWall is already set by DetermineWallOrGround in ProcessDashMovement)
+                npc.NpcAnimator.SetTrigger("Land");
+            }
         }
     }
 
@@ -188,10 +199,7 @@ namespace GenTwoStates
         {
             npc.SetUnscaledTimer(npc.RecoveryDuration);
 
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetTrigger("Impact");
-
-            Debug.Log($"[GenTwo] {npc.name}: Recovering for {npc.RecoveryDuration}s");
+            Debug.Log($"[GenTwo] {npc.name}: Recovering for {npc.RecoveryDuration}s (OnWall: {npc.IsOnWall})");
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
@@ -201,6 +209,10 @@ namespace GenTwoStates
 
             if (npc.UpdateUnscaledTimer())
             {
+                // RecoveryDone trigger: Landing → IdleGround/IdleWall
+                if (npc.NpcAnimator != null)
+                    npc.NpcAnimator.SetTrigger("RecoveryDone");
+
                 return new Idle();
             }
 
@@ -222,11 +234,15 @@ namespace GenTwoStates
             {
                 npc.NpcAnimator.SetBool("IsDashing", false);
                 npc.NpcAnimator.SetBool("IsCharging", false);
+
+                // Stunned trigger: AnyState → StunnedGround/StunnedWall
+                npc.NpcAnimator.SetTrigger("Stunned");
             }
         }
 
         // Stun handling is done by NpcBase.HandleStunned()
         // This state just exists so the state machine reflects it
+        // OnStunEnd() triggers RecoveryDone → Idle transition
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc) => null;
     }
 }

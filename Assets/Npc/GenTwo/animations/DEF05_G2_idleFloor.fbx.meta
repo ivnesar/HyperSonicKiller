@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: af59110047da31041a0f1765a9e2946f
+guid: 2815de70be257a847aa117a05aba843d
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -31,18 +31,18 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: DEF05_reload
-      takeName: DEF05_reload
-      internalID: 293879922071060052
+      name: DEF05_G2_idleFloor
+      takeName: DEF05_G2_idleFloor
+      internalID: 4392633110305836119
       firstFrame: 0
-      lastFrame: 84
+      lastFrame: 30
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
       cycleOffset: 0
       loop: 0
       hasAdditiveReferencePose: 0
-      loopTime: 0
+      loopTime: 1
       loopBlend: 0
       loopBlendOrientation: 0
       loopBlendPositionY: 0

@@ -84,6 +84,9 @@ public class GenTwoNpc : NpcBase
     private Vector3 dashDirection;
     private bool hasHitPlayer;
 
+    // Surface state (wall vs ground)
+    private bool isOnWall;
+
     // Debug: cached intercept point from last calculation
     private Vector3 lastInterceptPoint;
     private bool hasValidIntercept;
@@ -114,6 +117,9 @@ public class GenTwoNpc : NpcBase
 
     /// <summary>Current dash direction (set once at dash start, never changes).</summary>
     public Vector3 DashDirection => dashDirection;
+
+    /// <summary>True wenn GenTwo an einer Wand hängt (statt am Boden).</summary>
+    public bool IsOnWall => isOnWall;
 
     /// <summary>True while GenTwo is in the Dashing state.</summary>
     public bool IsDashing => currentState is GenTwoStates.Dashing;
@@ -186,6 +192,9 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnStunEnd()
     {
+        if (NpcAnimator != null)
+            NpcAnimator.SetTrigger("RecoveryDone");
+
         ChangeState(new GenTwoStates.Idle());
     }
 
@@ -424,6 +433,9 @@ public class GenTwoNpc : NpcBase
                 // Hit a surface - stop here
                 transform.position = surfaceHit.point + surfaceHit.normal * 0.3f;
 
+                // Determine wall vs ground from the surface normal
+                DetermineWallOrGround(surfaceHit.normal);
+
                 PlaySound(impactSound);
                 return true; // Dash ends
             }
@@ -436,6 +448,10 @@ public class GenTwoNpc : NpcBase
                 if (distToPlayer <= playerHitRadius)
                 {
                     hasHitPlayer = true;
+
+                    // Trigger DashAttack animation (regardless of damage)
+                    if (animator != null)
+                        animator.SetTrigger("DashAttack");
 
                     if (IsPlayerDashing)
                     {
@@ -471,6 +487,16 @@ public class GenTwoNpc : NpcBase
 
     public new void SetStateTimer(float t) => base.SetStateTimer(t);
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
+    /// <summary>
+    /// Rotates toward target using unscaled time (works during slow-mo).
+    /// Blocked while GenTwo is on a wall to prevent clipping.
+    /// </summary>
+    public new void RotateTowardTargetUnscaled()
+    {
+        if (isOnWall) return;
+        base.RotateTowardTargetUnscaled();
+    }
+
     public new void RotateTowardTarget() => base.RotateTowardTarget();
     public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
 
@@ -507,6 +533,57 @@ public class GenTwoNpc : NpcBase
         {
             transform.rotation = Quaternion.LookRotation(flatDir);
         }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Wall/Ground Detection
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Bestimmt anhand der Aufprall-Normale ob GenTwo an einer Wand oder
+    /// am Boden gelandet ist. Alles über 45° zur Vertikalen = Wand.
+    /// Bei Wand-Landing wird die Rotation auf die Surface-Normal gesetzt,
+    /// sodass GenTwo von der Wand wegschaut und korrekt aufliegt.
+    /// </summary>
+    public void DetermineWallOrGround(Vector3 surfaceNormal)
+    {
+        float angle = Vector3.Angle(surfaceNormal, Vector3.up);
+        isOnWall = angle > 45f;
+
+        if (isOnWall)
+        {
+            // GenTwo schaut von der Wand weg (entlang der Normale)
+            Vector3 flatNormal = new Vector3(surfaceNormal.x, 0f, surfaceNormal.z).normalized;
+            if (flatNormal.sqrMagnitude > 0.01f)
+            {
+                transform.rotation = Quaternion.LookRotation(flatNormal);
+            }
+        }
+
+        if (NpcAnimator != null)
+            NpcAnimator.SetBool("IsOnWall", isOnWall);
+
+        Debug.Log($"[GenTwo] {name}: Landed on {(isOnWall ? "WALL" : "GROUND")} (angle: {angle:F1}°)");
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Animator Override
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// GenTwo nutzt keinen MoveSpeed (kein NavMesh) und steuert Stun über
+    /// einen Trigger statt den IsStunned-Bool aus NpcBase.
+    /// </summary>
+    protected override void UpdateAnimator()
+    {
+        if (animator == null) return;
+
+        animator.SetInteger("StateID", GetStateID());
+        animator.SetBool("IsDead", isDead);
     }
 
     #endregion
