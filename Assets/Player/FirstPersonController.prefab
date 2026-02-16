@@ -73,6 +73,7 @@ GameObject:
   - component: {fileID: 7005038953154893743}
   - component: {fileID: 9190051213164589030}
   - component: {fileID: 6255646037874087239}
+  - component: {fileID: 6872239883917322336}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -376,6 +377,22 @@ MonoBehaviour:
   dashFOV: 110
   swordDashFOV: 130
   transitionSpeed: 0.2
+--- !u!114 &6872239883917322336
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 274585b5369a88a4f8336d86e6c0db9c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerArmAnimator
+  armAnimator: {fileID: 4554340878585235414}
+  moveSpeedSmoothTime: 0.1
+  attackVariantCount: 3
+  blockVariantCount: 4
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
@@ -734,6 +751,10 @@ PrefabInstance:
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 08bd97545fb70b5409b75f7ca4f2fa3c, type: 2}
+    - target: {fileID: 5866666021909216657, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
+      propertyPath: m_UpdateMode
+      value: 2
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -742,6 +763,11 @@ PrefabInstance:
       addedObject: {fileID: 5711857297488474606}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
+--- !u!95 &4554340878585235414 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
+  m_PrefabInstance: {fileID: 7953024132803574343}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &7625834635877997996 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
