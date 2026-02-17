@@ -20,6 +20,21 @@ using UnityEngine;
 public class ProxyMineNpc : NpcBase
 {
     // ════════════════════════════════════════════════════════════════════════
+    #region Hidden Base Fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    public override string[] HiddenBaseFields => new[]
+    {
+        "behaviorMode",      // Wird in OnStart() auf Stationary gesetzt
+        "moveSpeed",         // Mine bewegt sich nicht
+        "stoppingDistance",  // Mine bewegt sich nicht
+        "maxRotationSpeed",  // Mine rotiert nicht
+        "useRagdollOnDeath", // Mine explodiert, kein Ragdoll
+    };
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 

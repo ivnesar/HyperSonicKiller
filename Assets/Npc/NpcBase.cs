@@ -104,6 +104,13 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     #region Properties
     // ════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Felder die im Inspector versteckt werden sollen.
+    /// Subklassen überschreiben dies mit den Namen der irrelevanten Base-Felder.
+    /// Nur visuell — die Werte bleiben serialisiert.
+    /// </summary>
+    public virtual string[] HiddenBaseFields => null;
+
     public BehaviorMode CurrentBehaviorMode => behaviorMode;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;

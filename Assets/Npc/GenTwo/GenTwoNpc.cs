@@ -23,6 +23,20 @@ using UnityEngine;
 public class GenTwoNpc : NpcBase
 {
     // ════════════════════════════════════════════════════════════════════════
+    #region Hidden Base Fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    public override string[] HiddenBaseFields => new[]
+    {
+        "behaviorMode",      // GenTwo ist immer stationär (dash-basiert)
+        "moveSpeed",         // Kein NavMesh-Movement, nutzt eigenen dashSpeed
+        "stoppingDistance",  // Kein NavMesh
+        "maxRotationSpeed",  // Nutzt eigene Rotation (FaceDirection / unscaled)
+    };
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 

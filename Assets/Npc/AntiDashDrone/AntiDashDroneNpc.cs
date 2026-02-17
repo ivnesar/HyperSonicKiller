@@ -21,6 +21,20 @@ using UnityEngine;
 public class AntiDashDroneNpc : NpcBase
 {
     // ════════════════════════════════════════════════════════════════════════
+    #region Hidden Base Fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    public override string[] HiddenBaseFields => new[]
+    {
+        "behaviorMode",      // Drone ist immer stationär
+        "moveSpeed",         // Drone bewegt sich nicht
+        "stoppingDistance",  // Drone bewegt sich nicht
+        "maxRotationSpeed",  // Drone rotiert nicht
+    };
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 

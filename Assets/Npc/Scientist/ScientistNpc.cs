@@ -19,6 +19,17 @@ using UnityEngine.AI;
 public class ScientistNpc : NpcBase
 {
     // ════════════════════════════════════════════════════════════════════════
+    #region Hidden Base Fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    public override string[] HiddenBaseFields => new[]
+    {
+        "behaviorMode",  // Scientist nutzt eigene Fluchtlogik
+    };
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region State Enum
     // ════════════════════════════════════════════════════════════════════════
 
