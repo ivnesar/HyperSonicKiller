@@ -4,7 +4,7 @@ using UnityEngine;
 /// Drives the first-person arm Animator based on player state and combat events.
 /// Sits on the Player GameObject, reads state from PlayerCore subsystems.
 /// 
-/// Subscribes to events for one-shot animations (Attack, Block)
+/// Subscribes to events for one-shot animations (Attack, Block, SwordThrow, SwordRecover)
 /// and polls state each frame for continuous parameters (MoveSpeed, IsDashing, etc.).
 /// 
 /// ─────────────────────────────────────────────────────────────────────
@@ -16,10 +16,13 @@ using UnityEngine;
 ///   Bool    IsStuck         — true while stuck to wall
 ///   Bool    IsDead          — true when dead
 ///   Bool    IsExhausted     — true when block HP depleted
+///   Bool    HasSword        — false while sword is thrown away
 ///   Trigger Attack          — fires per enemy hit during dash
 ///   Int     AttackVariant   — 0-3, randomized before each Attack trigger
 ///   Trigger Block           — fires per blocked hit
 ///   Int     BlockVariant    — 0-3, randomized before each Block trigger
+///   Trigger SwordThrow      — fires when sword is thrown
+///   Trigger SwordRecover    — fires when sword returns to player's hand
 /// ─────────────────────────────────────────────────────────────────────
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
@@ -56,10 +59,13 @@ public class PlayerArmAnimator : MonoBehaviour
     private static readonly int HashIsStuck         = Animator.StringToHash("IsStuck");
     private static readonly int HashIsDead          = Animator.StringToHash("IsDead");
     private static readonly int HashIsExhausted     = Animator.StringToHash("IsExhausted");
+    private static readonly int HashHasSword        = Animator.StringToHash("HasSword");
     private static readonly int HashAttack          = Animator.StringToHash("Attack");
     private static readonly int HashAttackVariant   = Animator.StringToHash("AttackVariant");
     private static readonly int HashBlock           = Animator.StringToHash("Block");
     private static readonly int HashBlockVariant    = Animator.StringToHash("BlockVariant");
+    private static readonly int HashSwordThrow      = Animator.StringToHash("SwordThrow");
+    private static readonly int HashSwordRecover    = Animator.StringToHash("SwordRecover");
 
     #endregion
 
@@ -120,11 +126,16 @@ public class PlayerArmAnimator : MonoBehaviour
 
     private void SubscribeToEvents()
     {
-        // Attack: fires per enemy hit during dash
         if (core.Combat != null)
         {
             core.Combat.OnAttack += HandleAttack;
             core.Combat.OnBlockedHit += HandleBlockedHit;
+        }
+
+        if (core.SwordThrow != null)
+        {
+            core.SwordThrow.OnSwordThrown += HandleSwordThrown;
+            core.SwordThrow.OnSwordCaught += HandleSwordCaught;
         }
     }
 
@@ -136,6 +147,12 @@ public class PlayerArmAnimator : MonoBehaviour
         {
             core.Combat.OnAttack -= HandleAttack;
             core.Combat.OnBlockedHit -= HandleBlockedHit;
+        }
+
+        if (core.SwordThrow != null)
+        {
+            core.SwordThrow.OnSwordThrown -= HandleSwordThrown;
+            core.SwordThrow.OnSwordCaught -= HandleSwordCaught;
         }
     }
 
@@ -167,6 +184,10 @@ public class PlayerArmAnimator : MonoBehaviour
         // Exhausted comes from combat, not player state
         bool isExhausted = core.Combat != null && core.Combat.IsExhausted;
         armAnimator.SetBool(HashIsExhausted, isExhausted);
+
+        // HasSword — true when sword is in player's hand
+        bool hasSword = core.SwordThrow == null || core.SwordThrow.HasSword;
+        armAnimator.SetBool(HashHasSword, hasSword);
     }
 
     #endregion
@@ -191,6 +212,20 @@ public class PlayerArmAnimator : MonoBehaviour
         int variant = GetNonRepeatingVariant(blockVariantCount, ref lastBlockVariant);
         armAnimator.SetInteger(HashBlockVariant, variant);
         armAnimator.SetTrigger(HashBlock);
+    }
+
+    private void HandleSwordThrown()
+    {
+        if (armAnimator == null) return;
+
+        armAnimator.SetTrigger(HashSwordThrow);
+    }
+
+    private void HandleSwordCaught()
+    {
+        if (armAnimator == null) return;
+
+        armAnimator.SetTrigger(HashSwordRecover);
     }
 
     #endregion

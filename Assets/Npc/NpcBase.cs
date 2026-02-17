@@ -25,7 +25,8 @@ public enum NpcType
     GenOne, 
     GenTwo,
     AntiDashDrone,
-    ProxyMine
+    ProxyMine,
+    Scientist
 }
 
 public abstract class NpcBase : MonoBehaviour, IEnemy

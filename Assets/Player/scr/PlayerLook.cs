@@ -11,7 +11,8 @@ public class PlayerLook : MonoBehaviour
     #region Inspector Settings
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Look Settings")]
+    [Header("Look Settings")] 
+    [SerializeField] private Transform rotationTarget;
     [SerializeField] private float sensitivity = 2f;
     [SerializeField] private float maxVerticalAngle = 80f;
 
@@ -66,13 +67,13 @@ public class PlayerLook : MonoBehaviour
         currentVerticalAngle -= lookInput.y * sensitivity;
         currentVerticalAngle = Mathf.Clamp(currentVerticalAngle, -maxVerticalAngle, maxVerticalAngle);
 
-        core.CameraTransform.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f);
+        rotationTarget.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f); //core.CameraTransform
     }
 
     private void HandleDeathCamera()
     {
         // Spin camera on death for dramatic effect
-        core.CameraTransform.Rotate(Vector3.forward * deathRotationSpeed * Time.deltaTime);
+        rotationTarget.Rotate(Vector3.forward * deathRotationSpeed * Time.deltaTime); //core.CameraTransform
     }
 
     #endregion
@@ -108,7 +109,7 @@ public class PlayerLook : MonoBehaviour
         // Vertical
         currentVerticalAngle = -Mathf.Asin(direction.y) * Mathf.Rad2Deg;
         currentVerticalAngle = Mathf.Clamp(currentVerticalAngle, -maxVerticalAngle, maxVerticalAngle);
-        core.CameraTransform.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f);
+        rotationTarget.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f); //core.CameraTransform
     }
 
     #endregion
