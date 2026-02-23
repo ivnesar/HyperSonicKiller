@@ -99,15 +99,9 @@ public class PlayerDash : MonoBehaviour
     [Tooltip("Layer mask for detecting enemies during dash")]
     [SerializeField] private LayerMask enemyLayer;
     
-    [Tooltip("Layer mask for detecting defender shields during dash")]
-    [SerializeField] private LayerMask shieldLayer;
-    
     [Header("Attack Angle Thresholds")]
     [Tooltip("Max angle from dash direction to hit normal enemies (generous)")]
     [SerializeField] private float enemyHitAngle = 60f;
-    
-    [Tooltip("Max angle from dash direction to hit shields (strict - requires precision)")]
-    [SerializeField] private float shieldHitAngle = 25f;
 
     #endregion
 
@@ -196,6 +190,12 @@ public class PlayerDash : MonoBehaviour
     public Vector3 StuckSurfaceNormal => stuckSurfaceNormal;
     public bool IsSwordDashing => isSwordDashing;
     public bool IsWallStickActive => isWallStickActive;
+    
+    /// <summary>Current dash speed (for external systems like GenTwo intercept calculation).</summary>
+    public float DashSpeed => dashSpeed;
+    
+    /// <summary>Maximum dash distance (for external systems like GenTwo intercept calculation).</summary>
+    public float DashMaxDistance => dashMaxDistance;
     
     /// <summary>Current attack dash radius (for external systems).</summary>
     public float AttackDashRadius => attackDashRadius;
@@ -458,12 +458,12 @@ public class PlayerDash : MonoBehaviour
     }
 
     /// <summary>
-    /// Checks for enemies and shields within the attack radius and processes hits.
-    /// Shields are checked first and can block the attack (dealing counter damage to player).
+    /// Checks for enemies within the attack radius and processes hits.
+    /// If an enemy has a DefenderShield and the player is inside its FOV cone,
+    /// the attack is parried (player gets exhausted, no damage dealt).
     /// No damage is dealt when player is Exhausted.
     /// 
     /// Enemies must be within enemyHitAngle of dash direction to be hit (generous).
-    /// Shields require shieldHitAngle precision (strict).
     /// </summary>
     private void CheckAndDamageEnemiesInRadius()
     {
@@ -473,10 +473,6 @@ public class PlayerDash : MonoBehaviour
             return;
         }
 
-        // Check for shields FIRST (they have priority over enemies)
-        CheckShieldsInRadius();
-
-        // Then check for enemies
         Collider[] enemyHits = Physics.OverlapSphere(transform.position, attackDashRadius, enemyLayer);
         
         foreach (var col in enemyHits)
@@ -496,10 +492,23 @@ public class PlayerDash : MonoBehaviour
                         continue;
                     }
                     
-                    enemiesHitThisDash.Add(enemy);
+                    // ── Shield Parry Check ──────────────────────────────
+                    // If this enemy has a shield and the player is in its FOV,
+                    // the attack is parried instead of dealing damage.
+                    var shield = col.GetComponent<DefenderShield>();
+                    if (shield != null && shield.IsBlockingAttackFrom(transform.position))
+                    {
+                        enemiesHitThisDash.Add(enemy);
+                        shield.ParryMeleeAttack();
+                        
+                        // Cancel the dash immediately — player should not keep flying
+                        ForceCancelDash();
+                        
+                        Debug.Log($"[PlayerDash] Attack parried by {col.name}'s shield!");
+                        return; // Exit entirely, dash is over
+                    }
                     
-                    // Calculate hit info
-                    Vector3 hitPoint = col.ClosestPoint(transform.position);
+                    enemiesHitThisDash.Add(enemy);
                     
                     // Deal damage via melee interface
                     enemy.OnMeleeDamage(attackDashDamage);
@@ -512,45 +521,6 @@ public class PlayerDash : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Checks for defender shields within the attack radius.
-    /// If a shield is hit from the front, it blocks and counter-attacks.
-    /// Only triggers if shield is within shieldHitAngle of dash direction (requires precision).
-    /// </summary>
-    private void CheckShieldsInRadius()
-    {
-        // Skip if no shield layer is set
-        if (shieldLayer == 0) return;
-
-        Collider[] shieldHits = Physics.OverlapSphere(transform.position, attackDashRadius, shieldLayer);
-        
-        foreach (var col in shieldHits)
-        {
-            DefenderShield shield = col.GetComponent<DefenderShield>();
-            if (shield != null)
-            {
-                // Check if shield is within the strict hit angle (requires precision)
-                Vector3 toShield = (col.transform.position - transform.position).normalized;
-                float angle = Vector3.Angle(dashDirection, toShield);
-                
-                if (angle > shieldHitAngle)
-                {
-                    // Shield is not in direct path - player is dashing past it
-                    continue;
-                }
-                
-                // Let the shield determine if this is a frontal attack or not
-                // dashStartPosition is where the dash began (used to determine attack direction)
-                bool wasBlocked = shield.OnHitByDashAttack(dashStartPosition);
-                
-                if (wasBlocked)
-                {
-                    Debug.Log($"[PlayerDash] Attack blocked by DefenderShield! (angle: {angle:F1}°)");
-                    // Note: Shield already dealt counter damage to player
-                }
-            }
-        }
-    }
 
     private void CheckDashCancels()
     {

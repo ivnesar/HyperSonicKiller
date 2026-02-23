@@ -402,23 +402,23 @@ public class ThrownSword : MonoBehaviour
         hitObject = target;
         OnHitTarget?.Invoke(target);
 
-        // Check for DefenderShield FIRST (before IEnemy)
-        // Shield blocks sword completely - no embed, no stun on defender
-        DefenderShield shield = target.GetComponent<DefenderShield>();
-        if (shield != null)
-        {
-            // Shield handles the interaction (reflects sword, exhausts player)
-            shield.OnHitByThrownSword(this);
-            return; // Don't process as normal hit
-        }
-
         // Check for IEnemy (full sword interaction support)
         // Search up the hierarchy in case we hit a child collider
         IEnemy enemy = target.GetComponentInParent<IEnemy>();
 
         if (enemy != null)
         {
-            // Notify enemy that sword is embedded - this handles the indefinite stun
+            // ── Shield Parry Check ──────────────────────────────────
+            // If this enemy has a DefenderShield and the sword came from
+            // inside its FOV cone, the sword is parried.
+            DefenderShield shield = enemy.Transform.GetComponent<DefenderShield>();
+            if (shield != null && shield.IsBlockingAttackFrom(transform.position))
+            {
+                shield.ParryThrownSword(this);
+                return; // Don't embed, don't stun — sword returns, player exhausted
+            }
+
+            // No shield or attack from behind — embed normally
             enemy.OnSwordEmbedded();
             embeddedEnemy = enemy;
         }

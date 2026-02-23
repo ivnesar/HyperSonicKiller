@@ -55,12 +55,6 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Speed multiplier applied ONLY while the player is in Dashing state")]
     [SerializeField] private float dashSpeedMultiplier = 1.3f;
 
-    [Tooltip("Estimated player dash speed (should match PlayerDash.dashSpeed)")]
-    [SerializeField] private float playerDashSpeed = 20f;
-
-    [Tooltip("Max distance the player dash can cover (should match PlayerDash.dashMaxDistance)")]
-    [SerializeField] private float playerDashMaxDistance = 15f;
-
     [Tooltip("Radius for detecting collision with the player during dash")]
     [SerializeField] private float playerHitRadius = 1.2f;
 
@@ -287,7 +281,7 @@ public class GenTwoNpc : NpcBase
     /// Returns the direction GenTwo should dash toward, or Vector3.zero if no valid intercept exists.
     /// 
     /// Uses proper intercept geometry:
-    ///   Player moves along: P(t) = playerPos + playerDashSpeed * playerDir * t
+    ///   Player moves along: P(t) = playerPos + playerDash.DashSpeed * playerDir * t
     ///   GenTwo must reach P(t) in the same time t:
     ///     |P(t) - genTwoPos| = genTwoSpeed * t
     /// 
@@ -308,11 +302,12 @@ public class GenTwoNpc : NpcBase
         Vector3 playerDir = playerDash.DashDirection.normalized;
         Vector3 genTwoPos = transform.position;
 
-        float pSpeed = playerDashSpeed;
+        float pSpeed = playerDash != null ? playerDash.DashSpeed : 20f;
         float gSpeed = dashSpeed * dashSpeedMultiplier;
 
         // Maximum time the player will be dashing (distance / speed)
-        float maxPlayerDashTime = playerDashMaxDistance / pSpeed;
+        float maxDist = playerDash != null ? playerDash.DashMaxDistance : 15f;
+        float maxPlayerDashTime = maxDist / pSpeed;
 
         // Relative position: player relative to GenTwo
         Vector3 relPos = playerPos - genTwoPos;
@@ -355,9 +350,9 @@ public class GenTwoNpc : NpcBase
 
         // Clamp fallback to max dash distance too
         float interceptDistAlongPath = Vector3.Dot(interceptPoint - playerPos, playerDir);
-        if (interceptDistAlongPath > playerDashMaxDistance)
+        if (interceptDistAlongPath > maxDist)
         {
-            interceptPoint = playerPos + playerDir * playerDashMaxDistance;
+            interceptPoint = playerPos + playerDir * maxDist;
         }
 
         // Check if path to intercept point is clear

@@ -732,6 +732,7 @@ GameObject:
   - component: {fileID: 2021042655059817858}
   - component: {fileID: 1078752966882323621}
   - component: {fileID: 7760183188333331989}
+  - component: {fileID: 8516579965078543535}
   m_Layer: 6
   m_Name: Npc_Defender
   m_TagString: Enemy
@@ -839,7 +840,7 @@ MonoBehaviour:
   maxHealth: 100
   moveSpeed: 4
   stoppingDistance: 0.5
-  maxRotationSpeed: 180
+  maxRotationSpeed: 70
   hitSound: {fileID: 0}
   useRagdollOnDeath: 1
   destroyDelay: 10
@@ -947,6 +948,25 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &8516579965078543535
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31f059e7843cf5840a7880a30d00fbcf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DefenderShield
+  shieldAngle: 140
+  shieldRange: 2
+  heightOffset: 1
+  parrySound: {fileID: 0}
+  parryEffect: {fileID: 0}
+  gizmoColor: {r: 0, g: 0.8, b: 1, a: 0.25}
+  alwaysShowGizmo: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0
@@ -2493,9 +2513,7 @@ GameObject:
   - component: {fileID: 5363113495235611610}
   - component: {fileID: 7049300455519263750}
   - component: {fileID: 8694413956099774009}
-  - component: {fileID: 6285071068423152027}
-  - component: {fileID: 1789134225845702801}
-  m_Layer: 8
+  m_Layer: 6
   m_Name: Shield
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2574,41 +2592,3 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &6285071068423152027
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9088637679061434273}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.0000005, y: 1, z: 1.0000005}
-  m_Center: {x: 0.0000009536745, y: 0, z: 0.0000002384187}
---- !u!114 &1789134225845702801
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9088637679061434273}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 31f059e7843cf5840a7880a30d00fbcf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DefenderShield
-  counterDamage: 500
-  defender: {fileID: 3415283527969894265}
-  shieldBlockDashSound: {fileID: 0}
-  shieldBlockSwordSound: {fileID: 0}
-  shieldBlockEffect: {fileID: 0}

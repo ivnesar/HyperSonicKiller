@@ -253,7 +253,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         direction.y = 0f;
 
         if (direction.sqrMagnitude < 0.01f) return;
-        Debug.Log("rotate");
+
         Quaternion targetRotation = Quaternion.LookRotation(direction);
         float maxAngle = maxRotationSpeed * Time.deltaTime;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);

@@ -1,16 +1,21 @@
 using UnityEngine;
 
 /// <summary>
-/// Shield component for Defender NPC.
-/// Handles all shield-specific interactions:
-/// - Blocks dash attacks from the front → instant counter (500 damage = death)
-/// - Blocks thrown sword → reflects sword, exhausts player
+/// Shield component for Defender NPC — FOV-based parry system.
+/// 
+/// HOW IT WORKS:
+/// Instead of a physical collider, the shield uses an invisible detection cone
+/// (FOV) projected in the NPC's forward direction. If the player is inside this
+/// cone when they attack (melee dash or thrown sword), the attack is parried
+/// and the player is forced into the Exhausted state.
+/// 
+/// The shield mesh is purely visual — it has no gameplay role.
 /// 
 /// SETUP:
-/// 1. Attach this script to the Shield mesh GameObject (child of Defender)
-/// 2. Ensure Shield has a Collider (trigger or solid)
-/// 3. Set Shield GameObject to "Shield" layer
-/// 4. Assign references in Inspector or let it auto-find them
+/// 1. Attach this script to the Defender NPC GameObject (same as DefenderNpc).
+/// 2. Tweak FOV angle, range, and height offset in the Inspector.
+/// 3. Remove any collider from the shield mesh (or disable interaction).
+/// 4. Player scripts call IsBlockingAttackFrom() before dealing damage.
 /// </summary>
 public class DefenderShield : MonoBehaviour
 {
@@ -18,17 +23,23 @@ public class DefenderShield : MonoBehaviour
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Counter Attack (Dash Block)")]
-    [Tooltip("Damage dealt to player when they dash into the shield from the front")]
-    [SerializeField] private int counterDamage = 500;
+    [Header("Shield FOV Detection")]
+    [Tooltip("Total cone angle in degrees (e.g. 120 = 60° per side)")]
+    [SerializeField] private float shieldAngle = 120f;
 
-    [Header("References (Auto-assigned if empty)")]
-    [SerializeField] private DefenderNpc defender;
+    [Tooltip("How far the shield cone reaches")]
+    [SerializeField] private float shieldRange = 2f;
 
-    [Header("Feedback Hooks (Optional - for future use)")]
-    [SerializeField] private AudioClip shieldBlockDashSound;
-    [SerializeField] private AudioClip shieldBlockSwordSound;
-    [SerializeField] private ParticleSystem shieldBlockEffect;
+    [Tooltip("Height offset above root position for the cone origin")]
+    [SerializeField] private float heightOffset = 1.5f;
+
+    [Header("Feedback Hooks (Optional)")]
+    [SerializeField] private AudioClip parrySound;
+    [SerializeField] private ParticleSystem parryEffect;
+
+    [Header("Gizmo Settings")]
+    [SerializeField] private Color gizmoColor = new Color(0f, 0.8f, 1f, 0.25f);
+    [SerializeField] private bool alwaysShowGizmo = false;
 
     #endregion
 
@@ -36,8 +47,10 @@ public class DefenderShield : MonoBehaviour
     #region Runtime State
     // ════════════════════════════════════════════════════════════════════════
 
-    private PlayerCore cachedPlayerCore;
+    private DefenderNpc defender;
     private AudioSource audioSource;
+    private PlayerCore cachedPlayerCore;
+    private PlayerCombat cachedPlayerCombat;
 
     #endregion
 
@@ -47,186 +60,210 @@ public class DefenderShield : MonoBehaviour
 
     private void Awake()
     {
-        // Auto-find DefenderNpc in parent hierarchy
-        if (defender == null)
-        {
-            defender = GetComponentInParent<DefenderNpc>();
-        }
+        defender = GetComponent<DefenderNpc>();
 
         if (defender == null)
         {
-            Debug.LogError($"[DefenderShield] No DefenderNpc found in parent hierarchy of {gameObject.name}!");
+            Debug.LogError($"[DefenderShield] No DefenderNpc found on {gameObject.name}! " +
+                           "This script must be on the same GameObject as DefenderNpc.");
+            enabled = false;
+            return;
         }
 
-        // Get or add AudioSource for feedback
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
-        {
             audioSource = gameObject.AddComponent<AudioSource>();
-        }
     }
 
     private void Start()
     {
-        // Cache player reference
-        CachePlayerReference();
+        CachePlayerReferences();
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Public API - Called by PlayerDash
+    #region Public API — Called by Player Scripts
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Called by PlayerDash when the shield is within the attack radius during a dash.
-    /// Checks if attack comes from the front (shield blocks) or back (attack passes through).
+    /// Checks whether the shield is currently blocking an attack from the given position.
+    /// Call this BEFORE dealing damage to the Defender.
+    /// 
+    /// Returns true if the attacker is inside the shield's FOV cone.
     /// </summary>
-    /// <param name="attackOrigin">Position where the dash started</param>
-    /// <returns>True if shield blocked the attack (player should take damage), false if attack passes through</returns>
-    public bool OnHitByDashAttack(Vector3 attackOrigin)
+    public bool IsBlockingAttackFrom(Vector3 attackerPosition)
     {
-        if (defender == null) return false;
-
-        // Calculate attack direction (from player to defender)
-        Vector3 defenderPosition = defender.transform.position;
-        Vector3 attackDirection = (defenderPosition - attackOrigin).normalized;
-        
-        // Get defender's forward direction (where the shield faces)
-        Vector3 shieldForward = defender.transform.forward;
-        
-        // Calculate angle between attack direction and shield forward
-        // If angle < 90°: attack comes from the front → BLOCKED
-        // If angle >= 90°: attack comes from behind → PASSES THROUGH
-        Vector3 directionToAttacker = (attackOrigin - defenderPosition).normalized;
-        float angle = Vector3.Angle(shieldForward, directionToAttacker);
-
-        if (angle < 90f)
-        {
-            // Attack from front - BLOCKED, counter attack!
-            ExecuteCounterAttack();
-            PlayBlockFeedback(shieldBlockDashSound);
-            Debug.Log($"[DefenderShield] Dash blocked! Angle: {angle:F1}° - Counter attack!");
-            return true;
-        }
-        else
-        {
-            // Attack from behind - passes through
-            Debug.Log($"[DefenderShield] Attack from behind. Angle: {angle:F1}° - Passes through");
+        if (defender == null || defender.IsDead || defender.IsStunned)
             return false;
-        }
+
+        Vector3 origin = GetConeOrigin();
+        Vector3 toAttacker = attackerPosition - origin;
+
+        // Flatten to horizontal for angle check (shield doesn't care about vertical angle)
+        Vector3 toAttackerFlat = new Vector3(toAttacker.x, 0f, toAttacker.z);
+        Vector3 forwardFlat = new Vector3(transform.forward.x, 0f, transform.forward.z).normalized;
+
+        if (toAttackerFlat.sqrMagnitude < 0.001f)
+            return false;
+
+        // Range check (horizontal distance)
+        float distance = toAttackerFlat.magnitude;
+        if (distance > shieldRange)
+            return false;
+
+        // Angle check
+        float angle = Vector3.Angle(forwardFlat, toAttackerFlat.normalized);
+        float halfAngle = shieldAngle * 0.5f;
+
+        return angle <= halfAngle;
     }
 
     /// <summary>
-    /// Called by ThrownSword when it hits the shield.
-    /// Reflects the sword and exhausts the player.
+    /// Called by PlayerDash/PlayerCombat when a melee attack is parried.
+    /// Exhausts the player and plays feedback.
     /// </summary>
-    /// <param name="sword">The thrown sword that hit the shield</param>
-    public void OnHitByThrownSword(ThrownSword sword)
+    public void ParryMeleeAttack()
+    {
+        EnsurePlayerReferences();
+
+        if (cachedPlayerCombat != null)
+            cachedPlayerCombat.ForceExhaust();
+
+        PlayParryFeedback();
+
+        Debug.Log("[DefenderShield] Melee attack parried! Player exhausted.");
+    }
+
+    /// <summary>
+    /// Called by ThrownSword when it hits the Defender and the shield blocks it.
+    /// Forces the sword to return and exhausts the player.
+    /// </summary>
+    public void ParryThrownSword(ThrownSword sword)
     {
         if (sword == null) return;
 
-        EnsurePlayerReference();
+        EnsurePlayerReferences();
 
-        // Force sword to return immediately (no embed, no stun on defender)
+        // Force sword to return immediately
         sword.ForceReturnFromShield();
 
-        // Exhaust the player (BlockHP = 0, can't attack for a duration)
-        if (cachedPlayerCore != null && cachedPlayerCore.Combat != null)
-        {
-            cachedPlayerCore.Combat.ForceExhaust();
-        }
+        // Exhaust the player
+        if (cachedPlayerCombat != null)
+            cachedPlayerCombat.ForceExhaust();
 
-        PlayBlockFeedback(shieldBlockSwordSound);
+        PlayParryFeedback();
 
-        Debug.Log("[DefenderShield] Thrown sword blocked! Player exhausted.");
+        Debug.Log("[DefenderShield] Thrown sword parried! Sword returned, player exhausted.");
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Internal Logic
+    #region Internal Helpers
     // ════════════════════════════════════════════════════════════════════════
 
-    private void ExecuteCounterAttack()
+    /// <summary>
+    /// Returns the world-space origin of the shield detection cone.
+    /// </summary>
+    private Vector3 GetConeOrigin()
     {
-        EnsurePlayerReference();
+        return transform.position + Vector3.up * heightOffset;
+    }
 
-        if (cachedPlayerCore != null)
+    private void CachePlayerReferences()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
         {
-            // Deal lethal damage directly (bypasses block since this IS the counter)
-            cachedPlayerCore.TakeDirectDamage(counterDamage);
-            
-            Debug.Log($"[DefenderShield] Counter attack dealt {counterDamage} damage to player!");
+            cachedPlayerCore = player.GetComponent<PlayerCore>();
+            cachedPlayerCombat = player.GetComponent<PlayerCombat>();
         }
     }
 
-    private void CachePlayerReference()
+    private void EnsurePlayerReferences()
     {
-        if (cachedPlayerCore == null)
-        {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                cachedPlayerCore = player.GetComponent<PlayerCore>();
-            }
-        }
+        if (cachedPlayerCombat == null)
+            CachePlayerReferences();
     }
 
-    private void EnsurePlayerReference()
+    private void PlayParryFeedback()
     {
-        if (cachedPlayerCore == null)
-        {
-            CachePlayerReference();
-        }
-    }
+        if (parrySound != null && audioSource != null)
+            audioSource.PlayOneShot(parrySound);
 
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Feedback (Hooks for future VFX/SFX)
-    // ════════════════════════════════════════════════════════════════════════
-
-    private void PlayBlockFeedback(AudioClip clip)
-    {
-        // Play sound if available
-        if (clip != null && audioSource != null)
-        {
-            audioSource.PlayOneShot(clip);
-        }
-
-        // Play particle effect if available
-        if (shieldBlockEffect != null)
-        {
-            shieldBlockEffect.Play();
-        }
+        if (parryEffect != null)
+            parryEffect.Play();
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Debug Visualization
+    #region Gizmo Visualization
     // ════════════════════════════════════════════════════════════════════════
+
+    private void OnDrawGizmos()
+    {
+        if (alwaysShowGizmo)
+            DrawShieldCone();
+    }
 
     private void OnDrawGizmosSelected()
     {
-        if (defender == null)
+        if (!alwaysShowGizmo)
+            DrawShieldCone();
+    }
+
+    private void DrawShieldCone()
+    {
+        Vector3 origin = transform.position + Vector3.up * heightOffset;
+        Vector3 forward = transform.forward;
+        float halfAngle = shieldAngle * 0.5f;
+
+        // ── Solid cone fill ──────────────────────────────────────────────
+        Gizmos.color = gizmoColor;
+
+        int segments = 20;
+        Vector3 previousPoint = Vector3.zero;
+
+        for (int i = 0; i <= segments; i++)
         {
-            defender = GetComponentInParent<DefenderNpc>();
+            float t = (float)i / segments;
+            float currentAngle = Mathf.Lerp(-halfAngle, halfAngle, t);
+            Vector3 direction = Quaternion.Euler(0f, currentAngle, 0f) * forward;
+            Vector3 endPoint = origin + direction * shieldRange;
+
+            // Lines from origin to arc edge
+            Gizmos.DrawLine(origin, endPoint);
+
+            // Arc line connecting edge points
+            if (i > 0)
+                Gizmos.DrawLine(previousPoint, endPoint);
+
+            previousPoint = endPoint;
         }
 
-        if (defender != null)
-        {
-            // Draw shield forward direction
-            Gizmos.color = Color.cyan;
-            Vector3 shieldPos = transform.position;
-            Gizmos.DrawRay(shieldPos, defender.transform.forward * 2f);
+        // ── Wireframe outline (brighter) ─────────────────────────────────
+        Color outlineColor = new Color(gizmoColor.r, gizmoColor.g, gizmoColor.b, 0.8f);
+        Gizmos.color = outlineColor;
 
-            // Draw "safe zone" behind the defender
-            Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
-            Vector3 behindPos = defender.transform.position - defender.transform.forward * 1.5f;
-            Gizmos.DrawWireSphere(behindPos, 0.5f);
-        }
+        // Left and right boundary lines
+        Vector3 leftDir = Quaternion.Euler(0f, -halfAngle, 0f) * forward;
+        Vector3 rightDir = Quaternion.Euler(0f, halfAngle, 0f) * forward;
+        Gizmos.DrawLine(origin, origin + leftDir * shieldRange);
+        Gizmos.DrawLine(origin, origin + rightDir * shieldRange);
+
+        // Forward direction indicator
+        Gizmos.color = Color.blue;
+        Gizmos.DrawLine(origin, origin + forward * (shieldRange * 0.5f));
+
+        // Origin point
+        Gizmos.color = Color.white;
+        Gizmos.DrawWireSphere(origin, 0.1f);
+
+        // ── Height indicator lines ───────────────────────────────────────
+        Gizmos.color = new Color(1f, 1f, 1f, 0.3f);
+        Gizmos.DrawLine(transform.position, origin);
     }
 
     #endregion
