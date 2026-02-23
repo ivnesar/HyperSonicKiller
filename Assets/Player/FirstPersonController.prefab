@@ -231,7 +231,7 @@ MonoBehaviour:
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 8320
   maxFloorAngle: 45
   dashTimeScale: 0.01
   dashCancelUpwardForce: 10
@@ -243,11 +243,7 @@ MonoBehaviour:
   enemyLayer:
     serializedVersion: 2
     m_Bits: 64
-  shieldLayer:
-    serializedVersion: 2
-    m_Bits: 256
   enemyHitAngle: 50
-  shieldHitAngle: 40
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
@@ -288,7 +284,7 @@ MonoBehaviour:
   maxBlockHP: 300
   blockRegenDelay: 1
   blockRegenRate: 30
-  exhaustionDuration: 1
+  exhaustionDuration: 5
 --- !u!114 &4948156137820876829
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -311,7 +307,7 @@ MonoBehaviour:
   maxThrowDistance: 1000
   throwLayerMask:
     serializedVersion: 2
-    m_Bits: 448
+    m_Bits: 8384
   swordRemovalDamage: 50
   postRemovalStunDuration: 2
   throwActionName: ThrowSword

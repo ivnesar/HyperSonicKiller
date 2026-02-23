@@ -927,8 +927,8 @@ MonoBehaviour:
   iconAttacking: {fileID: 2800000, guid: d4fa7fd8cb94e4a49a249e106fe33d84, type: 3}
   iconStunned: {fileID: 2800000, guid: 4a476fc86c2d1dc4a9dd1edb6254df5a, type: 3}
   iconDead: {fileID: 2800000, guid: 2a017127043a8804fa6e203f3e145aa0, type: 3}
-  secondaryIconIdle: {fileID: 2800000, guid: d37b3c81226120b42975490b345f0443, type: 3}
-  secondaryIconCharging: {fileID: 2800000, guid: 48461e9772d776f45ad999838ef173af, type: 3}
+  secondaryIconIdle: {fileID: 2800000, guid: c04fb3d2ccf11fa49be2f84cf472a17a, type: 3}
+  secondaryIconCharging: {fileID: 2800000, guid: c04fb3d2ccf11fa49be2f84cf472a17a, type: 3}
   secondaryIconAttacking: {fileID: 2800000, guid: d24851f21cb299047bc2de2b7a308d8c, type: 3}
   secondaryIconStunned: {fileID: 2800000, guid: 2e9ef2329cf539f488b57641aa32c646, type: 3}
   secondaryIconDead: {fileID: 2800000, guid: c04fb3d2ccf11fa49be2f84cf472a17a, type: 3}
