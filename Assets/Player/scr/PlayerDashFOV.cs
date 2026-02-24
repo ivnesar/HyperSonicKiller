@@ -32,6 +32,10 @@ public class PlayerDashFOV : MonoBehaviour
     private float targetFOV;
     private float fovVelocity; // used by SmoothDamp
 
+    // External FOV override (e.g. sword throw aim zoom)
+    private bool fovOverrideActive;
+    private float fovOverrideValue;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -68,6 +72,13 @@ public class PlayerDashFOV : MonoBehaviour
 
     private void UpdateTargetFOV()
     {
+        // External override takes priority (e.g. sword throw aim zoom)
+        if (fovOverrideActive)
+        {
+            targetFOV = fovOverrideValue;
+            return;
+        }
+
         targetFOV = core.CurrentState switch
         {
             PlayerCore.PlayerState.Dashing        => dashFOV,
@@ -88,6 +99,36 @@ public class PlayerDashFOV : MonoBehaviour
             Time.unscaledDeltaTime
         );
     }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Public API - FOV Override
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Set an external FOV override. While active, dash FOV logic is ignored.
+    /// Used by sword throw aim zoom.
+    /// </summary>
+    public void SetFOVOverride(float fov)
+    {
+        fovOverrideActive = true;
+        fovOverrideValue = fov;
+    }
+
+    /// <summary>
+    /// Clear the external FOV override, returning to normal dash-based FOV logic.
+    /// </summary>
+    public void ClearFOVOverride()
+    {
+        fovOverrideActive = false;
+    }
+
+    /// <summary>True if an external system is currently overriding the FOV.</summary>
+    public bool IsFOVOverridden => fovOverrideActive;
+
+    /// <summary>The normal (non-dash, non-override) FOV value.</summary>
+    public float NormalFOV => normalFOV;
 
     #endregion
 }

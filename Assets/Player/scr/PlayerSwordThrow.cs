@@ -8,6 +8,11 @@ using System;
 /// 
 /// UPDATED: Added swordRemovalDamage - damage dealt when sword is recalled from an embedded enemy.
 /// UPDATED: Added ForceRecallWithDashDamage for sword dash mechanic.
+/// UPDATED: Throw is now hold-to-aim with zoom + time slow, release-to-throw.
+///   - Hold ThrowSword key: camera zooms in over aimZoomInDuration, time slows to aimTimeScale.
+///   - Zoom is controlled by aimZoomFactor (e.g. 3 = FOV/3). Mouse sensitivity scales down by the same factor.
+///   - Time slow expires after aimSlowMaxDuration (even if still holding).
+///   - Release key: sword is thrown, zoom/time/sensitivity reset immediately.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerSwordThrow : MonoBehaviour
@@ -57,6 +62,19 @@ public class PlayerSwordThrow : MonoBehaviour
     [Header("Input")]
     [SerializeField] private string throwActionName = "ThrowSword";
 
+    [Header("Aim Zoom (Hold to Aim)")]
+    [Tooltip("Zoom multiplier while aiming (e.g. 3 = 3x zoom, FOV divided by 3)")]
+    [SerializeField] private float aimZoomFactor = 3f;
+
+    [Tooltip("Time in unscaled seconds to reach full zoom")]
+    [SerializeField] private float aimZoomInDuration = 0.2f;
+
+    [Tooltip("Time slow target while aiming (matches dash timeScale)")]
+    [SerializeField] private float aimTimeScale = 0.1f;
+
+    [Tooltip("Max duration of time slow in unscaled seconds (time resets after this even if still holding)")]
+    [SerializeField] private float aimSlowMaxDuration = 2f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -69,7 +87,16 @@ public class PlayerSwordThrow : MonoBehaviour
 
     // Recall delay after hit
     private float lastHitTime = -999f;
-    
+
+    // Aim zoom state
+    private bool isAiming;
+    private float aimTimer;            // unscaled time since aim started
+    private float aimSlowTimer;        // unscaled time since slow started
+    private bool aimSlowExpired;       // true after aimSlowMaxDuration elapsed
+    private float timeScaleBeforeAim;  // to restore if something else had set it
+    private PlayerDashFOV dashFOV;     // cached reference for FOV override
+    private PlayerLook look;           // cached reference for sensitivity adjustment
+    private float baseSensitivity;     // original sensitivity before aim zoom
 
     // Debug visualization
     private Vector3 debugTargetPoint;
@@ -102,6 +129,9 @@ public class PlayerSwordThrow : MonoBehaviour
     /// <summary>True if sword is currently embedded in an enemy.</summary>
     public bool IsSwordInEnemy => activeSword != null && activeSword.IsStuck && activeSword.EmbeddedEnemy != null;
 
+    /// <summary>True if player is currently holding the throw key to aim.</summary>
+    public bool IsAiming => isAiming;
+
     #endregion
 
     // Reference to combat for exhaustion check
@@ -115,11 +145,23 @@ public class PlayerSwordThrow : MonoBehaviour
     {
         core = GetComponent<PlayerCore>();
         combat = GetComponent<PlayerCombat>();
+        dashFOV = GetComponent<PlayerDashFOV>();
+        look = GetComponent<PlayerLook>();
     }
 
     private void Update()
     {
-        if (core.IsDead) return;
+        if (core.IsDead)
+        {
+            if (isAiming) StopAim();
+            return;
+        }
+
+        // Cancel aim if player enters a state where throwing isn't allowed
+        if (isAiming && !CanThrow())
+        {
+            StopAim();
+        }
 
         HandleInput();
     }
@@ -132,22 +174,50 @@ public class PlayerSwordThrow : MonoBehaviour
 
     private void HandleInput()
     {
-        if (!core.Input.GetActionDown(throwActionName)) return;
-
         if (hasSword)
         {
-            // Player has sword -> throw it
-            if (CanThrow())
-            {
-                ThrowSword();
-            }
+            // ── Throw flow: Hold to aim, Release to throw ──
+            HandleAimInput();
         }
         else
         {
-            // Player doesn't have sword -> recall it (only if delay has passed)
+            // ── Recall flow: unchanged (press to recall) ──
+            if (!core.Input.GetActionDown(throwActionName)) return;
+
             if (CanRecall())
             {
                 RecallSword();
+            }
+        }
+    }
+
+    private void HandleAimInput()
+    {
+        bool isHolding = core.Input.GetAction(throwActionName);
+        bool justPressed = core.Input.GetActionDown(throwActionName);
+        bool justReleased = core.Input.GetActionUp(throwActionName);
+
+        // ── Start aiming ──
+        if (justPressed && CanThrow())
+        {
+            StartAim();
+            return;
+        }
+
+        // ── While aiming ──
+        if (isAiming && isHolding)
+        {
+            UpdateAim();
+            return;
+        }
+
+        // ── Release: throw sword + cancel aim ──
+        if (isAiming && justReleased)
+        {
+            StopAim();
+            if (CanThrow())
+            {
+                ThrowSword();
             }
         }
     }
@@ -170,6 +240,96 @@ public class PlayerSwordThrow : MonoBehaviour
         // Must wait 1 second after sword hits something before recall
         float timeSinceHit = Time.time - lastHitTime;
         return timeSinceHit >= recallDelay;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Aim Zoom & Time Slow
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void StartAim()
+    {
+        isAiming = true;
+        aimTimer = 0f;
+        aimSlowTimer = 0f;
+        aimSlowExpired = false;
+        timeScaleBeforeAim = Time.timeScale;
+
+        // Cache base sensitivity before we modify it
+        if (look != null)
+        {
+            baseSensitivity = look.GetSensitivity();
+        }
+
+        // Start time slow immediately
+        Time.timeScale = aimTimeScale;
+    }
+
+    private void UpdateAim()
+    {
+        float dt = Time.unscaledDeltaTime;
+        aimTimer += dt;
+        aimSlowTimer += dt;
+
+        // ── Zoom: lerp zoom factor from 1x to aimZoomFactor over aimZoomInDuration ──
+        float zoomProgress = Mathf.Clamp01(aimTimer / aimZoomInDuration);
+        float currentZoom = Mathf.Lerp(1f, aimZoomFactor, zoomProgress);
+
+        // Apply FOV override: normalFOV / currentZoom
+        float normalFOV = dashFOV != null ? dashFOV.NormalFOV : 70f;
+        float zoomedFOV = normalFOV / currentZoom;
+
+        if (dashFOV != null)
+        {
+            dashFOV.SetFOVOverride(zoomedFOV);
+        }
+
+        // ── Sensitivity: scale down proportionally to zoom ──
+        if (look != null)
+        {
+            look.SetSensitivity(baseSensitivity / currentZoom);
+        }
+
+        // ── Time slow expiry: after aimSlowMaxDuration, reset time even if still holding ──
+        if (!aimSlowExpired && aimSlowTimer >= aimSlowMaxDuration)
+        {
+            aimSlowExpired = true;
+            Time.timeScale = 1f;
+        }
+    }
+
+    private void StopAim()
+    {
+        if (!isAiming) return;
+
+        isAiming = false;
+        aimTimer = 0f;
+        aimSlowTimer = 0f;
+        aimSlowExpired = false;
+
+        // Reset time scale
+        Time.timeScale = 1f;
+
+        // Clear FOV override (PlayerDashFOV will SmoothDamp back to normal)
+        if (dashFOV != null)
+        {
+            dashFOV.ClearFOVOverride();
+        }
+
+        // Restore original sensitivity
+        if (look != null)
+        {
+            look.SetSensitivity(baseSensitivity);
+        }
+    }
+
+    /// <summary>
+    /// Force-cancels aim state. Called externally (e.g. on death, dash start, etc.)
+    /// </summary>
+    public void CancelAim()
+    {
+        StopAim();
     }
 
     #endregion
@@ -327,6 +487,8 @@ public class PlayerSwordThrow : MonoBehaviour
     /// </summary>
     public void ForceRecall()
     {
+        CancelAim();
+
         if (activeSword != null)
         {
             Destroy(activeSword.gameObject);

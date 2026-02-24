@@ -73,10 +73,10 @@ public class PlayerInputHandler : MonoBehaviour
             { "Jump",       new KeyBinding { Key = KeyCode.Space } },
             { "Sprint",     new KeyBinding { Key = KeyCode.LeftShift } },
             
-            { "Dash",       new KeyBinding { Key = KeyCode.Mouse1 } }, //KeyCode.Mouse0
+            { "Dash",       new KeyBinding { Key = KeyCode.Mouse0 } }, //KeyCode.Mouse0
             { "DashDown",   new KeyBinding { Key = KeyCode.LeftControl } },
             
-            { "ThrowSword", new KeyBinding { Key = KeyCode.R } }, //KeyCode.Mouse1
+            { "ThrowSword", new KeyBinding { Key = KeyCode.Mouse1 } }, //KeyCode.Mouse1
         };
     }
 
