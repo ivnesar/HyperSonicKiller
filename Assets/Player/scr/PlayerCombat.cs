@@ -209,7 +209,7 @@ public class PlayerCombat : MonoBehaviour
         // Note: If Exhausted, player can still dash but won't enter Attacking state
     }
 
-    private void HandleDashCompleted(bool hitSurface, bool hitWall)
+    private void HandleDashCompleted(bool hitSurface, bool hitWall, bool isStickyLanding)
     {
         // Return to idle after dash completes (if was attacking)
         if (currentState == CombatState.Attacking)

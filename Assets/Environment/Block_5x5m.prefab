@@ -44,6 +44,7 @@ GameObject:
   - component: {fileID: 8012733090405660102}
   - component: {fileID: 4472724796435815657}
   - component: {fileID: 5042722842584600393}
+  - component: {fileID: 291714324794936723}
   m_Layer: 7
   m_Name: Cube
   m_TagString: Untagged
@@ -144,3 +145,15 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &291714324794936723
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3434746826251388677}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StickySurface

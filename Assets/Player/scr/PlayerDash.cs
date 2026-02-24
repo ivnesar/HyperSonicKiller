@@ -37,7 +37,7 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     public event Action OnDashStarted;
-    public event Action<bool, bool> OnDashCompleted;  // (hitSurface, hitWall)
+    public event Action<bool, bool, bool> OnDashCompleted;  // (hitSurface, hitWall, isStickyLanding)
     public event Action OnWallStick;
     public event Action OnUnstick;
     public event Action<int> OnChargesChanged;  // remaining charges
@@ -146,6 +146,8 @@ public class PlayerDash : MonoBehaviour
     private Vector3 dashDirection;
     private float dashProgress;
     private bool dashTargetIsWall;
+    private bool dashHitSurface;          // true if dash ends on a surface (not open air)
+    private Collider dashTargetCollider;   // collider of the surface we're landing on (null if none)
     private Vector3 stuckSurfaceNormal;
 
     // Wall stick state
@@ -337,6 +339,8 @@ public class PlayerDash : MonoBehaviour
 
     /// <summary>
     /// Attempts to start an attack dash. Finds the target surface and NPCs in path.
+    /// Always starts a dash — if no surface is found, the player dashes the full
+    /// dashMaxDistance and transitions to Airborne.
     /// </summary>
     private void TryStartAttackDash()
     {
@@ -345,25 +349,17 @@ public class PlayerDash : MonoBehaviour
 
         // Find all hits along the path (surfaces AND enemies)
         RaycastHit[] allHits = Physics.RaycastAll(origin, direction, dashMaxDistance, dashSurfaceLayer | enemyLayer);
-        
-        if (allHits.Length == 0)
-        {
-            // Nothing hit at all - don't dash
-            Debug.Log("[PlayerDash] Attack dash failed - no targets found");
-            return;
-        }
 
         // Sort by distance
-        System.Array.Sort(allHits, (a, b) => a.distance.CompareTo(b.distance));
+        if (allHits.Length > 0)
+            System.Array.Sort(allHits, (a, b) => a.distance.CompareTo(b.distance));
 
         // Find the first SURFACE (not an enemy)
         RaycastHit? surfaceHit = null;
         foreach (var hit in allHits)
         {
-            // Check if this is a surface (not an enemy)
             if (!hit.collider.TryGetComponent<IEnemy>(out _))
             {
-                // Check if we're not trying to dash to the same spot
                 if (!IsSameExactSurface(hit))
                 {
                     surfaceHit = hit;
@@ -372,29 +368,20 @@ public class PlayerDash : MonoBehaviour
             }
         }
 
-        // If no surface found, check if we hit an NPC - then stop at first NPC
-        if (!surfaceHit.HasValue)
+        if (surfaceHit.HasValue)
         {
-            foreach (var hit in allHits)
-            {
-                if (hit.collider.TryGetComponent<IEnemy>(out _))
-                {
-                    // Stop at this enemy's position (plus a small offset)
-                    Vector3 stopPoint = hit.point + direction * 0.5f;
-                    StartAttackDash(stopPoint, -direction); // Use reverse direction as "surface normal"
-                    return;
-                }
-            }
-            
-            // Nothing valid found
-            Debug.Log("[PlayerDash] Attack dash failed - no valid surface or enemy");
-            return;
+            // Surface found — dash to it
+            StartAttackDash(surfaceHit.Value.point, surfaceHit.Value.normal, surfaceHit.Value.collider);
         }
-
-        StartAttackDash(surfaceHit.Value.point, surfaceHit.Value.normal);
+        else
+        {
+            // No surface found — dash full distance into open air
+            Vector3 openAirTarget = transform.position + direction * dashMaxDistance;
+            StartAttackDash(openAirTarget, -direction, null);
+        }
     }
 
-    private void StartAttackDash(Vector3 targetPoint, Vector3 surfaceNormal)
+    private void StartAttackDash(Vector3 targetPoint, Vector3 surfaceNormal, Collider hitCollider)
     {
         // Deactivate wall stick if active
         DeactivateWallStick();
@@ -408,6 +395,8 @@ public class PlayerDash : MonoBehaviour
         dashProgress = 0f;
         stuckSurfaceNormal = surfaceNormal;
         dashTargetIsWall = IsWallSurface(surfaceNormal);
+        dashHitSurface = hitCollider != null;
+        dashTargetCollider = hitCollider;
         currentDashType = DashType.Attack;
         
         // Clear hit tracking for new dash
@@ -430,7 +419,7 @@ public class PlayerDash : MonoBehaviour
         
         if (dashDistance < 0.01f)
         {
-            CompleteDash(hitSurface: true);
+            CompleteDash(hitSurface: dashHitSurface);
             return;
         }
         
@@ -446,7 +435,7 @@ public class PlayerDash : MonoBehaviour
             // Final check for enemies at destination
             CheckAndDamageEnemiesInRadius();
             
-            CompleteDash(hitSurface: true);
+            CompleteDash(hitSurface: dashHitSurface);
         }
         else
         {
@@ -544,18 +533,31 @@ public class PlayerDash : MonoBehaviour
         dashProgress = 0f;
         enemiesHitThisDash.Clear();
 
-        // Only activate wall stick if target was a WALL and player is not grounded
-        if (hitSurface && dashTargetIsWall && !core.Controller.isGrounded)
+        // Check if the surface we landed on is sticky
+        bool isStickyLanding = hitSurface && dashTargetCollider != null 
+                               && dashTargetCollider.GetComponentInParent<StickySurface>() != null;
+
+        if (isStickyLanding && dashTargetIsWall && !core.Controller.isGrounded)
         {
+            // Sticky wall — activate wall stick and recharge charges
             ActivateWallStick(transform.position);
-            //Debug.Log("[PlayerDash] Dash completed - sticking to WALL");
+        }
+        else if (isStickyLanding && !dashTargetIsWall)
+        {
+            // Sticky floor — recharge charges (state transition handled by PlayerCore)
+        }
+        else if (hitSurface && !isStickyLanding)
+        {
+            // Non-sticky surface — no wall stick, no charge recharge
+            Debug.Log($"[PlayerDash] Landed on non-sticky surface: {(dashTargetCollider != null ? dashTargetCollider.name : "unknown")} — no stick, no recharge");
         }
         else
         {
-            //Debug.Log($"[PlayerDash] Dash completed - landing on {(dashTargetIsWall ? "wall but grounded" : "FLOOR")}");
+            // No surface hit (dashed into open air)
+            Debug.Log("[PlayerDash] Dash ended in open air — no surface contact");
         }
 
-        OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall);
+        OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall, isStickyLanding);
     }
 
     private void CancelDash(float verticalForce)

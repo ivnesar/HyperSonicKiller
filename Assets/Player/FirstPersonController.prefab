@@ -158,6 +158,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03e9eb3b943e5a84686c94b080d9085a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInputHandler
+  Dash: 324
+  ThrowSword: 114
 --- !u!114 &6409869773086982550
 MonoBehaviour:
   m_ObjectHideFlags: 0

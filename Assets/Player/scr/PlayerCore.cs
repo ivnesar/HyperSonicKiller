@@ -238,11 +238,15 @@ public class PlayerCore : MonoBehaviour
         switch (state)
         {
             case PlayerState.Normal:
-                Dash?.ResetCharges();
+                // Check if standing on a sticky surface — recharge charges
+                if (IsGroundSurfaceSticky())
+                {
+                    Dash?.ResetCharges();
+                }
                 break;
 
             case PlayerState.StuckToSurface:
-                Dash?.ResetCharges();
+                // Charges reset is handled by PlayerDash.CompleteDash → HandleDashCompleted
                 break;
                 
             case PlayerState.Dashing:
@@ -297,20 +301,37 @@ public class PlayerCore : MonoBehaviour
         Debug.Log("[PlayerCore] Player died!");
     }
 
-    private void HandleDashCompleted(bool hitSurface, bool hitWall)
+    private void HandleDashCompleted(bool hitSurface, bool hitWall, bool isStickyLanding)
     {
-        // Only stick to surface if it was a WALL, not a floor
-        if (hitSurface && hitWall && !Controller.isGrounded)
+        if (isStickyLanding)
         {
-            SetState(PlayerState.StuckToSurface);
-        }
-        else if (Controller.isGrounded)
-        {
-            SetState(PlayerState.Normal);
+            // Sticky surface — recharge charges
+            Dash?.ResetCharges();
+
+            if (hitWall && !Controller.isGrounded)
+            {
+                SetState(PlayerState.StuckToSurface);
+            }
+            else if (Controller.isGrounded)
+            {
+                SetState(PlayerState.Normal);
+            }
+            else
+            {
+                SetState(PlayerState.Airborne);
+            }
         }
         else
         {
-            SetState(PlayerState.Airborne);
+            // Non-sticky surface or open air — no recharge, no wall stick
+            if (Controller.isGrounded)
+            {
+                SetState(PlayerState.Normal);
+            }
+            else
+            {
+                SetState(PlayerState.Airborne);
+            }
         }
     }
     
@@ -371,6 +392,28 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool CanBlock => CurrentState != PlayerState.Dead && 
                             CurrentState != PlayerState.DashingToSword;  // Can still block during attack dash
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Surface Helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Raycasts downward to check if the ground beneath the player has a StickySurface component.
+    /// Used when landing (entering Normal state) to decide whether to recharge dash charges.
+    /// </summary>
+    private bool IsGroundSurfaceSticky()
+    {
+        float checkDistance = Controller.height / 2f + 0.5f;
+
+        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, checkDistance))
+        {
+            return hit.collider.GetComponentInParent<StickySurface>() != null;
+        }
+
+        return false;
+    }
 
     #endregion
 }
