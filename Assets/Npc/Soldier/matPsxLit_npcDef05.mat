@@ -14,8 +14,8 @@ Material:
   m_ValidKeywords:
   - _DITHERMODE_SCREEN
   - _FILTERMODE_POINT
-  - _LIGHTMODE_TEXELLIT
-  - _RECEIVESHADOWSMODE_ON
+  - _LIGHTMODE_LIT
+  - _RECEIVESHADOWSMODE_OFF
   - _SNAPMODE_VIEW
   m_InvalidKeywords:
   - _USE_VERTEX_COLORS_OFF
@@ -94,14 +94,14 @@ Material:
     - _ColorBitDepth: 64
     - _DitherMode: 0
     - _FilterMode: 1
-    - _LightMode: 1
-    - _ReceiveShadowsMode: 0
+    - _LightMode: 0
+    - _ReceiveShadowsMode: 1
     - _ResolutionLimit: 64
     - _SnapMode: 2
-    - _SnapsPerUnit: 128
+    - _SnapsPerUnit: 24
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _AffineTextureStrength: 1
+    - _AffineTextureStrength: 0.2
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _AmbientLight: 0.02

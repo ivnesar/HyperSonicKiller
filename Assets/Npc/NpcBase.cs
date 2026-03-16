@@ -144,6 +144,8 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
     protected virtual void Awake()
     {
+        NpcRegistry.Register(this);
+
         navAgent = GetComponent<NavMeshAgent>();
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
@@ -532,6 +534,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (isDead) return;
 
         isDead = true;
+        NpcRegistry.Unregister(this);
         isStunned = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
@@ -623,6 +626,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     // ════════════════════════════════════════════════════════════════════════
     #region Debug
     // ════════════════════════════════════════════════════════════════════════
+
+    protected virtual void OnDestroy()
+    {
+        NpcRegistry.Unregister(this);
+    }
 
     protected virtual void OnDrawGizmosSelected()
     {
