@@ -57,6 +57,14 @@ public class PlayerInputHandler : MonoBehaviour
 
     private void Update()
     {
+        // Don't register gameplay inputs while paused
+        if (TimeManager.Instance.IsPaused)
+        {
+            // Clear all states so nothing remains "held" after unpause
+            ClearAllStates();
+            return;
+        }
+
         UpdateAllBindings();
     }
 
@@ -201,6 +209,19 @@ public class PlayerInputHandler : MonoBehaviour
                 binding.State = InputState.None;
                 binding.WasPressedLastFrame = false;
             }
+        }
+    }
+
+    /// <summary>
+    /// Resets all bindings to None. Called during pause to prevent
+    /// stale Hold/Press states from persisting after unpause.
+    /// </summary>
+    private void ClearAllStates()
+    {
+        foreach (var binding in bindings.Values)
+        {
+            binding.State = InputState.None;
+            binding.WasPressedLastFrame = false;
         }
     }
 

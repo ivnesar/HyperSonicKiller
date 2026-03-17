@@ -843,6 +843,7 @@ MonoBehaviour:
   hitSound: {fileID: 0}
   useRagdollOnDeath: 1
   destroyDelay: 10
+  snapTarget: {fileID: 1590548316490049355}
   showDebugInfo: 1
   minShootingRange: 3
   maxShootingRange: 24

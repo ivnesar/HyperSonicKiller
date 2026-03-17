@@ -56,6 +56,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     [SerializeField] protected bool useRagdollOnDeath = true;
     [SerializeField] protected float destroyDelay = 10f;
 
+    [Header("Camera Snap Target")]
+    [Tooltip("Transform auf den die Kamera bei Treffer snappt (z.B. Head- oder Chest-Bone). Wenn leer, wird transform.position + Vector3.up als Fallback genutzt.")]
+    [SerializeField] protected Transform snapTarget;
+
     [Header("Debug")]
     [SerializeField] protected bool showDebugInfo = true;
 
@@ -118,6 +122,12 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     public bool IsStunned => isStunned;
     public float RemainingStunTime => isStunned ? Mathf.Max(0f, stunEndTime - Time.time) : 0f;
     public Transform Transform => transform;
+
+    /// <summary>
+    /// Snap-Ziel für die Kamera bei Treffer.
+    /// Gibt das zugewiesene Transform zurück, oder null wenn keins gesetzt ist.
+    /// </summary>
+    public Transform SnapTarget => snapTarget;
 
     /// <summary>
     /// Position des Spielers. NPC weiß IMMER wo der Spieler ist.
@@ -281,7 +291,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (direction.sqrMagnitude < 0.01f) return;
 
         Quaternion targetRotation = Quaternion.LookRotation(direction);
-        float maxAngle = maxRotationSpeed * Time.unscaledDeltaTime;
+        float maxAngle = maxRotationSpeed * TimeManager.Instance.GameDeltaTime;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
     }
     

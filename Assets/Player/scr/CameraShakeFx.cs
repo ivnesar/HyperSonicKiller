@@ -74,7 +74,7 @@ public class CameraShakeFx : MonoBehaviour
             return;
         }
 
-        shakeTimer -= Time.unscaledDeltaTime;
+        shakeTimer -= TimeManager.Instance.GameDeltaTime;
 
         // Fade out intensity over duration
         float progress = shakeTimer / shakeDuration;

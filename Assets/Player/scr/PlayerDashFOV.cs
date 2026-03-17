@@ -96,7 +96,7 @@ public class PlayerDashFOV : MonoBehaviour
             ref fovVelocity,
             transitionSpeed,
             Mathf.Infinity,
-            Time.unscaledDeltaTime
+            TimeManager.Instance.GameDeltaTime
         );
     }
 

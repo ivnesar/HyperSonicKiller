@@ -103,6 +103,10 @@ public class PlayerDash : MonoBehaviour
     [Tooltip("Max angle from dash direction to hit normal enemies (generous)")]
     [SerializeField] private float enemyHitAngle = 60f;
 
+    [Header("Hit Feedback")]
+    [Tooltip("Dauer des HitStops in Sekunden (Echtzeit). Typisch: 0.05 - 0.15")]
+    [SerializeField] private float hitStopDuration = 0.08f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -403,7 +407,7 @@ public class PlayerDash : MonoBehaviour
         enemiesHitThisDash.Clear();
 
         // Slow time during dash
-        Time.timeScale = dashTimeScale;
+        TimeManager.Instance.StartDashSlowMo(dashTimeScale);
 
         // Notify core to change state
         core.SetState(PlayerCore.PlayerState.Dashing);
@@ -423,7 +427,8 @@ public class PlayerDash : MonoBehaviour
             return;
         }
         
-        float moveDistance = dashSpeed * Time.unscaledDeltaTime;
+        // GameDeltaTime: runs at full speed during SlowMo, but stops during Pause/HitStop
+        float moveDistance = dashSpeed * TimeManager.Instance.GameDeltaTime;
         dashProgress += moveDistance / dashDistance;
 
         if (dashProgress >= 1f)
@@ -503,6 +508,22 @@ public class PlayerDash : MonoBehaviour
                     enemy.OnMeleeDamage(attackDashDamage);
                     
                     OnEnemyHitDuringDash?.Invoke(enemy);
+
+                    // HitStop bei jedem Treffer auslösen
+                    if (hitStopDuration > 0f)
+                    {
+                        TimeManager.Instance.TriggerHitStop(hitStopDuration);
+                    }
+
+                    // Kamera-Snap zum getroffenen Gegner
+                    if (core.Look != null)
+                    {
+                        // SnapTarget vom Enemy nutzen, Fallback auf Enemy-Transform
+                        Transform snapTarget = enemy.SnapTarget != null 
+                            ? enemy.SnapTarget 
+                            : enemy.Transform;
+                        core.Look.SnapToTarget(snapTarget);
+                    }
                     
                     Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage (angle: {angle:F1}°)");
                 }
@@ -529,9 +550,12 @@ public class PlayerDash : MonoBehaviour
 
     private void CompleteDash(bool hitSurface)
     {
-        Time.timeScale = 1f;
+        TimeManager.Instance.StopDashSlowMo();
         dashProgress = 0f;
         enemiesHitThisDash.Clear();
+
+        // Kamera-Snap abbrechen wenn Dash endet
+        core.Look?.CancelSnap();
 
         // Check if the surface we landed on is sticky
         bool isStickyLanding = hitSurface && dashTargetCollider != null 
@@ -562,9 +586,12 @@ public class PlayerDash : MonoBehaviour
 
     private void CancelDash(float verticalForce)
     {
-        Time.timeScale = 1f;
+        TimeManager.Instance.StopDashSlowMo();
         dashProgress = 0f;
         enemiesHitThisDash.Clear();
+        
+        // Kamera-Snap abbrechen wenn Dash gecancelt wird
+        core.Look?.CancelSnap();
         
         DeactivateWallStick();
 
@@ -637,7 +664,7 @@ public class PlayerDash : MonoBehaviour
         swordDashStartRotation = transform.rotation;
         swordDashRotationTimer = 0f;
         
-        Time.timeScale = dashTimeScale;
+        TimeManager.Instance.StartDashSlowMo(dashTimeScale);
         
         OnSwordDashStarted?.Invoke();
         
@@ -663,12 +690,12 @@ public class PlayerDash : MonoBehaviour
         }
         
         Vector3 moveDirection = toTarget.normalized;
-        float moveDistance = Mathf.Min(swordDashSpeed * Time.unscaledDeltaTime, distance);
+        float moveDistance = Mathf.Min(swordDashSpeed * TimeManager.Instance.GameDeltaTime, distance);
         
         core.Controller.Move(moveDirection * moveDistance);
         
         // Smooth rotation towards sword
-        swordDashRotationTimer += Time.unscaledDeltaTime;
+        swordDashRotationTimer += TimeManager.Instance.GameDeltaTime;
         float rotationProgress = Mathf.Clamp01(swordDashRotationTimer / swordDashRotationDuration);
         
         Vector3 lookDir = toTarget;
@@ -682,7 +709,7 @@ public class PlayerDash : MonoBehaviour
 
     private void CompleteSwordDash(bool caughtSword)
     {
-        Time.timeScale = 1f;
+        TimeManager.Instance.StopDashSlowMo();
         isSwordDashing = false;
         swordDashTarget = null;
         
@@ -703,7 +730,7 @@ public class PlayerDash : MonoBehaviour
     {
         if (!isSwordDashing) return;
         
-        Time.timeScale = 1f;
+        TimeManager.Instance.StopDashSlowMo();
         isSwordDashing = false;
         swordDashTarget = null;
         swordDashRotationTimer = 0f;
@@ -886,10 +913,7 @@ public class PlayerDash : MonoBehaviour
             isWallStickActive = false;
         }
         
-        if (Time.timeScale != 1f)
-        {
-            Time.timeScale = 1f;
-        }
+        TimeManager.Instance.StopDashSlowMo();
         
         isSwordDashing = false;
         swordDashTarget = null;

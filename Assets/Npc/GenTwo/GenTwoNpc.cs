@@ -18,7 +18,7 @@ using UnityEngine;
 /// 
 /// IMPORTANT: GenTwo does NOT use NavMesh. Movement is purely dash-based.
 /// Uses segmented raycasting during dash to prevent tunneling at high speeds.
-/// Uses Time.unscaledDeltaTime for dash movement (respects player's time slow).
+/// Uses TimeManager.Instance.GameDeltaTime for dash movement (respects player's time slow, stops during Pause).
 /// </summary>
 public class GenTwoNpc : NpcBase
 {
@@ -427,7 +427,7 @@ public class GenTwoNpc : NpcBase
         }
 
         // Total distance to move this frame (unscaled for time-slow compatibility)
-        float totalMoveDistance = currentSpeed * Time.unscaledDeltaTime;
+        float totalMoveDistance = currentSpeed * TimeManager.Instance.GameDeltaTime;
 
         // Segment the movement for anti-tunneling
         float segmentDistance = totalMoveDistance / raycastSegments;
@@ -519,12 +519,13 @@ public class GenTwoNpc : NpcBase
     }
 
     /// <summary>
-    /// Update the unscaled timer using Time.unscaledDeltaTime.
+    /// Update the unscaled timer using GameDeltaTime.
+    /// Runs at full speed during SlowMo, but stops during Pause/HitStop.
     /// Returns true when the timer has expired.
     /// </summary>
     public bool UpdateUnscaledTimer()
     {
-        unscaledTimer -= Time.unscaledDeltaTime;
+        unscaledTimer -= TimeManager.Instance.GameDeltaTime;
         return unscaledTimer <= 0f;
     }
 

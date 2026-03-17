@@ -75,6 +75,12 @@ public interface IEnemy : IDamageable, IStunnable
     /// </summary>
     Transform Transform { get; }
 
+    /// <summary>
+    /// Optional snap target for camera snap on hit (e.g. head or chest bone).
+    /// Returns null if no snap target is set — caller should fall back to Transform.
+    /// </summary>
+    Transform SnapTarget { get; }
+
     // ────────────────────────────────────────────────────────────────────────
     // Melee Combat
     // ────────────────────────────────────────────────────────────────────────

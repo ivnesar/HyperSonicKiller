@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using System.Collections;
 
@@ -33,11 +34,28 @@ public class GameManager : MonoBehaviour
 
         // Subscribe to scene loaded event for cleanup
         SceneManager.sceneLoaded += OnSceneLoaded;
+
+        // Subscribe to pause input action (works even at timeScale = 0)
+        if (pauseAction != null && pauseAction.action != null)
+        {
+            pauseAction.action.performed += OnPauseInput;
+            pauseAction.action.Enable();
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] No Pause InputAction assigned! Pause will not work.");
+        }
     }
 
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
+
+        // Unsubscribe from pause action
+        if (pauseAction != null && pauseAction.action != null)
+        {
+            pauseAction.action.performed -= OnPauseInput;
+        }
 
         // Clear singleton reference if this is the instance being destroyed
         if (Instance == this)
@@ -62,6 +80,10 @@ public class GameManager : MonoBehaviour
     [Tooltip("Small delay before reload to let UI update")]
     [SerializeField] private float restartDelay = 0.1f;
 
+    [Header("Pause Settings")]
+    [Tooltip("Input Action for toggling pause (from InputSystem_Actions)")]
+    [SerializeField] private InputActionReference pauseAction;
+
     [Header("Debug")]
     [SerializeField] private bool showDebugUI = true;
 
@@ -75,6 +97,7 @@ public class GameManager : MonoBehaviour
     private PlayerCore player;
 
     public bool IsPlayerDead => player != null && player.IsDead;
+    public bool IsPaused => TimeManager.Instance.IsPaused;
 
     #endregion
 
@@ -89,6 +112,9 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
+        // Don't process other input while paused
+        if (IsPaused) return;
+
         // Check for restart input
         if (Input.GetKeyDown(restartKey) && !isRestarting)
         {
@@ -97,6 +123,15 @@ public class GameManager : MonoBehaviour
                 RestartLevel();
             }
         }
+    }
+
+    /// <summary>
+    /// Called by Input System when Pause action is performed.
+    /// Works at any timeScale because Input System callbacks are frame-based.
+    /// </summary>
+    private void OnPauseInput(InputAction.CallbackContext context)
+    {
+        TogglePause();
     }
 
     private void OnGUI()
@@ -131,6 +166,103 @@ public class GameManager : MonoBehaviour
             GUI.color = Color.white;
             GUI.Label(rect, $"Press [{restartKey}] to Restart", style);
         }
+
+        // Show pause overlay
+        if (IsPaused)
+        {
+            // Dim background
+            GUI.color = new Color(0f, 0f, 0f, 0.5f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+
+            GUIStyle pauseStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 48,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = Color.white }
+            };
+
+            GUI.color = Color.white;
+            GUI.Label(
+                new Rect(0, Screen.height * 0.35f, Screen.width, 60),
+                "PAUSED", pauseStyle
+            );
+
+            GUIStyle hintStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 20,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = new Color(0.8f, 0.8f, 0.8f) }
+            };
+
+            string pauseKeyName = GetPauseKeyDisplayName();
+            GUI.Label(
+                new Rect(0, Screen.height * 0.45f, Screen.width, 40),
+                $"Press [{pauseKeyName}] to Resume", hintStyle
+            );
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Pause
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Toggle pause on/off.
+    /// </summary>
+    public void TogglePause()
+    {
+        if (IsPaused)
+            Unpause();
+        else
+            Pause();
+    }
+
+    /// <summary>
+    /// Pause the game. Cursor is unlocked so player can interact with menus.
+    /// </summary>
+    public void Pause()
+    {
+        if (IsPaused) return;
+
+        TimeManager.Instance.Pause();
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        Debug.Log("[GameManager] Game paused.");
+    }
+
+    /// <summary>
+    /// Unpause the game. Cursor is locked again for gameplay.
+    /// </summary>
+    public void Unpause()
+    {
+        if (!IsPaused) return;
+
+        TimeManager.Instance.Unpause();
+
+        // Only lock cursor if player is alive
+        if (player == null || !player.IsDead)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        Debug.Log("[GameManager] Game resumed.");
+    }
+
+    /// <summary>
+    /// Returns the display name of the currently bound pause key.
+    /// </summary>
+    private string GetPauseKeyDisplayName()
+    {
+        if (pauseAction != null && pauseAction.action != null && pauseAction.action.bindings.Count > 0)
+        {
+            return pauseAction.action.GetBindingDisplayString(0);
+        }
+        return "Esc";
     }
 
     #endregion
@@ -152,8 +284,8 @@ public class GameManager : MonoBehaviour
         // Ensure cursor is properly locked for gameplay
         ResetCursorState();
 
-        // Reset time scale (in case it was modified)
-        Time.timeScale = 1f;
+        // Reset all time layers (in case scene loaded while paused/slow-mo)
+        TimeManager.Instance.ClearAllLayers();
     }
 
     #endregion
@@ -241,8 +373,8 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("[GameManager] Running pre-reload cleanup...");
 
-        // Reset time scale
-        Time.timeScale = 1f;
+        // Reset all time layers
+        TimeManager.Instance.ClearAllLayers();
 
         // Reset cursor (will be set properly on scene load)
         Cursor.lockState = CursorLockMode.None;

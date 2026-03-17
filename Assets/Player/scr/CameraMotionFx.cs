@@ -74,7 +74,7 @@ public class CameraMotionFx : MonoBehaviour
     {
         if (!isPunching) return;
 
-        punchTimer += Time.unscaledDeltaTime;
+        punchTimer += TimeManager.Instance.GameDeltaTime;
 
         float forwardTime = punchDuration * forwardRatio;
         float returnTime = punchDuration - forwardTime;

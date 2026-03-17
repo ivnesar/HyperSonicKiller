@@ -12,6 +12,7 @@ using System;
 ///   - Hold ThrowSword key: camera zooms in over aimZoomInDuration, time slows to aimTimeScale.
 ///   - Zoom is controlled by aimZoomFactor (e.g. 3 = FOV/3). Mouse sensitivity scales down by the same factor.
 ///   - Time slow expires after aimSlowMaxDuration (even if still holding).
+///   - Time slow managed via TimeManager "AimSlowMo" layer (same priority as DashSlowMo).
 ///   - Release key: sword is thrown, zoom/time/sensitivity reset immediately.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
@@ -93,7 +94,6 @@ public class PlayerSwordThrow : MonoBehaviour
     private float aimTimer;            // unscaled time since aim started
     private float aimSlowTimer;        // unscaled time since slow started
     private bool aimSlowExpired;       // true after aimSlowMaxDuration elapsed
-    private float timeScaleBeforeAim;  // to restore if something else had set it
     private PlayerDashFOV dashFOV;     // cached reference for FOV override
     private PlayerLook look;           // cached reference for sensitivity adjustment
     private float baseSensitivity;     // original sensitivity before aim zoom
@@ -254,7 +254,6 @@ public class PlayerSwordThrow : MonoBehaviour
         aimTimer = 0f;
         aimSlowTimer = 0f;
         aimSlowExpired = false;
-        timeScaleBeforeAim = Time.timeScale;
 
         // Cache base sensitivity before we modify it
         if (look != null)
@@ -262,13 +261,13 @@ public class PlayerSwordThrow : MonoBehaviour
             baseSensitivity = look.GetSensitivity();
         }
 
-        // Start time slow immediately
-        Time.timeScale = aimTimeScale;
+        // Start time slow via TimeManager (same priority as dash slow-mo)
+        TimeManager.Instance.SetLayer("AimSlowMo", aimTimeScale, TimeManager.PRIORITY_SLOW_MO, blocksGameTime: false);
     }
 
     private void UpdateAim()
     {
-        float dt = Time.unscaledDeltaTime;
+        float dt = TimeManager.Instance.GameDeltaTime;
         aimTimer += dt;
         aimSlowTimer += dt;
 
@@ -291,11 +290,11 @@ public class PlayerSwordThrow : MonoBehaviour
             look.SetSensitivity(baseSensitivity / currentZoom);
         }
 
-        // ── Time slow expiry: after aimSlowMaxDuration, reset time even if still holding ──
+        // ── Time slow expiry: after aimSlowMaxDuration, remove slow-mo layer ──
         if (!aimSlowExpired && aimSlowTimer >= aimSlowMaxDuration)
         {
             aimSlowExpired = true;
-            Time.timeScale = 1f;
+            TimeManager.Instance.RemoveLayer("AimSlowMo");
         }
     }
 
@@ -308,8 +307,8 @@ public class PlayerSwordThrow : MonoBehaviour
         aimSlowTimer = 0f;
         aimSlowExpired = false;
 
-        // Reset time scale
-        Time.timeScale = 1f;
+        // Remove aim slow-mo layer
+        TimeManager.Instance.RemoveLayer("AimSlowMo");
 
         // Clear FOV override (PlayerDashFOV will SmoothDamp back to normal)
         if (dashFOV != null)
