@@ -4,6 +4,11 @@ using UnityEngine;
 /// Soldier NPC - Schießt auf den Spieler aus der Distanz.
 /// Benötigt freie Sichtlinie zum Schießen.
 /// Enthält dynamische Bone-Rotation für vertikales Zielen.
+/// 
+/// ANIMANCER MIGRATION:
+/// - NpcAnimator Property entfernt → AnimManager (SoldierAnimationManager) stattdessen.
+/// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayFire()).
+/// - FireShot() nutzt AnimManager.PlayFireShot() statt animator.SetTrigger("Fire").
 /// </summary>
 public class SoldierNpc : NpcBase
 {
@@ -78,7 +83,12 @@ public class SoldierNpc : NpcBase
     public float TimeBetweenShots => timeBetweenShots;
     public int ShotsPerSalvo => shotsPerSalvo;
     public float ReloadDuration => reloadDuration;
-    public Animator NpcAnimator => animator;
+
+    /// <summary>
+    /// Typed animation manager reference for SoldierStates.
+    /// Use this instead of the old NpcAnimator property.
+    /// </summary>
+    public SoldierAnimationManager AnimManager { get; private set; }
 
     #endregion
 
@@ -114,6 +124,20 @@ public class SoldierNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
     #region NpcBase Implementation
     // ════════════════════════════════════════════════════════════════════════
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        // Typsichere Referenz auf den Animation Manager
+        AnimManager = GetComponentInChildren<SoldierAnimationManager>();
+
+        if (AnimManager == null)
+        {
+            Debug.LogWarning($"[SoldierNpc] No SoldierAnimationManager found on {gameObject.name}! " +
+                             "Animations will not work.");
+        }
+    }
 
     protected override void OnStart()
     {
@@ -280,8 +304,8 @@ public class SoldierNpc : NpcBase
         if (bullet != null)
             bullet.Initialize(direction, damagePerShot, transform, bulletHitMask);
 
-        if (animator != null)
-            animator.SetTrigger("Fire");
+        // Animation über den Manager statt direkt über den Animator
+        AnimManager?.PlayFireShot();
         
         PlaySound(fireSound);
         
@@ -404,7 +428,6 @@ public class SoldierNpc : NpcBase
         // Aim Bone Visualisierung
         if (Application.isPlaying && aimBone != null && playerTransform != null)
         {
-            // Zeige die Zielrichtung des Aim-Bones
             Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
             Gizmos.color = IsAiming ? Color.cyan : Color.gray;
             Gizmos.DrawLine(aimBone.position, targetPoint);

@@ -18,7 +18,13 @@ using UnityEngine;
 /// 
 /// IMPORTANT: GenTwo does NOT use NavMesh. Movement is purely dash-based.
 /// Uses segmented raycasting during dash to prevent tunneling at high speeds.
-/// Uses TimeManager.Instance.GameDeltaTime for dash movement (respects player's time slow, stops during Pause).
+/// Uses TimeManager.Instance.GameDeltaTime for dash movement.
+/// 
+/// ANIMANCER MIGRATION:
+/// - NpcAnimator Property entfernt → AnimManager (GenTwoAnimationManager) stattdessen.
+/// - DetermineWallOrGround() nutzt AnimManager.SetOnWall() statt SetBool.
+/// - ProcessDashMovement() nutzt AnimManager.PlayDashAttack() statt SetTrigger.
+/// - UpdateAnimator() überschrieben: GenTwo braucht kein Movement-Update.
 /// </summary>
 public class GenTwoNpc : NpcBase
 {
@@ -100,7 +106,6 @@ public class GenTwoNpc : NpcBase
     private bool hasValidIntercept;
 
     // Unscaled timer — independent of Time.timeScale
-    // Needed because the player slows time during their dash
     private float unscaledTimer;
 
     #endregion
@@ -121,7 +126,12 @@ public class GenTwoNpc : NpcBase
 
     public PlayerCore PlayerCore => playerCore;
     public PlayerDash PlayerDash => playerDash;
-    public Animator NpcAnimator => animator;
+
+    /// <summary>
+    /// Typed animation manager reference for GenTwoStates.
+    /// Use this instead of the old NpcAnimator property.
+    /// </summary>
+    public GenTwoAnimationManager AnimManager { get; private set; }
 
     /// <summary>Current dash direction (set once at dash start, never changes).</summary>
     public Vector3 DashDirection => dashDirection;
@@ -159,6 +169,15 @@ public class GenTwoNpc : NpcBase
         if (navAgent != null)
         {
             navAgent.enabled = false;
+        }
+
+        // Typsichere Referenz auf den Animation Manager
+        AnimManager = GetComponentInChildren<GenTwoAnimationManager>();
+
+        if (AnimManager == null)
+        {
+            Debug.LogWarning($"[GenTwoNpc] No GenTwoAnimationManager found on {gameObject.name}! " +
+                             "Animations will not work.");
         }
     }
 
@@ -200,9 +219,7 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnStunEnd()
     {
-        if (NpcAnimator != null)
-            NpcAnimator.SetTrigger("RecoveryDone");
-
+        AnimManager?.PlayRecoveryDone();
         ChangeState(new GenTwoStates.Idle());
     }
 
@@ -231,7 +248,6 @@ public class GenTwoNpc : NpcBase
 
     /// <summary>
     /// Checks if GenTwo has a clear line of sight to the player.
-    /// Raycasts from GenTwo +1m up to player +1m up to avoid floor clipping.
     /// </summary>
     public bool HasLineOfSightToPlayer()
     {
@@ -244,7 +260,6 @@ public class GenTwoNpc : NpcBase
 
         if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, surfaceLayerMask))
         {
-            // Hit a surface before reaching the player → no LOS
             return false;
         }
 
@@ -253,7 +268,6 @@ public class GenTwoNpc : NpcBase
 
     /// <summary>
     /// Checks if GenTwo has a clear path to a specific world position.
-    /// Raycasts from GenTwo +1m up to targetPoint +1m up.
     /// </summary>
     public bool HasClearPathTo(Vector3 targetPoint)
     {
@@ -276,43 +290,23 @@ public class GenTwoNpc : NpcBase
     #region Intercept Calculation
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Calculates the optimal intercept point on the player's dash trajectory.
-    /// Returns the direction GenTwo should dash toward, or Vector3.zero if no valid intercept exists.
-    /// 
-    /// Uses proper intercept geometry:
-    ///   Player moves along: P(t) = playerPos + playerDash.DashSpeed * playerDir * t
-    ///   GenTwo must reach P(t) in the same time t:
-    ///     |P(t) - genTwoPos| = genTwoSpeed * t
-    /// 
-    /// The intercept point is clamped to the player's maximum dash distance
-    /// to prevent GenTwo from aiming at a point the player will never reach.
-    /// 
-    /// Additionally checks LOS to the intercept point — returns Vector3.zero
-    /// if a wall blocks the path.
-    /// </summary>
     public Vector3 CalculateInterceptDirection()
     {
         if (playerDash == null || playerCore == null)
             return GetDirectionToTarget();
 
         Vector3 playerPos = playerTransform.position;
-        // Use the player's locked-in dash direction, NOT camera forward.
-        // Camera can rotate freely during dash without affecting flight path.
         Vector3 playerDir = playerDash.DashDirection.normalized;
         Vector3 genTwoPos = transform.position;
 
         float pSpeed = playerDash != null ? playerDash.DashSpeed : 20f;
         float gSpeed = dashSpeed * dashSpeedMultiplier;
 
-        // Maximum time the player will be dashing (distance / speed)
         float maxDist = playerDash != null ? playerDash.DashMaxDistance : 15f;
         float maxPlayerDashTime = maxDist / pSpeed;
 
-        // Relative position: player relative to GenTwo
         Vector3 relPos = playerPos - genTwoPos;
 
-        // Quadratic: (pSpeed² - gSpeed²)t² + 2·pSpeed·dot(relPos, playerDir)·t + |relPos|² = 0
         float a = (pSpeed * pSpeed) - (gSpeed * gSpeed);
         float b = 2f * Vector3.Dot(relPos, playerDir) * pSpeed;
         float c = relPos.sqrMagnitude;
@@ -326,7 +320,6 @@ public class GenTwoNpc : NpcBase
             float t1 = (-b - sqrtDisc) / (2f * a);
             float t2 = (-b + sqrtDisc) / (2f * a);
 
-            // Pick smallest positive t
             float t = -1f;
             if (t1 > 0.01f && t2 > 0.01f) t = Mathf.Min(t1, t2);
             else if (t1 > 0.01f) t = t1;
@@ -334,7 +327,6 @@ public class GenTwoNpc : NpcBase
 
             if (t > 0f)
             {
-                // Clamp to player's max dash time — player stops at the wall
                 t = Mathf.Min(t, maxPlayerDashTime);
                 interceptPoint = playerPos + playerDir * pSpeed * t;
             }
@@ -348,14 +340,12 @@ public class GenTwoNpc : NpcBase
             interceptPoint = FallbackClosestPoint(genTwoPos, playerPos, playerDir);
         }
 
-        // Clamp fallback to max dash distance too
         float interceptDistAlongPath = Vector3.Dot(interceptPoint - playerPos, playerDir);
         if (interceptDistAlongPath > maxDist)
         {
             interceptPoint = playerPos + playerDir * maxDist;
         }
 
-        // Check if path to intercept point is clear
         if (!HasClearPathTo(interceptPoint))
         {
             hasValidIntercept = false;
@@ -363,13 +353,11 @@ public class GenTwoNpc : NpcBase
             return Vector3.zero;
         }
 
-        // Cache for debug visualization
         lastInterceptPoint = interceptPoint;
         hasValidIntercept = true;
 
         Vector3 direction = (interceptPoint - genTwoPos).normalized;
 
-        // Debug: log timing info
         float genTwoTravelDist = Vector3.Distance(genTwoPos, interceptPoint);
         float genTwoTravelTime = genTwoTravelDist / gSpeed;
         float playerTravelTime = interceptDistAlongPath / pSpeed;
@@ -378,10 +366,6 @@ public class GenTwoNpc : NpcBase
         return direction;
     }
 
-    /// <summary>
-    /// Fallback: closest point on the player's dash line, at least 2m ahead.
-    /// Used when the quadratic intercept equation has no valid solution.
-    /// </summary>
     private Vector3 FallbackClosestPoint(Vector3 genTwoPos, Vector3 playerPos, Vector3 playerDir)
     {
         Vector3 toGenTwo = genTwoPos - playerPos;
@@ -390,18 +374,12 @@ public class GenTwoNpc : NpcBase
         return playerPos + playerDir * t;
     }
 
-    /// <summary>
-    /// Sets the dash direction. Called once when entering Dashing state.
-    /// </summary>
     public void SetDashDirection(Vector3 direction)
     {
         dashDirection = direction.normalized;
         hasHitPlayer = false;
     }
 
-    /// <summary>
-    /// Clears the cached intercept data (called when returning to Idle).
-    /// </summary>
     public void ClearInterceptData()
     {
         hasValidIntercept = false;
@@ -419,17 +397,14 @@ public class GenTwoNpc : NpcBase
     /// </summary>
     public bool ProcessDashMovement()
     {
-        // Calculate speed: multiplier only active while player is dashing
         float currentSpeed = dashSpeed;
         if (IsPlayerDashing)
         {
             currentSpeed *= dashSpeedMultiplier;
         }
 
-        // Total distance to move this frame (unscaled for time-slow compatibility)
         float totalMoveDistance = currentSpeed * TimeManager.Instance.GameDeltaTime;
 
-        // Segment the movement for anti-tunneling
         float segmentDistance = totalMoveDistance / raycastSegments;
         Vector3 currentPos = transform.position;
 
@@ -439,17 +414,13 @@ public class GenTwoNpc : NpcBase
             if (Physics.Raycast(currentPos, dashDirection, out RaycastHit surfaceHit,
                 segmentDistance + 0.5f, surfaceLayerMask))
             {
-                // Hit a surface - stop here
                 transform.position = surfaceHit.point + surfaceHit.normal * 0.3f;
-
-                // Determine wall vs ground from the surface normal
                 DetermineWallOrGround(surfaceHit.normal);
-
                 PlaySound(impactSound);
-                return true; // Dash ends
+                return true;
             }
 
-            // 2. Check for player collision (only damages if player is dashing)
+            // 2. Check for player collision
             if (!hasHitPlayer && playerTransform != null)
             {
                 float distToPlayer = Vector3.Distance(currentPos, playerTransform.position);
@@ -458,23 +429,18 @@ public class GenTwoNpc : NpcBase
                 {
                     hasHitPlayer = true;
 
-                    // Trigger DashAttack animation (regardless of damage)
-                    if (animator != null)
-                        animator.SetTrigger("DashAttack");
+                    // DashAttack animation über den Manager
+                    AnimManager?.PlayDashAttack();
 
                     if (IsPlayerDashing)
                     {
-                        // Player is dashing → lethal damage!
                         playerCore.TakeDirectDamage(collisionDamage);
                         Debug.Log($"[GenTwo] {name}: INTERCEPTED player during dash! Dealt {collisionDamage} damage!");
                     }
                     else
                     {
-                        // Player is NOT dashing → harmless pass-through
                         Debug.Log($"[GenTwo] {name}: Passed through player (player not dashing - no damage)");
                     }
-
-                    // GenTwo does NOT stop on player hit - continues flying
                 }
             }
 
@@ -482,10 +448,8 @@ public class GenTwoNpc : NpcBase
             currentPos += dashDirection * segmentDistance;
         }
 
-        // Apply final position
         transform.position = currentPos;
-
-        return false; // Dash continues
+        return false;
     }
 
     #endregion
@@ -496,6 +460,7 @@ public class GenTwoNpc : NpcBase
 
     public new void SetStateTimer(float t) => base.SetStateTimer(t);
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
+
     /// <summary>
     /// Rotates toward target using unscaled time (works during slow-mo).
     /// Blocked while GenTwo is on a wall to prevent clipping.
@@ -509,20 +474,11 @@ public class GenTwoNpc : NpcBase
     public new void RotateTowardTarget() => base.RotateTowardTarget();
     public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
 
-    /// <summary>
-    /// Set the unscaled timer. Use this instead of SetStateTimer for timing
-    /// that must be independent of Time.timeScale (e.g., charge and recovery).
-    /// </summary>
     public void SetUnscaledTimer(float duration)
     {
         unscaledTimer = duration;
     }
 
-    /// <summary>
-    /// Update the unscaled timer using GameDeltaTime.
-    /// Runs at full speed during SlowMo, but stops during Pause/HitStop.
-    /// Returns true when the timer has expired.
-    /// </summary>
     public bool UpdateUnscaledTimer()
     {
         unscaledTimer -= TimeManager.Instance.GameDeltaTime;
@@ -532,10 +488,6 @@ public class GenTwoNpc : NpcBase
     public void PlayChargeSound() => PlaySound(chargeSound);
     public void PlayDashSound() => PlaySound(dashSound);
 
-    /// <summary>
-    /// Rotates GenTwo to face its dash direction instantly.
-    /// Called at dash start.
-    /// </summary>
     public void FaceDirection(Vector3 direction)
     {
         Vector3 flatDir = new Vector3(direction.x, 0f, direction.z).normalized;
@@ -554,8 +506,6 @@ public class GenTwoNpc : NpcBase
     /// <summary>
     /// Bestimmt anhand der Aufprall-Normale ob GenTwo an einer Wand oder
     /// am Boden gelandet ist. Alles über 45° zur Vertikalen = Wand.
-    /// Bei Wand-Landing wird die Rotation auf die Surface-Normal gesetzt,
-    /// sodass GenTwo von der Wand wegschaut und korrekt aufliegt.
     /// </summary>
     public void DetermineWallOrGround(Vector3 surfaceNormal)
     {
@@ -564,7 +514,6 @@ public class GenTwoNpc : NpcBase
 
         if (isOnWall)
         {
-            // GenTwo schaut von der Wand weg (entlang der Normale)
             Vector3 flatNormal = new Vector3(surfaceNormal.x, 0f, surfaceNormal.z).normalized;
             if (flatNormal.sqrMagnitude > 0.01f)
             {
@@ -572,8 +521,8 @@ public class GenTwoNpc : NpcBase
             }
         }
 
-        if (NpcAnimator != null)
-            NpcAnimator.SetBool("IsOnWall", isOnWall);
+        // Animation Manager über Wall-State informieren
+        AnimManager?.SetOnWall(isOnWall);
 
         Debug.Log($"[GenTwo] {name}: Landed on {(isOnWall ? "WALL" : "GROUND")} (angle: {angle:F1}°)");
     }
@@ -585,15 +534,12 @@ public class GenTwoNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// GenTwo nutzt keinen MoveSpeed (kein NavMesh) und steuert Stun über
-    /// einen Trigger statt den IsStunned-Bool aus NpcBase.
+    /// GenTwo nutzt kein NavMesh-Movement — UpdateAnimator tut nichts.
+    /// Animation wird vollständig von den States über AnimManager gesteuert.
     /// </summary>
     protected override void UpdateAnimator()
     {
-        if (animator == null) return;
-
-        animator.SetInteger("StateID", GetStateID());
-        animator.SetBool("IsDead", isDead);
+        // Intentionally empty — GenTwo has no movement blending.
     }
 
     #endregion
@@ -646,8 +592,6 @@ public class GenTwoNpc : NpcBase
 
     protected override void Die()
     {
-        // NavAgent is already disabled for GenTwo, so skip the navAgent cleanup
-        // Just handle ragdoll and destroy
         if (isDead) return;
 
         isDead = true;
@@ -658,12 +602,11 @@ public class GenTwoNpc : NpcBase
         if (useRagdollOnDeath && ragdollController != null)
         {
             ragdollController.ActivateRagdollWithAccumulatedImpact();
-            if (animator != null) animator.enabled = false;
+            animHandler?.DisableForRagdoll();
         }
         else
         {
-            if (animator != null)
-                animator.SetTrigger("Die");
+            animHandler?.PlayDeath();
         }
 
         if (destroyDelay >= 0)
@@ -678,30 +621,24 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnDrawGizmosSelected()
     {
-        // Detection range
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
-        // Player hit radius
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, playerHitRadius);
 
         if (!Application.isPlaying) return;
         if (playerTransform == null) return;
 
-        // Line to player
         Gizmos.color = IsPlayerInRange ? Color.yellow : Color.gray;
         Gizmos.DrawLine(transform.position + Vector3.up, playerTransform.position + Vector3.up);
 
-        // Dash direction
         if (IsDashing)
         {
             Gizmos.color = Color.red;
             Gizmos.DrawRay(transform.position, dashDirection * 10f);
         }
     }
-
-
 
     #endregion
 }

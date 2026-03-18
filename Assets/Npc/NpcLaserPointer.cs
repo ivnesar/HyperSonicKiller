@@ -202,10 +202,9 @@ public class NpcLaserPointer : MonoBehaviour
         if (showDebug && Time.frameCount % 30 == 0)
         {
             Debug.Log($"[LaserPointer] {gameObject.name} | " +
-                      $"FOV: {debugAngle:F1}° / {fieldOfView * 0.5f:F1}° (inFOV={inFOV}) | " +
+                      $"HorizontalAngle: {debugAngle:F1}° / {fieldOfView * 0.5f:F1}° (inFOV={inFOV}) | " +
                       $"LOS={hasLOS} | Tracking={IsTracking} | " +
-                      $"Origin.forward={laserOrigin.forward} | " +
-                      $"Origin.up={laserOrigin.up}");
+                      $"NPC.forward={npc.transform.forward}");
         }
 
         // Smooth Überblendung zur Zielrichtung
@@ -255,14 +254,27 @@ public class NpcLaserPointer : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Prüft ob der Zielpunkt innerhalb des FOV-Winkels des laserOrigin liegt.
-    /// Nutzt laserOrigin.forward (Waffenrichtung inkl. Bone-Rotation),
-    /// damit vertikales Zielen korrekt berücksichtigt wird.
+    /// Prüft ob der Zielpunkt innerhalb des FOV-Winkels liegt.
+    /// 
+    /// Nutzt den HORIZONTALEN Winkel zwischen NPC-Body-Forward und Spielerrichtung.
+    /// Grund: laserOrigin.forward hängt von der Aim-Bone-Rotation ab, die erst
+    /// in SoldierNpc.LateUpdate() angewendet wird. Wenn NpcLaserPointer.LateUpdate()
+    /// zuerst läuft, zeigt laserOrigin.forward noch horizontal → der vertikale
+    /// Winkel zum Spieler übersteigt das FOV → tracking = false.
+    /// 
+    /// Durch die horizontale Prüfung ist der Check unabhängig von der LateUpdate-
+    /// Reihenfolge und der vertikalen Bone-Rotation.
     /// </summary>
     private bool IsPlayerInFOV(Vector3 origin, Vector3 targetPoint)
     {
-        Vector3 directionToTarget = (targetPoint - origin).normalized;
-        float angle = Vector3.Angle(laserOrigin.forward, directionToTarget);
+        // Horizontale Richtung zum Spieler (Y ignoriert)
+        Vector3 directionToTarget = targetPoint - origin;
+        Vector3 flatDirectionToTarget = new Vector3(directionToTarget.x, 0f, directionToTarget.z).normalized;
+
+        // Horizontale NPC-Blickrichtung (Body-Forward, wird in Update() gesetzt)
+        Vector3 flatForward = new Vector3(npc.transform.forward.x, 0f, npc.transform.forward.z).normalized;
+
+        float angle = Vector3.Angle(flatForward, flatDirectionToTarget);
         bool inFOV = angle <= fieldOfView * 0.5f;
 
         // Debug-Daten cachen
@@ -272,10 +284,10 @@ public class NpcLaserPointer : MonoBehaviour
 
         if (showDebug)
         {
-            // laserOrigin.forward als cyan Ray
-            Debug.DrawRay(origin, laserOrigin.forward * 5f, Color.cyan);
+            // NPC-Body-Forward als cyan Ray (horizontal)
+            Debug.DrawRay(origin, flatForward * 5f, Color.cyan);
             // Richtung zum Spieler als grün (im FOV) oder rot (außerhalb)
-            Debug.DrawRay(origin, directionToTarget * 5f, inFOV ? Color.green : Color.red);
+            Debug.DrawRay(origin, directionToTarget.normalized * 5f, inFOV ? Color.green : Color.red);
         }
 
         return inFOV;
@@ -338,30 +350,25 @@ public class NpcLaserPointer : MonoBehaviour
     private void OnDrawGizmos()
     {
         if (!showDebug || !Application.isPlaying) return;
-        if (laserOrigin == null) return;
+        if (laserOrigin == null || npc == null) return;
 
         Vector3 origin = laserOrigin.position;
-        Vector3 forward = laserOrigin.forward;
+        // FOV-Cone basiert auf dem horizontalen Body-Forward (wie IsPlayerInFOV)
+        Vector3 forward = new Vector3(npc.transform.forward.x, 0f, npc.transform.forward.z).normalized;
         float halfAngle = fieldOfView * 0.5f;
         float coneLength = 5f;
 
         // ── FOV Cone Ränder zeichnen ──
 
         // Horizontale Ränder (links/rechts)
-        Vector3 leftDir = Quaternion.AngleAxis(-halfAngle, laserOrigin.up) * forward;
-        Vector3 rightDir = Quaternion.AngleAxis(halfAngle, laserOrigin.up) * forward;
-
-        // Vertikale Ränder (oben/unten)
-        Vector3 upDir = Quaternion.AngleAxis(-halfAngle, laserOrigin.right) * forward;
-        Vector3 downDir = Quaternion.AngleAxis(halfAngle, laserOrigin.right) * forward;
+        Vector3 leftDir = Quaternion.AngleAxis(-halfAngle, Vector3.up) * forward;
+        Vector3 rightDir = Quaternion.AngleAxis(halfAngle, Vector3.up) * forward;
 
         // Cone Farbe: grün wenn Spieler im FOV, rot wenn nicht
         Gizmos.color = debugInFOV ? new Color(0f, 1f, 0f, 0.5f) : new Color(1f, 0f, 0f, 0.5f);
 
         Gizmos.DrawRay(origin, leftDir * coneLength);
         Gizmos.DrawRay(origin, rightDir * coneLength);
-        Gizmos.DrawRay(origin, upDir * coneLength);
-        Gizmos.DrawRay(origin, downDir * coneLength);
 
         // Forward-Richtung (cyan)
         Gizmos.color = Color.cyan;
@@ -371,7 +378,6 @@ public class NpcLaserPointer : MonoBehaviour
         if (playerTransform != null)
         {
             Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-            Vector3 dirToTarget = (targetPoint - origin).normalized;
 
             Gizmos.color = (debugInFOV && debugHasLOS) ? Color.green : Color.red;
             Gizmos.DrawLine(origin, targetPoint);
@@ -386,27 +392,25 @@ public class NpcLaserPointer : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         if (!showDebug || !Application.isPlaying) return;
-        if (laserOrigin == null) return;
+        if (laserOrigin == null || npc == null) return;
 
-        // Zusätzliche Info wenn selektiert: Winkelkreis am FOV-Rand
         Vector3 origin = laserOrigin.position;
-        Vector3 forward = laserOrigin.forward;
+        Vector3 forward = new Vector3(npc.transform.forward.x, 0f, npc.transform.forward.z).normalized;
         float halfAngle = fieldOfView * 0.5f;
         float coneLength = 5f;
 
         Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
 
-        // Kreisförmige FOV-Grenze zeichnen (16 Segmente)
+        // Horizontaler FOV-Bogen (16 Segmente)
         int segments = 16;
         Vector3 previousPoint = Vector3.zero;
 
         for (int i = 0; i <= segments; i++)
         {
-            float rotAngle = (360f / segments) * i;
-
-            // Richtung am Rand des Cones
-            Vector3 edgeDir = Quaternion.AngleAxis(halfAngle, laserOrigin.up) * forward;
-            edgeDir = Quaternion.AngleAxis(rotAngle, forward) * edgeDir;
+            // Interpoliere von -halfAngle bis +halfAngle um Vector3.up
+            float t = (float)i / segments;
+            float currentAngle = Mathf.Lerp(-halfAngle, halfAngle, t);
+            Vector3 edgeDir = Quaternion.AngleAxis(currentAngle, Vector3.up) * forward;
 
             Vector3 point = origin + edgeDir.normalized * coneLength;
 

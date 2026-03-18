@@ -732,6 +732,8 @@ GameObject:
   - component: {fileID: 4221902022032833579}
   - component: {fileID: 5996686098694072418}
   - component: {fileID: 6565262033440337451}
+  - component: {fileID: 8571718847622865397}
+  - component: {fileID: 1508127111980046060}
   - component: {fileID: 5241556215887614238}
   m_Layer: 6
   m_Name: Npc_Soldier
@@ -767,7 +769,7 @@ Animator:
   m_GameObject: {fileID: 2472838132611520362}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 90555b2c7d6883749b5787271fc90923, type: 3}
-  m_Controller: {fileID: 9100000, guid: 895771e7bf12a7042a48a98b8b2a402f, type: 2}
+  m_Controller: {fileID: 0}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -845,7 +847,7 @@ MonoBehaviour:
   useRagdollOnDeath: 1
   destroyDelay: 10
   snapTarget: {fileID: 1590548316490049355}
-  showDebugInfo: 1
+  showDebugInfo: 0
   minShootingRange: 3
   maxShootingRange: 24
   preferredRange: 12
@@ -973,6 +975,119 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &8571718847622865397
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d11e7729d70d58945b4003eec1a15443, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoldierAnimationManager
+  animancer: {fileID: 1508127111980046060}
+  idle:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8903082955919803346, guid: 927f30056e257974784d372de90217bd, type: 3}
+    _NormalizedStartTime: NaN
+  walk:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 3347313319606220912, guid: 4d3a148ef1d50b74aa13384d58087459, type: 3}
+    _NormalizedStartTime: NaN
+  aimHold:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -3253210736431989694, guid: ed43727a8aad72942b879e2654671d07, type: 3}
+    _NormalizedStartTime: NaN
+  stunned:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 2919245319784944379, guid: 09e8be1cd6fc8d64a998e21a3e92c753, type: 3}
+    _NormalizedStartTime: NaN
+  aim:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -3253210736431989694, guid: ed43727a8aad72942b879e2654671d07, type: 3}
+    _NormalizedStartTime: NaN
+  fire:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 8339094038623882743, guid: c0c19622311588840932c87ea142c396, type: 3}
+    _NormalizedStartTime: NaN
+  reload:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 293879922071060052, guid: af59110047da31041a0f1765a9e2946f, type: 3}
+    _NormalizedStartTime: NaN
+  hit:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8903082955919803346, guid: 927f30056e257974784d372de90217bd, type: 3}
+    _NormalizedStartTime: NaN
+  die:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8903082955919803346, guid: 927f30056e257974784d372de90217bd, type: 3}
+    _NormalizedStartTime: NaN
+  walkThreshold: 0.1
+  references:
+    version: 2
+    RefIds: []
+--- !u!114 &1508127111980046060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ad50f81b1d25c441943c37a89ba23f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Kybernetik.Animancer::Animancer.AnimancerComponent
+  _Animator: {fileID: 3767853563656458135}
+  _Transitions: {fileID: 0}
+  _ActionOnDisable: 0
 --- !u!114 &5241556215887614238
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -997,9 +1112,9 @@ MonoBehaviour:
   laserLength: 50
   startWidth: 0.03
   endWidth: 0.01
-  trackingColor: {r: 1, g: 0, b: 0, a: 1}
-  forwardColor: {r: 1, g: 0, b: 0.8929987, a: 1}
+  transitionDuration: 0.3
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
+  showDebug: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

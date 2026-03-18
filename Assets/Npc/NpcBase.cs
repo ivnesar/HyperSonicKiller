@@ -10,6 +10,14 @@ using UnityEngine.AI;
 // - Rotation begrenzt durch maxRotationSpeed
 // - Einfaches Grundverhalten als Basis für Erweiterungen
 //
+// ANIMANCER MIGRATION:
+// - Alle direkten Animator-Zugriffe (SetTrigger, SetBool, SetFloat)
+//   sind durch INpcAnimationHandler-Aufrufe ersetzt.
+// - Das 'animator' Feld existiert noch für Subsysteme wie NpcRagdollController,
+//   wird aber NICHT mehr für Animationssteuerung verwendet.
+// - Konkrete NPCs (SoldierNpc, GenTwoNpc) finden ihren AnimationManager
+//   über GetComponentInChildren<T>() und exponieren ihn typsicher.
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 public enum BehaviorMode
@@ -70,10 +78,24 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     // ════════════════════════════════════════════════════════════════════════
 
     protected NavMeshAgent navAgent;
-    protected Animator animator;
     protected AudioSource audioSource;
     protected NpcRagdollController ragdollController;
     protected Transform playerTransform;
+
+    /// <summary>
+    /// Animation handler — alle Animationssteuerung läuft hierüber.
+    /// Wird automatisch via GetComponentInChildren gefunden.
+    /// Konkrete NPCs haben zusätzlich eine typsichere Referenz auf ihren
+    /// spezifischen Manager (z.B. SoldierAnimationManager).
+    /// </summary>
+    protected INpcAnimationHandler animHandler;
+
+    /// <summary>
+    /// Rohe Animator-Referenz. Wird NICHT für Animationssteuerung verwendet
+    /// (dafür gibt es animHandler). Existiert für Subsysteme die den Animator
+    /// direkt brauchen (z.B. NpcRagdollController Zustandsprüfung).
+    /// </summary>
+    protected Animator animator;
 
     #endregion
 
@@ -98,9 +120,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     // State Timer (für Subklassen)
     protected float stateTimer;
 
-    // Animation
+    // Movement Smoothing (für UpdateAnimator)
     private float currentSpeedVelocity;
     private const float SPEED_SMOOTH_TIME = 0.1f;
+    private float smoothedSpeed;
 
     #endregion
 
@@ -167,6 +190,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
         ragdollController = GetComponent<NpcRagdollController>();
+
+        // Animation handler finden (AnimancerComponent-basierter Manager)
+        animHandler = GetComponentInChildren<INpcAnimationHandler>();
 
         currentHealth = maxHealth;
 
@@ -284,7 +310,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             RotateToward(playerTransform.position);
     }
     
-    
     /// <summary>
     /// Rotates toward target using unscaled time (works during slow-mo).
     /// </summary>
@@ -301,7 +326,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         float maxAngle = maxRotationSpeed * TimeManager.Instance.GameDeltaTime;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
     }
-    
 
     protected Vector3 GetDirectionToTarget()
     {
@@ -335,7 +359,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     private void HandleStunned()
     {
         StopMovement();
-        UpdateAnimator();
 
         if (hasSwordEmbedded) return;
 
@@ -350,8 +373,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (navAgent != null && navAgent.enabled)
             navAgent.isStopped = false;
 
-        if (animator != null)
-            animator.SetBool("IsStunned", false);
+        animHandler?.PlayStunEnd();
 
         if (hasPendingSwordDamage)
             ApplyPendingSwordDamage();
@@ -360,7 +382,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             OnStunEnd();
     }
 
-    protected  void ApplyPendingSwordDamage()
+    protected void ApplyPendingSwordDamage()
     {
         if (!hasPendingSwordDamage || pendingSwordRemovalDamage <= 0) return;
 
@@ -370,9 +392,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         currentHealth -= damage;
         
-        if (animator != null)
-            animator.SetTrigger("Hit");
-        
+        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -412,9 +432,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (ragdollController != null)
             ragdollController.RegisterMeleeImpact(hitPoint);
         
-        if (animator != null)
-            animator.SetTrigger("Hit");
-        
+        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -429,8 +447,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         IsLaserActive = false;
         StopMovement();
         
-        if (animator != null)
-            animator.SetBool("IsStunned", true);
+        animHandler?.PlayStunStart();
         
         OnStunStart();
     }
@@ -444,9 +461,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (playerTransform != null && ragdollController != null)
             ragdollController.RegisterMeleeImpact(playerTransform.position);
 
-        if (animator != null)
-            animator.SetTrigger("Hit");
-        
+        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -477,8 +492,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         StopMovement();
         
-        if (animator != null)
-            animator.SetBool("IsStunned", true);
+        animHandler?.PlayStunStart();
         
         OnStunStart();
     }
@@ -510,9 +524,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         {
             currentHealth -= damage;
             
-            if (animator != null)
-                animator.SetTrigger("Hit");
-            
+            animHandler?.PlayHitReaction();
             PlaySound(hitSound);
 
             if (currentHealth <= 0)
@@ -534,9 +546,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (ragdollController != null)
             ragdollController.RegisterBulletImpact(bulletDirection, hitPoint);
         
-        if (animator != null)
-            animator.SetTrigger("Hit");
-        
+        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -568,12 +578,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (useRagdollOnDeath && ragdollController != null)
         {
             ragdollController.ActivateRagdollWithAccumulatedImpact();
-            if (animator != null) animator.enabled = false;
+            animHandler?.DisableForRagdoll();
         }
         else
         {
-            if (animator != null)
-                animator.SetTrigger("Die");
+            animHandler?.PlayDeath();
         }
 
         if (destroyDelay >= 0)
@@ -597,12 +606,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (useRagdollOnDeath && ragdollController != null)
         {
             ragdollController.ActivateRagdollWithImpact(impactDirection, forceMagnitude, impactPoint);
-            if (animator != null) animator.enabled = false;
+            animHandler?.DisableForRagdoll();
         }
         else
         {
-            if (animator != null)
-                animator.SetTrigger("Die");
+            animHandler?.PlayDeath();
         }
 
         if (destroyDelay >= 0)
@@ -615,24 +623,25 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     #region Animator & Audio
     // ════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Updates movement animation via the animation handler.
+    /// Override in subclasses that don't use NavMesh movement (e.g. GenTwo).
+    /// </summary>
     protected virtual void UpdateAnimator()
     {
-        if (animator == null) return;
+        if (animHandler == null) return;
 
         float targetSpeed = (navAgent != null && navAgent.enabled)
             ? navAgent.velocity.magnitude / moveSpeed : 0f;
 
-        float smoothedSpeed = Mathf.SmoothDamp(
-            animator.GetFloat("MoveSpeed"),
+        smoothedSpeed = Mathf.SmoothDamp(
+            smoothedSpeed,
             targetSpeed,
             ref currentSpeedVelocity,
             SPEED_SMOOTH_TIME
         );
 
-        animator.SetFloat("MoveSpeed", smoothedSpeed);
-        animator.SetInteger("StateID", GetStateID());
-        animator.SetBool("IsStunned", isStunned);
-        animator.SetBool("IsDead", isDead);
+        animHandler.UpdateMovement(smoothedSpeed);
     }
 
     protected void PlaySound(AudioClip clip)
@@ -670,8 +679,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
                 Gizmos.DrawLine(corners[i], corners[i + 1]);
         }
     }
-
-
 
     #endregion
 }

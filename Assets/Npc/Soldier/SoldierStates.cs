@@ -1,19 +1,13 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// SOLDIER STATES
+// SOLDIER STATES (Animancer Version)
 // ════════════════════════════════════════════════════════════════════════════
 //
+// Alle animator.SetTrigger/SetBool Aufrufe sind durch typsichere
+// AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
+//
 // Idle → MovingToRange → Aiming → Firing → Reloading → zurück
-//
-// Line-of-Sight wird geprüft in:
-// - Aiming: Wechselt nur zu Firing wenn LOS frei
-// - Firing: Bei LOS-Verlust → sofort Reloading (Salve abgebrochen)
-//
-// IsAiming wird gesetzt in:
-// - Aiming.Enter() → true
-// - Firing.Enter() → true (bleibt aktiv)
-// - Alle anderen States → false
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -32,22 +26,21 @@ namespace SoldierStates
             npc.StopMovement();
             npc.IsAiming = false;
             npc.IsLaserActive = false;
-            npc.LockedTargetPosition = null;  // Sicherheit: Lock immer aufheben außerhalb Firing
+            npc.LockedTargetPosition = null;
+
+            npc.AnimManager?.PlayIdle();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
             npc.RotateTowardTarget();
 
-            // Kann schießen = in Reichweite UND freie Sicht
             if (npc.CanShoot())
                 return new Aiming();
 
-            // Nur in Reichweite aber keine Sicht → warten
             if (npc.IsInShootingRange() && !npc.HasLineOfSight())
                 return null;
 
-            // Außerhalb Reichweite → bewegen
             if (npc.CurrentBehaviorMode == BehaviorMode.Pursuing && npc.CanReachPlayer)
                 return new MovingToRange();
 
@@ -67,9 +60,8 @@ namespace SoldierStates
         {
             npc.IsAiming = false;
             npc.IsLaserActive = false;
-            
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsMoving", true);
+
+            npc.AnimManager?.PlayWalk();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
@@ -82,14 +74,12 @@ namespace SoldierStates
                 return new Idle();
             }
 
-            // Kann schießen → Aiming
             if (npc.CanShoot())
             {
                 npc.StopMovement();
                 return new Aiming();
             }
 
-            // Bewegungslogik
             if (npc.DistanceToTarget > npc.PreferredRange)
             {
                 npc.MoveTowardTarget();
@@ -106,8 +96,7 @@ namespace SoldierStates
 
         public override void Exit(SoldierNpc npc)
         {
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsMoving", false);
+            // Walk-Animation wird vom nächsten State überschrieben
         }
     }
 
@@ -123,26 +112,22 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
-            npc.IsAiming = true;  // Bone-Rotation aktivieren
+            npc.IsAiming = true;
             npc.IsLaserActive = true;
-                
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetTrigger("Aim");
+
+            npc.AnimManager?.PlayAim();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
             npc.RotateTowardTarget();
 
-            // LOS verloren während Zielen → zurück zu Idle
             if (!npc.HasLineOfSight())
                 return new Idle();
 
-            // Außerhalb Reichweite → Idle (wird dann zu Moving wechseln)
             if (!npc.IsInShootingRange())
                 return new Idle();
 
-            // Timer abgelaufen → Feuern
             if (npc.UpdateStateTimer())
                 return new Firing();
 
@@ -163,29 +148,25 @@ namespace SoldierStates
             npc.StopMovement();
             npc.ShotsFiredInSalvo = 0;
             npc.NextShotTime = 0f;
-            npc.IsAiming = true;  // Bone-Rotation bleibt aktiv
+            npc.IsAiming = true;
             npc.IsLaserActive = true;
-            
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsFiring", true);
+
+            npc.AnimManager?.PlayFiringStance();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
-            // ── Dash-Lock: Position einfrieren wenn Spieler zu dashen beginnt ──
+            // Dash-Lock: Position einfrieren wenn Spieler zu dashen beginnt
             if (npc.LockedTargetPosition == null && npc.IsPlayerDashing)
             {
                 npc.LockedTargetPosition = npc.TargetPosition;
             }
 
-            // Zur effektiven Zielposition drehen (gelockt oder live)
             npc.RotateTowardPosition(npc.EffectiveTargetPosition);
 
-            // LOS verloren → Salve abbrechen, sofort nachladen
             if (!npc.HasLineOfSight())
                 return new Reloading();
 
-            // Schuss abfeuern
             if (Time.time >= npc.NextShotTime && npc.ShotsFiredInSalvo < npc.ShotsPerSalvo)
             {
                 npc.FireShot();
@@ -193,7 +174,6 @@ namespace SoldierStates
                 npc.NextShotTime = Time.time + npc.TimeBetweenShots;
             }
 
-            // Salve komplett → Nachladen
             if (npc.ShotsFiredInSalvo >= npc.ShotsPerSalvo)
                 return new Reloading();
 
@@ -202,8 +182,7 @@ namespace SoldierStates
 
         public override void Exit(SoldierNpc npc)
         {
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsFiring", false);
+            // Firing-Animation wird vom nächsten State überschrieben
         }
     }
 
@@ -219,13 +198,11 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
-            npc.IsAiming = false;  // Bone-Rotation deaktivieren beim Nachladen
+            npc.IsAiming = false;
             npc.IsLaserActive = false;
-            npc.LockedTargetPosition = null;  // Dash-Lock aufheben → Spieler wieder verfolgen
-            
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetTrigger("Reload");
-            
+            npc.LockedTargetPosition = null;
+
+            npc.AnimManager?.PlayReload();
             npc.PlayReloadSound();
         }
 
@@ -251,14 +228,10 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;  // Bone-Rotation deaktivieren
+            npc.IsAiming = false;
             npc.IsLaserActive = false;
-            
-            if (npc.NpcAnimator != null)
-            {
-                npc.NpcAnimator.SetBool("IsFiring", false);
-                npc.NpcAnimator.SetBool("IsMoving", false);
-            }
+
+            npc.AnimManager?.PlayStunnedFromCombat();
         }
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc) => null;
