@@ -616,6 +616,30 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: endWidth
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: fieldOfView
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserLength
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserTarget
+      value: 
+      objectReference: {fileID: 597235679}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: losCheckMask.m_Bits
+      value: 8320
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: collisionMask.m_Bits
+      value: 8320
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1170,6 +1194,11 @@ Transform:
 Transform:
   m_CorrespondingSourceObject: {fileID: 6386316311934283463, guid: 43c4abf52c3eee740bee940e39ba8231, type: 3}
   m_PrefabInstance: {fileID: 1904232603}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &597235679 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2661380836094038274, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+  m_PrefabInstance: {fileID: 6036283739886460675}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &648850234 stripped
 Transform:
@@ -8541,6 +8570,30 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: endWidth
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: fieldOfView
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserLength
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserTarget
+      value: 
+      objectReference: {fileID: 597235679}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: losCheckMask.m_Bits
+      value: 8320
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: collisionMask.m_Bits
+      value: 8320
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9801,6 +9854,34 @@ PrefabInstance:
     - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_IsActive
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: endWidth
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: showDebug
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: fieldOfView
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserLength
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: laserTarget
+      value: 
+      objectReference: {fileID: 597235679}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: losCheckMask.m_Bits
+      value: 8320
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: collisionMask.m_Bits
+      value: 8320
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

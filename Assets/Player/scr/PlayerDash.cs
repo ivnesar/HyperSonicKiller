@@ -525,7 +525,7 @@ public class PlayerDash : MonoBehaviour
                         core.Look.SnapToTarget(snapTarget);
                     }
                     
-                    Debug.Log($"[PlayerDash] Hit enemy during dash: {col.name} for {attackDashDamage} damage (angle: {angle:F1}°)");
+                   
                 }
             }
         }
@@ -573,12 +573,12 @@ public class PlayerDash : MonoBehaviour
         else if (hitSurface && !isStickyLanding)
         {
             // Non-sticky surface — no wall stick, no charge recharge
-            Debug.Log($"[PlayerDash] Landed on non-sticky surface: {(dashTargetCollider != null ? dashTargetCollider.name : "unknown")} — no stick, no recharge");
+          
         }
         else
         {
             // No surface hit (dashed into open air)
-            Debug.Log("[PlayerDash] Dash ended in open air — no surface contact");
+
         }
 
         OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall, isStickyLanding);
@@ -758,7 +758,6 @@ public class PlayerDash : MonoBehaviour
         
         OnWallStick?.Invoke();
         
-        Debug.Log($"[PlayerDash] Wall stick activated at {stuckPosition}");
     }
 
     private void DeactivateWallStick()

@@ -60,14 +60,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
 		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
 		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
-
     }
-
-    HLSLINCLUDE
-
-    #pragma multi_compile_fragment __ _ALPHATEST_ON
-
-    ENDHLSL
 
     SubShader
     {
@@ -175,6 +168,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#include "RetroTerrainLitInput.hlsl"
 			#include "RetroTerrainLitPasses.hlsl"
@@ -203,6 +197,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
             #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#include "RetroTerrainLitInput.hlsl"
 			#include "RetroTerrainLitPasses.hlsl"
@@ -233,6 +228,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
             #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#include "RetroTerrainLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitDepthNormalsPass.hlsl"
@@ -256,6 +252,8 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
+
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
 
             #define SCENESELECTIONPASS
 			#include "RetroTerrainLitInput.hlsl"
@@ -287,6 +285,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 
             #pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
 			#pragma shader_feature_local_fragment _DITHERMODE_SCREEN _DITHERMODE_TEXTURE _DITHERMODE_OFF
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
 
 			#include "RetroTerrainLitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitMetaPass.hlsl"

@@ -251,12 +251,10 @@ public class PlayerCore : MonoBehaviour
                 
             case PlayerState.Dashing:
                 // Normal attack dash - NOT invulnerable
-                Debug.Log("[PlayerCore] Attack dash started");
                 break;
                 
             case PlayerState.DashingToSword:
                 // Sword dash - INVULNERABLE
-                Debug.Log("[PlayerCore] Sword dash started - player is invulnerable");
                 break;
 
             case PlayerState.Dead:
@@ -280,11 +278,11 @@ public class PlayerCore : MonoBehaviour
                 break;
                 
             case PlayerState.DashingToSword:
-                Debug.Log("[PlayerCore] Sword dash ended - invulnerability removed");
+
                 break;
                 
             case PlayerState.Dashing:
-                Debug.Log("[PlayerCore] Attack dash ended");
+ 
                 break;
         }
     }

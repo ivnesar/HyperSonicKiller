@@ -93,19 +93,18 @@ Shader "Retro Shaders Pro/Retro Lit"
 			#pragma target 3.0
 
             #pragma multi_compile_fog
-			#pragma multi_compile_instancing
-			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
 			#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-			#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-			#pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-			#pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
-			#pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
-			#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
-			#pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
-			#pragma multi_compile_fragment _ _SHADOWS_SOFT
-			#pragma multi_compile_fragment _ _LIGHT_LAYERS
-			#pragma multi_compile_fragment _ _LIGHT_COOKIES
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
+            #pragma multi_compile_fragment _ _LIGHT_LAYERS
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
 #if UNITY_VERSION >= 60010000
 			#pragma multi_compile _ _CLUSTER_LIGHT_LOOP
@@ -113,12 +112,13 @@ Shader "Retro Shaders Pro/Retro Lit"
 			#pragma multi_compile _ _FORWARD_PLUS
 #endif
 
-			#pragma multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+
 			#pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
-			#pragma multi_compile _ SHADOWS_SHADOWMASK
-			#pragma multi_compile _ DIRLIGHTMAP_COMBINED
-			#pragma multi_compile _ LIGHTMAP_ON
-			#pragma multi_compile _ DYNAMICLIGHTMAP_ON
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
 
 			#pragma shader_feature_local _LIGHTMODE_LIT _LIGHTMODE_TEXELLIT _LIGHTMODE_VERTEXLIT _LIGHTMODE_UNLIT
 			#pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
@@ -133,6 +133,10 @@ Shader "Retro Shaders Pro/Retro Lit"
 			#pragma shader_feature_local _RECEIVESHADOWSMODE_ON _RECEIVESHADOWSMODE_OFF
 
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+			#pragma multi_compile_instancing
+			#pragma instancing_options renderinglayer
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 
 			float3 calculateDiffuse(InputData inputData, float4 vertexColor)
 			{
@@ -337,7 +341,13 @@ Shader "Retro Shaders Pro/Retro Lit"
 				return (1.0f / det) * float2x2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
 			}
 
-			float4 frag(v2f i) : SV_TARGET
+			void frag(
+				v2f i, 
+				out float4 outColor : SV_Target0
+#ifdef _WRITE_RENDERING_LAYERS
+				, out float4 outRenderingLayers : SV_Target1
+#endif
+			)
 			{
 				UNITY_SETUP_INSTANCE_ID(i);
 				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
@@ -488,7 +498,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 #ifdef _DBUFFER
                 float3 specular = 0;
                 float metallic = 0;
-                float occlusion = 0;
+                float occlusion = 1;
                 float smoothness = 0;
                 float3 norm = normalWS;
                 ApplyDecal(i.positionCS, posterizedColor, specular, norm, metallic, occlusion, smoothness);
@@ -509,7 +519,12 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float3 finalColor = posterizedColor * diffuseLightColor + specularLightColor;
 				finalColor = MixFog(finalColor, i.affineUVAndFog.w);
 
-				return float4(finalColor, baseColor.a);
+				outColor = float4(finalColor, baseColor.a);
+
+#ifdef _WRITE_RENDERING_LAYERS
+				uint renderingLayers = GetMeshRenderingLayer();
+				outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+#endif
 			}
             ENDHLSL
         }
@@ -591,6 +606,8 @@ Shader "Retro Shaders Pro/Retro Lit"
 			#pragma target 2.0
 			#pragma vertex depthNormalsVert
 			#pragma fragment depthNormalsFrag
+
+			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
 
 			#pragma multi_compile_instancing
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"

@@ -223,8 +223,6 @@ public class PlayerCombat : MonoBehaviour
     {
         // Fire attack event for each hit (for sound/visual effects)
         OnAttack?.Invoke();
-        
-        Debug.Log($"[PlayerCombat] Dash attack hit: {enemy.Transform.name}");
     }
 
     #endregion
@@ -249,8 +247,7 @@ public class PlayerCombat : MonoBehaviour
         currentBlockHP -= absorbed;
         OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
         OnBlockedHit?.Invoke();
-
-        Debug.Log($"[PlayerCombat] Auto-blocked {absorbed} damage. BlockHP: {currentBlockHP}/{maxBlockHP}");
+        
 
         if (currentBlockHP <= 0)
         {

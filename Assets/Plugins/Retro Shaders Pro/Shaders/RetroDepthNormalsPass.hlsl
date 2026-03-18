@@ -34,7 +34,13 @@ v2f depthNormalsVert(appdata v)
 	return o;
 }
 
-float4 depthNormalsFrag(v2f i) : SV_TARGET
+void depthNormalsFrag(
+	v2f i,
+	out float4 outNormalWS : SV_Target0
+#ifdef _WRITE_RENDERING_LAYERS
+    , out float4 outRenderingLayers : SV_Target1
+#endif
+)
 {
 	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
@@ -50,7 +56,12 @@ float4 depthNormalsFrag(v2f i) : SV_TARGET
 
 	Alpha(baseColor.a, _BaseColor, _Cutoff);
 
-	return float4(NormalizeNormalPerPixel(i.normalWS), 0.0f);
+	outNormalWS = float4(NormalizeNormalPerPixel(i.normalWS), 0.0f);
+		
+#ifdef _WRITE_RENDERING_LAYERS
+	uint renderingLayers = GetMeshRenderingLayer();
+	outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+#endif
 }
 
 #endif // RETRO_DEPTH_NORMALS_PASS_INCLUDED

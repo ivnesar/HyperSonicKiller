@@ -60,7 +60,6 @@ public class TimeManager : MonoBehaviour
                     // Lazy init: erstelle neues GameObject
                     var go = new GameObject("[TimeManager]");
                     instance = go.AddComponent<TimeManager>();
-                    Debug.Log("[TimeManager] Auto-created via lazy init.");
                 }
             }
 
@@ -259,7 +258,7 @@ public class TimeManager : MonoBehaviour
         activeLayers.Add(layer);
         SortLayers();
 
-        Debug.Log($"[TimeManager] Layer set: '{layerName}' (timeScale={timeScale}, priority={priority}, blocksGame={blocksGameTime})");
+       
     }
 
     /// <summary>

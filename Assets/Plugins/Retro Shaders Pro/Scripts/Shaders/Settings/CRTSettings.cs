@@ -11,11 +11,17 @@ namespace RetroShadersPro.URP
         public BoolParameter showInSceneView = new BoolParameter(true);
         public BoolParameter enabled = new BoolParameter(false);
         public RenderPassEventParameter renderPassEvent = new RenderPassEventParameter(PostProcessRenderPassEvent.AfterURPPostProcessing);
+        public BoolParameter useBarrelDistortion = new BoolParameter(false); 
         public ClampedFloatParameter distortionStrength = new ClampedFloatParameter(0.0f, 0.0f, 1.0f);
         public ClampedFloatParameter distortionSmoothing = new ClampedFloatParameter(0.01f, 0.0f, 0.1f);
 
         public ColorRampModeParameter colorRampMode = new ColorRampModeParameter(ColorRampMode.None);
         public TextureParameter colorRampTex = new TextureParameter(null);
+        public ClampedIntParameter redValues = new ClampedIntParameter(256, 2, 256);
+        public ClampedIntParameter greenValues = new ClampedIntParameter(256, 2, 256);
+        public ClampedIntParameter blueValues = new ClampedIntParameter(256, 2, 256);
+
+        public BoolParameter useDithering = new BoolParameter(false);
 
         public ColorParameter tintColor = new ColorParameter(Color.white, true, false, true);
         public ColorParameter backgroundColor = new ColorParameter(Color.black);
@@ -83,7 +89,8 @@ namespace RetroShadersPro.URP
         [InspectorName("Sega Game Gear")] GameGear,
         [InspectorName("Custom Luminance")] CustomLuminance,
         [InspectorName("Custom RGB")] CustomRGB,
-        [InspectorName("Custom RGB+Intensity")] CustomIntensity
+        [InspectorName("Custom RGB+Intensity")] CustomIntensity,
+        [InspectorName("Custom RGB Sliders")] CustomSliders
     }
 
     // Allow each volume settings object to track the render pass event.

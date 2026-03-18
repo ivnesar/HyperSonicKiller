@@ -143,11 +143,14 @@ namespace RetroShadersPro.URP
                 var scanlineTex = settings.scanlineTex.value == null ? Texture2D.whiteTexture : settings.scanlineTex.value;
                 var trackingTex = settings.trackingTexture.value == null ? Texture2D.grayTexture : settings.trackingTexture.value;
 
+                var distortionStrength = settings.useBarrelDistortion.value ? settings.distortionStrength.value : 0;
+                var distortionSmoothing = settings.useBarrelDistortion.value ? settings.distortionSmoothing.value : 0;
+
                 // Set CRT effect properties.
                 material.SetColor("_TintColor", settings.tintColor.value);
                 material.SetColor("_BackgroundColor", settings.backgroundColor.value);
-                material.SetFloat("_DistortionStrength", settings.distortionStrength.value);
-                material.SetFloat("_DistortionSmoothing", settings.distortionSmoothing.value);
+                material.SetFloat("_DistortionStrength", distortionStrength);
+                material.SetFloat("_DistortionSmoothing", distortionSmoothing);
                 material.SetTexture("_RGBTex", rgbTex);
                 material.SetFloat("_RGBStrength", settings.rgbStrength.value);
                 material.SetTexture("_ScanlineTex", scanlineTex);
@@ -218,7 +221,7 @@ namespace RetroShadersPro.URP
 
                 var rampMode = settings.colorRampMode.value;
 
-                if (settings.colorRampTex.value == null)
+                if (settings.colorRampTex.value == null && rampMode != ColorRampMode.CustomSliders)
                 {
                     rampMode = ColorRampMode.None;
                 }
@@ -233,6 +236,7 @@ namespace RetroShadersPro.URP
                         material.EnableKeyword("_COLOR_RAMP_LUMINANCE");
                         material.DisableKeyword("_COLOR_RAMP_RGB");
                         material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_SLIDERS");
                         material.DisableKeyword("_COLOR_RAMP_NONE");
                         break;
                     case ColorRampMode.GBA:
@@ -251,6 +255,7 @@ namespace RetroShadersPro.URP
                         material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
                         material.EnableKeyword("_COLOR_RAMP_RGB");
                         material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_SLIDERS");
                         material.DisableKeyword("_COLOR_RAMP_NONE");
                         break;
                     case ColorRampMode.ZXSpectrum:
@@ -259,12 +264,33 @@ namespace RetroShadersPro.URP
                         material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
                         material.DisableKeyword("_COLOR_RAMP_RGB");
                         material.EnableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_SLIDERS");
                         material.DisableKeyword("_COLOR_RAMP_NONE");
+                        break;
+                    case ColorRampMode.CustomSliders:
+                        material.SetInteger("_RedValues", settings.redValues.value);
+                        material.SetInteger("_GreenValues", settings.greenValues.value);
+                        material.SetInteger("_BlueValues", settings.blueValues.value);
+                        material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
+                        material.DisableKeyword("_COLOR_RAMP_RGB");
+                        material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.EnableKeyword("_COLOR_RAMP_SLIDERS");
+                        material.DisableKeyword("_COLOR_RAMP_NONE");
+
+                        if(settings.useDithering.value)
+                        {
+                            material.EnableKeyword("_DITHERING_ON");
+                        }
+                        else
+                        {
+                            material.DisableKeyword("_DITHERING_ON");
+                        }
                         break;
                     case ColorRampMode.None:
                         material.DisableKeyword("_COLOR_RAMP_LUMINANCE");
                         material.DisableKeyword("_COLOR_RAMP_RGB");
                         material.DisableKeyword("_COLOR_RAMP_INTENSITY");
+                        material.DisableKeyword("_COLOR_RAMP_SLIDERS");
                         material.EnableKeyword("_COLOR_RAMP_NONE");
                         break;
                 }

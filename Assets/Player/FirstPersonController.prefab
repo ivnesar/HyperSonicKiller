@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &115176355810704293
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2661380836094038274}
+  m_Layer: 3
+  m_Name: LaserTarget
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2661380836094038274
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 115176355810704293}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: -0.3, z: 0.6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4254791061503729056}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3140235944506419512
 GameObject:
   m_ObjectHideFlags: 0
@@ -96,6 +127,7 @@ Transform:
   m_Children:
   - {fileID: 4254791061503729056}
   - {fileID: 8387491661958467619}
+  - {fileID: 4710231715612687513}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!143 &1564705603721853480
@@ -244,6 +276,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   enemyHitAngle: 50
+  hitStopDuration: 0.08
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
@@ -265,6 +298,8 @@ MonoBehaviour:
   sensitivity: 2
   maxVerticalAngle: 80
   deathRotationSpeed: 30
+  snapTransitionDuration: 0.05
+  snapHoldDuration: 0.1
 --- !u!114 &6295242138573287136
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -391,10 +426,159 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 274585b5369a88a4f8336d86e6c0db9c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerArmAnimator
-  armAnimator: {fileID: 4554340878585235414}
-  moveSpeedSmoothTime: 0.1
-  attackVariantCount: 3
-  blockVariantCount: 4
+  animancer: {fileID: 2921561139287513474}
+  idle:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _NormalizedStartTime: NaN
+  walk:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -3419257869308726280, guid: f97e31264c14f594ab69ed711267cb20, type: 3}
+    _NormalizedStartTime: NaN
+  dash:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -851199388697429409, guid: 532a1ed86fd4b88469b75c736949af14, type: 3}
+    _NormalizedStartTime: NaN
+  swordDash:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -851199388697429409, guid: 532a1ed86fd4b88469b75c736949af14, type: 3}
+    _NormalizedStartTime: NaN
+  stuck:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _NormalizedStartTime: NaN
+  dead:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _NormalizedStartTime: NaN
+  exhausted:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _NormalizedStartTime: NaN
+  disarmedIdle:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _NormalizedStartTime: NaN
+  attackVariants:
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 5672224541756932257, guid: 18abc0ce23c37564b9d44ab964b8a702, type: 3}
+    _NormalizedStartTime: NaN
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 4908025570523983687, guid: 8965cace293d6b84c93cc343afbaf2b3, type: 3}
+    _NormalizedStartTime: NaN
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 7634808874394192285, guid: 9cfa617b8f76fd14e813f69cc8ec13bd, type: 3}
+    _NormalizedStartTime: NaN
+  blockVariants:
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 1583499792131112717, guid: 58a039d4feb3a3542a65655a1b884002, type: 3}
+    _NormalizedStartTime: NaN
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8356373725688429918, guid: 040ae8fd5a55030468ec7e8c62c87503, type: 3}
+    _NormalizedStartTime: NaN
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -5657574281706313525, guid: b070aa64f16d18c4ebf741ba1eed9915, type: 3}
+    _NormalizedStartTime: NaN
+  - _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -328646839369039419, guid: c3d0a3b89e36a5c47bc5e7dea3bd0279, type: 3}
+    _NormalizedStartTime: NaN
+  swordThrow:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -7092634530270860565, guid: 4e2bab48a9410a54cba56878bc4d0564, type: 3}
+    _NormalizedStartTime: NaN
+  swordRecover:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -3479850984791167260, guid: a5e9248caeeb9c94d806f9b6f8ff9a16, type: 3}
+    _NormalizedStartTime: NaN
+  walkThreshold: 0.1
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
@@ -426,7 +610,7 @@ Transform:
   m_Children:
   - {fileID: 1194030060368761471}
   - {fileID: 7625834635877997996}
-  - {fileID: 4710231715612687513}
+  - {fileID: 2661380836094038274}
   m_Father: {fileID: 2083849052892089141}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4286656141119325308
@@ -486,11 +670,11 @@ Transform:
   m_GameObject: {fileID: 5351006709916586286}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: -1.75, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4254791061503729056}
+  m_Father: {fileID: 2083849052892089141}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4900311232160630933
 MonoBehaviour:
@@ -838,7 +1022,7 @@ PrefabInstance:
     - target: {fileID: 5866666021909216657, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 08bd97545fb70b5409b75f7ca4f2fa3c, type: 2}
+      objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
       propertyPath: m_UpdateMode
       value: 2
@@ -849,13 +1033,36 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 89347556097028939, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5711857297488474606}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2921561139287513474}
   m_SourcePrefab: {fileID: 100100000, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
 --- !u!95 &4554340878585235414 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
   m_PrefabInstance: {fileID: 7953024132803574343}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &7106601726594025238 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 57e1a3a477548964486a801668e84ed8, type: 3}
+  m_PrefabInstance: {fileID: 7953024132803574343}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2921561139287513474
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7106601726594025238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ad50f81b1d25c441943c37a89ba23f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Kybernetik.Animancer::Animancer.AnimancerComponent
+  _Animator: {fileID: 4554340878585235414}
+  _Transitions: {fileID: 0}
+  _ActionOnDisable: 0
 --- !u!4 &7625834635877997996 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 57e1a3a477548964486a801668e84ed8, type: 3}

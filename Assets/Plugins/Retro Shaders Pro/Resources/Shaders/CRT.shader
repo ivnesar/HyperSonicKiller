@@ -10,15 +10,21 @@
 
 		Pass
 		{
+			ZTest Always
+            Cull Off
+            ZWrite Off
+
 			HLSLPROGRAM
 			#pragma vertex Vert
 			#pragma fragment frag
+			#pragma target 3.0
 
 			#pragma multi_compile_local_fragment _ _CHROMATIC_ABERRATION_ON
 			#pragma multi_compile_local_fragment _ _TRACKING_ON
 			#pragma multi_compile_local_fragment _ _INTERLACING_ON
 			#pragma multi_compile_local_fragment _ _POINT_FILTERING_ON
-			#pragma multi_compile_local_fragment _COLOR_RAMP_NONE _COLOR_RAMP_RGB _COLOR_RAMP_LUMINANCE _COLOR_RAMP_INTENSITY
+			#pragma multi_compile_local_fragment _ _DITHERING_ON
+			#pragma multi_compile_local_fragment _COLOR_RAMP_NONE _COLOR_RAMP_RGB _COLOR_RAMP_LUMINANCE _COLOR_RAMP_INTENSITY _COLOR_RAMP_SLIDERS
 
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
@@ -51,7 +57,12 @@
 			float4 _TrackingLinesColor;
 			float _Brightness;
 			float _Contrast;
+			int _RedValues;
+			int _GreenValues;
+			int _BlueValues;
 			int _Interlacing;
+
+			#define EPSILON 1e-06
 
 			// Code 'liberated' from Shader Graph's Simple Noise node.
 			inline float randomValue(float2 uv)
@@ -79,6 +90,20 @@
 					);
 
 				return mul(rgbMatrix, col);
+			}
+
+			float3 dither(float3 col, float2 uv)
+			{
+				static float DITHER_THRESHOLDS[16] =
+				{
+					1.0 / 17.0,  9.0 / 17.0,  3.0 / 17.0, 11.0 / 17.0,
+					13.0 / 17.0,  5.0 / 17.0, 15.0 / 17.0,  7.0 / 17.0,
+					4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
+					16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
+				};
+				uint index = (uint(uv.x) % 4) * 4 + uint(uv.y) % 4;
+
+				return col - DITHER_THRESHOLDS[index];
 			}
 
             float4 frag (Varyings i) : SV_Target
@@ -171,6 +196,23 @@
 
 				col.rgb = float3(r, g, b);
 				col.rgb *= intensity;
+#elif defined(_COLOR_RAMP_SLIDERS)
+				float3 levels = float3(_RedValues, _GreenValues, _BlueValues);
+				float r = max((col.r - EPSILON) * levels.r, 0.0f);
+				float g = max((col.g - EPSILON) * levels.g, 0.0f);
+				float b = max((col.b - EPSILON) * levels.b, 0.0f);
+
+				float3 divisor = levels - 1.0f;
+
+#if defined(_DITHERING_ON)
+				float3 remainders = float3(frac(r), frac(g), frac(b));
+				float2 ditherUV = UVs * _ScreenParams.xy / _Size;
+				float3 ditheredColor = saturate(dither(remainders, ditherUV));
+				ditheredColor = step(0.5f, ditheredColor);
+#else
+				float3 ditheredColor = 0.0f;
+#endif
+				col.rgb = (float3(floor(r), floor(g), floor(b)) + ditheredColor) / divisor;
 #endif
 
 #ifdef _TRACKING_ON
@@ -211,9 +253,30 @@
 
 				col = lerp(_BackgroundColor.rgb, col, min(smoothedEdges.x, smoothedEdges.y));
 
-				return float4(col, alpha);
+				return float4(col, 1.0f);
             }
             ENDHLSL
         }
+
+		/*
+		Pass
+		{
+			HLSLPROGRAM
+			#pragma vertex Vert
+			#pragma fragment frag
+
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+
+			float4 frag (Varyings i) : SV_Target
+            {
+				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
+				return 0.5f;
+			}
+
+			ENDHLSL
+		}
+		*/
     }
 }

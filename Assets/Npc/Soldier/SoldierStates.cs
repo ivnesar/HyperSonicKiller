@@ -31,6 +31,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.IsAiming = false;
+            npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;  // Sicherheit: Lock immer aufheben außerhalb Firing
         }
 
@@ -65,6 +66,7 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.IsAiming = false;
+            npc.IsLaserActive = false;
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetBool("IsMoving", true);
@@ -122,7 +124,8 @@ namespace SoldierStates
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
             npc.IsAiming = true;  // Bone-Rotation aktivieren
-            
+            npc.IsLaserActive = true;
+                
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetTrigger("Aim");
         }
@@ -161,6 +164,7 @@ namespace SoldierStates
             npc.ShotsFiredInSalvo = 0;
             npc.NextShotTime = 0f;
             npc.IsAiming = true;  // Bone-Rotation bleibt aktiv
+            npc.IsLaserActive = true;
             
             if (npc.NpcAnimator != null)
                 npc.NpcAnimator.SetBool("IsFiring", true);
@@ -216,6 +220,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
             npc.IsAiming = false;  // Bone-Rotation deaktivieren beim Nachladen
+            npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;  // Dash-Lock aufheben → Spieler wieder verfolgen
             
             if (npc.NpcAnimator != null)
@@ -247,6 +252,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.IsAiming = false;  // Bone-Rotation deaktivieren
+            npc.IsLaserActive = false;
             
             if (npc.NpcAnimator != null)
             {

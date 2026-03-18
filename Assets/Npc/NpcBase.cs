@@ -130,6 +130,13 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     public Transform SnapTarget => snapTarget;
 
     /// <summary>
+    /// Steuert den Warnlaser (NpcLaserPointer).
+    /// Subklassen setzen dies auf true, wenn der NPC sich auf einen Angriff vorbereitet.
+    /// Die NpcLaserPointer-Komponente liest diesen Wert in LateUpdate.
+    /// </summary>
+    public bool IsLaserActive { get; set; }
+
+    /// <summary>
     /// Position des Spielers. NPC weiß IMMER wo der Spieler ist.
     /// </summary>
     public Vector3 TargetPosition => playerTransform != null ? playerTransform.position : transform.position;
@@ -419,6 +426,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         isStunned = true;
         stunEndTime = Time.time + duration;
+        IsLaserActive = false;
         StopMovement();
         
         if (animator != null)
@@ -465,6 +473,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         pendingSwordRemovalDamage = 0;
         isStunned = true;
         stunEndTime = float.MaxValue;
+        IsLaserActive = false;
 
         StopMovement();
         
@@ -546,6 +555,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isDead = true;
         NpcRegistry.Unregister(this);
         isStunned = false;
+        IsLaserActive = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 

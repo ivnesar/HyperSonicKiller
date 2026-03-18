@@ -732,6 +732,7 @@ GameObject:
   - component: {fileID: 4221902022032833579}
   - component: {fileID: 5996686098694072418}
   - component: {fileID: 6565262033440337451}
+  - component: {fileID: 5241556215887614238}
   m_Layer: 6
   m_Name: Npc_Soldier
   m_TagString: Enemy
@@ -972,6 +973,33 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &5241556215887614238
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1d082698f93f3d4da8f5a53ce67adb2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcLaserPointer
+  laserOrigin: {fileID: 9204991359742601462}
+  laserTarget: {fileID: 0}
+  fieldOfView: 60
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 8384
+  losCheckMask:
+    serializedVersion: 2
+    m_Bits: 8328
+  laserLength: 50
+  startWidth: 0.03
+  endWidth: 0.01
+  trackingColor: {r: 1, g: 0, b: 0, a: 1}
+  forwardColor: {r: 1, g: 0, b: 0.8929987, a: 1}
+  laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0
@@ -2595,5 +2623,10 @@ Transform:
 --- !u!4 &7782134500540018537 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4916641972100205951, guid: ff7d307c69b2df1438e7416d114ef9d3, type: 3}
+  m_PrefabInstance: {fileID: 3442115477767250454}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9204991359742601462 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5799065208765778656, guid: ff7d307c69b2df1438e7416d114ef9d3, type: 3}
   m_PrefabInstance: {fileID: 3442115477767250454}
   m_PrefabAsset: {fileID: 0}

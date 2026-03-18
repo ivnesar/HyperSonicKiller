@@ -30,6 +30,10 @@ namespace RetroShadersPro.URP
         private readonly GUIContent tintColorInfo = new("Tint Color",
             "Tint applied to the entire screen.");
 
+        private SerializedDataParameter useBarrelDistortion;
+        private readonly GUIContent useBarrelDistortionInfo = new("Use Barrel Distortion",
+            "Choose whether to bend the edges of the screen using barrel distortion.");
+
         private SerializedDataParameter distortionStrength;
         private readonly GUIContent distortionStrengthInfo = new("Distortion Strength",
             "Strength of the barrel distortion. Values above zero cause CRT screen-like distortion; values below zero bulge outwards.");
@@ -148,16 +152,35 @@ namespace RetroShadersPro.URP
         private SerializedDataParameter colorRampMode;
         private readonly GUIContent colorRampModeInfo = new("Color Ramp Mode",
             "Should the shader apply a color mapping based on a supplied ramp texture?" +
-            "\nIn Luminance mode, the brightness of the input color maps to a single output color." +
-            "\nIn RGB mode, each color channel of the input color maps to separate output RGB values.");
+            "\n\nMost of the settings automatically retrieve a texture map from the Resources folder." +
+            "\n\nIn Custom Luminance mode, the input color's luminance value is used as a coordinate along the x-axis to sample the color ramp." +
+            "\n\nIn Custom RGB mode, the red, green, and blue input color values are used as three coordinates along the x-axis to sample the color ramp three times, for independent color ramps." +
+            "\n\nIn Custom RGB+Intensity mode, the input color's luminance is used to sample the alpha channel of the color ramp. That value multiplies the output color." +
+            "\n\nIn Custom RGB Sliders mode, you may use integer sliders to set the number of possible values for the red, green, and blue channels of the color.");
 
         private SerializedDataParameter colorRampTex;
         private readonly GUIContent colorRampTexInfo = new("Color Ramp Texture",
-            "A texture which encodes the color mapping from a normal screen output to your chosen color palette." +
-            "\n\nMost of the settings automatically retrieve a texture map from the Resources folder." +
-            "\n\nIn Custom Luminance mode, the input color's luminance value is used as a coordinate along the x-axis to sample the color ramp." +
-            "\n\nIn Custom RGB mode, the red, green, and blue input color values are used as three coordinates along the x-axis to sample the color ramp three times, for independent." +
-            "\n\nIn Custom RGB+Intensity mode, the input color's luminance is used to sample the alpha channel of the color ramp. That value multiplies the output color.");
+            "A texture which encodes the color mapping from a normal screen output to your chosen color palette.");
+
+        private SerializedDataParameter redValues;
+        private readonly GUIContent redValuesInfo = new("Red Values",
+            "The number of possible values that the red channel can take on." +
+            "\nA typical modern display probably uses 256 values.");
+
+        private SerializedDataParameter greenValues;
+        private readonly GUIContent greenValuesInfo = new("Green Values",
+            "The number of possible values that the green channel can take on." +
+            "\nA typical modern display probably uses 256 values.");
+
+        private SerializedDataParameter blueValues;
+        private readonly GUIContent blueValuesInfo = new("Blue Values",
+            "The number of possible values that the blue channel can take on." +
+            "\nA typical modern display probably uses 256 values.");
+
+        private SerializedDataParameter useDithering;
+        private readonly GUIContent useDitheringInfo = new("Use Dithering",
+            "Should the shader dither colors that fall between color values?" + 
+            "\nNote that individual materials may already be using dithering for their colors, which may look strange when combined with this setting.");
 
         private SerializedDataParameter enableInterlacing;
         private readonly GUIContent enableInterlacingInfo = new("Interlaced Rendering",
@@ -206,6 +229,7 @@ namespace RetroShadersPro.URP
             enabled = Unpack(o.Find(x => x.enabled));
             renderPassEvent = Unpack(o.Find(x => x.renderPassEvent));
             tintColor = Unpack(o.Find(x => x.tintColor));
+            useBarrelDistortion = Unpack(o.Find(x => x.useBarrelDistortion));
             distortionStrength = Unpack(o.Find(x => x.distortionStrength));
             backgroundColor = Unpack(o.Find(x => x.backgroundColor));
             scaleParameters = Unpack(o.Find(x => x.scaleParameters));
@@ -234,6 +258,10 @@ namespace RetroShadersPro.URP
             contrast = Unpack(o.Find(x => x.contrast));
             colorRampMode = Unpack(o.Find(x => x.colorRampMode));
             colorRampTex = Unpack(o.Find(x => x.colorRampTex));
+            redValues = Unpack(o.Find(x => x.redValues));
+            greenValues = Unpack(o.Find(x => x.greenValues));
+            blueValues = Unpack(o.Find(x => x.blueValues));
+            useDithering = Unpack(o.Find(x => x.useDithering));
             enableInterlacing = Unpack(o.Find(x => x.enableInterlacing));
         }
 
@@ -284,9 +312,14 @@ namespace RetroShadersPro.URP
             EditorGUILayout.BeginVertical(BoxStyle);
             EditorGUILayout.LabelField("Barrel Distortion", LabelStyle);
 
-            PropertyField(distortionStrength, distortionStrengthInfo);
-            PropertyField(distortionSmoothing, distortionSmoothingInfo);
-            PropertyField(backgroundColor, backgroundColorInfo);
+            PropertyField(useBarrelDistortion, useBarrelDistortionInfo);
+
+            if(useBarrelDistortion.value.boolValue && useBarrelDistortion.overrideState.boolValue)
+            {
+                PropertyField(distortionStrength, distortionStrengthInfo);
+                PropertyField(distortionSmoothing, distortionSmoothingInfo);
+                PropertyField(backgroundColor, backgroundColorInfo);
+            }
 
             EditorGUILayout.EndVertical();
 
@@ -406,6 +439,13 @@ namespace RetroShadersPro.URP
                 rampMode == ColorRampMode.CustomIntensity)
             {
                 PropertyField(colorRampTex, colorRampTexInfo);
+            }
+            else if(rampMode == ColorRampMode.CustomSliders)
+            {
+                PropertyField(redValues, redValuesInfo);
+                PropertyField(greenValues, greenValuesInfo);
+                PropertyField(blueValues, blueValuesInfo);
+                PropertyField(useDithering, useDitheringInfo);
             }
             else
             {
