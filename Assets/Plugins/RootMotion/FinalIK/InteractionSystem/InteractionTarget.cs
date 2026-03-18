@@ -135,8 +135,18 @@ namespace RootMotion.FinalIK {
 		/// </summary>
 		[Tooltip("If true, will twist/swing around the pivot only once at the start of the interaction. If false, will continue rotating throuout the whole interaction.")]
 		public bool rotateOnce = true;
+        /// <summary>
+        /// Will not set HandPoser's pose target and allows you to use a pose target from a previous interaction if disabled.
+        /// </summary>
+        [Tooltip("Will not set HandPoser's pose target and allows you to use a pose target from a previous interaction if disabled.")]
+        public bool usePoser = true;
+		/// <summary>
+		/// Used only together with UniversalPoser. List of bones must match UniversalPoser's list of bones in both array size and hierarchy.
+		/// </summary>
+		[Tooltip("Used only together with UniversalPoser. List of bones must match UniversalPoser's list of bones in both array size and hierarchy.")]
+		public Transform[] bones = new Transform[0];
 
-        private Quaternion defaultLocalRotation;
+		private Quaternion defaultLocalRotation;
 		private Transform lastPivot;
 
 		// Should a curve of the Type be ignored for this effector?

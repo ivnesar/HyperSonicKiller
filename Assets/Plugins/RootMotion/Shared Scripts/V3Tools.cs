@@ -13,6 +13,8 @@ namespace RootMotion {
         /// </summary>
         public static float GetYaw(Vector3 forward)
         {
+            if (forward.x == 0f && forward.z == 0f) return 0f;
+            if (float.IsInfinity(forward.x) || float.IsInfinity(forward.z)) return 0;
             return Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
         }
 
@@ -32,7 +34,8 @@ namespace RootMotion {
         {
             Quaternion q = Quaternion.Inverse(Quaternion.LookRotation(Vector3.up, forward));
             up = q * up;
-            return Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+            float result = Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+            return Mathf.Clamp(result, -180f, 180f);
         }
 
         /// <summary>
@@ -42,6 +45,8 @@ namespace RootMotion {
         {
             Quaternion space = Quaternion.Inverse(Quaternion.LookRotation(spaceForward, spaceUp));
             Vector3 dirLocal = space * forward;
+            if (dirLocal.x == 0f && dirLocal.z == 0f) return 0f;
+            if (float.IsInfinity(dirLocal.x) || float.IsInfinity(dirLocal.z)) return 0;
             return Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
         }
 
@@ -52,6 +57,7 @@ namespace RootMotion {
         {
             Quaternion space = Quaternion.Inverse(Quaternion.LookRotation(spaceForward, spaceUp));
             Vector3 dirLocal = space * forward;
+            forward.Normalize();
             return -Mathf.Asin(dirLocal.y) * Mathf.Rad2Deg;
         }
 
@@ -66,7 +72,8 @@ namespace RootMotion {
 
             Quaternion q = Quaternion.Inverse(Quaternion.LookRotation(spaceUp, forward));
             up = q * up;
-            return Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+            float result = Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+            return Mathf.Clamp(result, -180f, 180f);
         }
 
         /// <summary>
@@ -89,24 +96,36 @@ namespace RootMotion {
 			return Vector3.Slerp(fromVector, toVector, weight);
 		}
 
-		/// <summary>
-		/// Returns vector projection on axis multiplied by weight.
-		/// </summary>
-		public static Vector3 ExtractVertical(Vector3 v, Vector3 verticalAxis, float weight) {
-			if (weight == 0f) return Vector3.zero;
-			return Vector3.Project(v, verticalAxis) * weight;
-		}
+        /// <summary>
+        /// Returns vector projection on axis multiplied by weight.
+        /// </summary>
+        public static Vector3 ExtractVertical(Vector3 v, Vector3 verticalAxis, float weight)
+        {
+            if (weight <= 0f) return Vector3.zero;
+            if (verticalAxis == Vector3.up) return Vector3.up * v.y * weight;
+            return Vector3.Project(v, verticalAxis) * weight;
+        }
 
-		/// <summary>
-		/// Returns vector projected to a plane and multiplied by weight.
-		/// </summary>
-		public static Vector3 ExtractHorizontal(Vector3 v, Vector3 normal, float weight) {
-			if (weight == 0f) return Vector3.zero;
-			
-			Vector3 tangent = v;
-			Vector3.OrthoNormalize(ref normal, ref tangent);
-			return Vector3.Project(v, tangent) * weight;
-		}
+        /// <summary>
+        /// Returns vector projected to a plane and multiplied by weight.
+        /// </summary>
+        public static Vector3 ExtractHorizontal(Vector3 v, Vector3 normal, float weight)
+        {
+            if (weight <= 0f) return Vector3.zero;
+            if (normal == Vector3.up) return new Vector3(v.x, 0f, v.z) * weight;
+            Vector3 tangent = v;
+            Vector3.OrthoNormalize(ref normal, ref tangent);
+            return Vector3.Project(v, tangent) * weight;
+        }
+
+        /// <summary>
+        /// Flattens a vector on a plane defined by 'normal'.
+        /// </summary>
+        public static Vector3 Flatten(Vector3 v, Vector3 normal)
+        {
+            if (normal == Vector3.up) return new Vector3(v.x, 0f, v.z);
+            return v - Vector3.Project(v, normal);
+        }
 
         /// <summary>
         /// Clamps the direction to clampWeight from normalDirection, clampSmoothing is the number of sine smoothing iterations applied on the result.

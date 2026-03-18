@@ -14,7 +14,10 @@ namespace RootMotion {
         public static float GetYaw(Quaternion space, Vector3 forward)
         {
             Vector3 dirLocal = Quaternion.Inverse(space) * forward;
-            return Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
+			if (dirLocal.x == 0f && dirLocal.z == 0f) return 0f;
+			if (float.IsInfinity(dirLocal.x) || float.IsInfinity(dirLocal.z)) return 0;
+
+			return Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
         }
 
         /// <summary>
@@ -24,6 +27,7 @@ namespace RootMotion {
         {
             forward = forward.normalized;
             Vector3 dirLocal = Quaternion.Inverse(space) * forward;
+			if (Mathf.Abs(dirLocal.y) > 1f) dirLocal.Normalize();
             return -Mathf.Asin(dirLocal.y) * Mathf.Rad2Deg;
         }
 
@@ -40,31 +44,35 @@ namespace RootMotion {
 
             Quaternion q = Quaternion.Inverse(Quaternion.LookRotation(spaceUp, forward));
             up = q * up;
-            return Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+            float result = Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+			return Mathf.Clamp(result, -180f, 180f);
         }
 
-        /// <summary>
-        /// Returns yaw angle (-180 - 180) of 'forward' vector relative to rotation space defined by spaceForward and spaceUp axes.
-        /// </summary>
-        public static float GetYaw(Quaternion space, Quaternion rotation)
-        {
-            Vector3 dirLocal = Quaternion.Inverse(space) * (rotation * Vector3.forward);
-            return Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
-        }
+		/// <summary>
+		/// Returns yaw angle (-180 - 180) of 'forward' vector relative to rotation space defined by spaceForward and spaceUp axes.
+		/// </summary>
+		public static float GetYaw(Quaternion space, Quaternion rotation)
+		{
+			Vector3 dirLocal = Quaternion.Inverse(space) * (rotation * Vector3.forward);
+			if (dirLocal.x == 0f && dirLocal.z == 0f) return 0f;
+			if (float.IsInfinity(dirLocal.x) || float.IsInfinity(dirLocal.z)) return 0;
+			return Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
+		}
 
-        /// <summary>
-        /// Returns pitch angle (-90 - 90) of 'forward' vector relative to rotation space defined by spaceForward and spaceUp axes.
-        /// </summary>
-        public static float GetPitch(Quaternion space, Quaternion rotation)
-        {
-            Vector3 dirLocal = Quaternion.Inverse(space) * (rotation * Vector3.forward);
-            return -Mathf.Asin(dirLocal.y) * Mathf.Rad2Deg;
-        }
+		/// <summary>
+		/// Returns pitch angle (-90 - 90) of 'forward' vector relative to rotation space defined by spaceForward and spaceUp axes.
+		/// </summary>
+		public static float GetPitch(Quaternion space, Quaternion rotation)
+		{
+			Vector3 dirLocal = Quaternion.Inverse(space) * (rotation * Vector3.forward);
+			if (Mathf.Abs(dirLocal.y) > 1f) dirLocal.Normalize();
+			return -Mathf.Asin(dirLocal.y) * Mathf.Rad2Deg;
+		}
 
-        /// <summary>
-        /// Returns bank angle (-180 - 180) of 'forward' and 'up' vectors relative to rotation space defined by spaceForward and spaceUp axes.
-        /// </summary>
-        public static float GetBank(Quaternion space, Quaternion rotation)
+		/// <summary>
+		/// Returns bank angle (-180 - 180) of 'forward' and 'up' vectors relative to rotation space defined by spaceForward and spaceUp axes.
+		/// </summary>
+		public static float GetBank(Quaternion space, Quaternion rotation)
         {
             Vector3 spaceUp = space * Vector3.up;
             
@@ -74,8 +82,9 @@ namespace RootMotion {
 
             Quaternion q = Quaternion.Inverse(Quaternion.LookRotation(spaceUp, forward));
             up = q * up;
-            return Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
-        }
+			float result = Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg;
+			return Mathf.Clamp(result, -180f, 180f);
+		}
 
         /// <summary>
         /// Optimized Quaternion.Lerp
@@ -116,7 +125,7 @@ namespace RootMotion {
 		}
 
 		/// <summary>
-		/// Creates a FromToRotation, but makes sure it's axis remains fixed near to the Quaternion singularity point.
+		/// Creates a FromToRotation, but makes sure its axis remains fixed near to the Quaternion singularity point.
 		/// </summary>
 		/// <returns>
 		/// The from to rotation around an axis.
@@ -235,9 +244,9 @@ namespace RootMotion {
 		/// <summary>
 		/// Used for matching the rotations of objects that have different orientations.
 		/// </summary>
-		public static Quaternion MatchRotation(Quaternion targetRotation, Vector3 targetforwardAxis, Vector3 targetUpAxis, Vector3 forwardAxis, Vector3 upAxis) {
-			Quaternion f = Quaternion.LookRotation(forwardAxis, upAxis);
-			Quaternion fTarget = Quaternion.LookRotation(targetforwardAxis, targetUpAxis);
+		public static Quaternion MatchRotation(Quaternion targetRotation, Vector3 targetAxis1, Vector3 targetAxis2, Vector3 axis1, Vector3 axis2) {
+			Quaternion f = Quaternion.LookRotation(axis1, axis2);
+			Quaternion fTarget = Quaternion.LookRotation(targetAxis1, targetAxis2);
 
 			Quaternion d = targetRotation * fTarget;
 			return d * Quaternion.Inverse(f);
@@ -260,6 +269,35 @@ namespace RootMotion {
             if (angle >= 180f) return angle - 360f;
             if (angle <= -180f) return angle + 360f;
             return angle;
+        }
+
+        /// <summary>
+        /// Mirrors a Quaternion on the YZ plane in provided rotation space.
+        /// </summary>
+        public static Quaternion MirrorYZ(Quaternion r, Quaternion space)
+        {
+            r = Quaternion.Inverse(space) * r;
+            Vector3 forward = r * Vector3.forward;
+            Vector3 up = r * Vector3.up;
+
+            forward.x *= -1;
+            up.x *= -1;
+
+            return space * Quaternion.LookRotation(forward, up);
+        }
+
+        /// <summary>
+        /// Mirrors a Quaternion on the world space YZ plane.
+        /// </summary>
+        public static Quaternion MirrorYZ(Quaternion r)
+        {
+            Vector3 forward = r * Vector3.forward;
+            Vector3 up = r * Vector3.up;
+
+            forward.x *= -1;
+            up.x *= -1;
+
+            return Quaternion.LookRotation(forward, up);
         }
     }
 }

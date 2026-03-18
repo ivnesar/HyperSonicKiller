@@ -28,7 +28,21 @@ namespace RootMotion.FinalIK
                 twistSolver.Initiate();
             }
 
-            if (ik != null) ik.GetIKSolver().OnPostUpdate += OnPostUpdate;
+            if (ik != null)
+            {
+                ik.GetIKSolver().OnPostUpdate += OnPostUpdate;
+            }
+        }
+
+        private void Update()
+        {
+            if (ik != null && ik.fixTransforms)
+            {
+                foreach (TwistSolver twistSolver in twistSolvers)
+                {
+                    twistSolver.FixTransforms();
+                }
+            }
         }
 
         void OnPostUpdate()
