@@ -84,6 +84,7 @@ public class SoldierNpc : NpcBase
     public int ShotsPerSalvo => shotsPerSalvo;
     public float ReloadDuration => reloadDuration;
 
+    
     /// <summary>
     /// Typed animation manager reference for SoldierStates.
     /// Use this instead of the old NpcAnimator property.
@@ -368,7 +369,10 @@ public class SoldierNpc : NpcBase
     public new void SetStateTimer(float t) => base.SetStateTimer(t);
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
     public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
-
+    
+    public new void StartAimTracking(float duration) => base.StartAimTracking(duration);
+    public new void SetAimProgress(float progress) => base.SetAimProgress(progress);
+    public new void ResetAimProgress() => base.ResetAimProgress();
     // ── Target Lock Helpers ──
 
     /// <summary>

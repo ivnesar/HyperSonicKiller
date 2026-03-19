@@ -614,7 +614,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: endWidth
@@ -8572,7 +8572,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: endWidth
@@ -9869,7 +9869,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: showDebug
-      value: 1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
+      propertyPath: startWidth
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: fieldOfView

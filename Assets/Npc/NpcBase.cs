@@ -18,6 +18,12 @@ using UnityEngine.AI;
 // - Konkrete NPCs (SoldierNpc, GenTwoNpc) finden ihren AnimationManager
 //   über GetComponentInChildren<T>() und exponieren ihn typsicher.
 //
+// AIM PROGRESS:
+// - Generisches System für Laser-Wiggle und andere Aim-Indikatoren.
+// - Subklassen rufen SetAimProgress() oder StartAimTracking() auf.
+// - NpcLaserPointer liest AimProgress um den Wiggle-Radius zu steuern.
+// - 0 = Aim gerade gestartet (max Wiggle), 1 = eingelockt (kein Wiggle).
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 public enum BehaviorMode
@@ -120,6 +126,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     // State Timer (für Subklassen)
     protected float stateTimer;
 
+    // Aim Progress Tracking
+    private float aimTotalDuration;
+    private float aimProgress;
+    private bool isTrackingAim;
+
     // Movement Smoothing (für UpdateAnimator)
     private float currentSpeedVelocity;
     private const float SPEED_SMOOTH_TIME = 0.1f;
@@ -158,6 +169,17 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// Die NpcLaserPointer-Komponente liest diesen Wert in LateUpdate.
     /// </summary>
     public bool IsLaserActive { get; set; }
+
+    /// <summary>
+    /// Fortschritt der Zielerfassung: 0 = gerade angefangen, 1 = eingelockt.
+    /// Wird von NpcLaserPointer gelesen um den Wiggle-Radius zu steuern.
+    /// 
+    /// Nutzung durch Subklassen:
+    ///   Option A: StartAimTracking(duration) → Progress wird automatisch berechnet
+    ///             basierend auf stateTimer (synchron mit SetStateTimer).
+    ///   Option B: SetAimProgress(value) → manuell setzen (z.B. für Firing-State).
+    /// </summary>
+    public float AimProgress => aimProgress;
 
     /// <summary>
     /// Position des Spielers. NPC weiß IMMER wo der Spieler ist.
@@ -223,6 +245,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         // Pfad-Check (periodisch)
         UpdatePathCheck();
+
+        // Aim Progress automatisch aktualisieren
+        UpdateAimProgress();
 
         // Stun-Handling
         if (isStunned)
@@ -353,6 +378,65 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Aim Progress
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Startet automatisches Aim-Tracking, synchron mit dem State Timer.
+    /// Rufe dies im State.Enter() auf, NACH SetStateTimer().
+    /// Der Progress wird automatisch in Update() berechnet:
+    ///   progress = 1 - (stateTimer / totalDuration)
+    /// 
+    /// Beispiel in Aiming.Enter():
+    ///   npc.SetStateTimer(npc.AimDuration);
+    ///   npc.StartAimTracking(npc.AimDuration);
+    /// </summary>
+    protected void StartAimTracking(float totalDuration)
+    {
+        aimTotalDuration = Mathf.Max(totalDuration, 0.001f);
+        aimProgress = 0f;
+        isTrackingAim = true;
+    }
+
+    /// <summary>
+    /// Setzt den Aim-Progress manuell (0-1).
+    /// Deaktiviert automatisches Tracking.
+    /// Nützlich z.B. im Firing-State wo der Progress auf 1 stehen soll.
+    /// </summary>
+    protected void SetAimProgress(float progress)
+    {
+        aimProgress = Mathf.Clamp01(progress);
+        isTrackingAim = false;
+    }
+
+    /// <summary>
+    /// Setzt den Aim-Progress auf 0 zurück und deaktiviert Tracking.
+    /// Rufe dies auf wenn der NPC nicht mehr zielt (z.B. Idle, Reloading).
+    /// </summary>
+    protected void ResetAimProgress()
+    {
+        aimProgress = 0f;
+        aimTotalDuration = 0f;
+        isTrackingAim = false;
+    }
+
+    /// <summary>
+    /// Wird jeden Frame in Update() aufgerufen.
+    /// Berechnet den Progress automatisch wenn Tracking aktiv ist.
+    /// </summary>
+    private void UpdateAimProgress()
+    {
+        if (!isTrackingAim) return;
+
+        // Progress = wie weit sind wir durch die Aim-Phase
+        // stateTimer zählt von totalDuration runter nach 0
+        float elapsed = aimTotalDuration - stateTimer;
+        aimProgress = Mathf.Clamp01(elapsed / aimTotalDuration);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Stun System
     // ════════════════════════════════════════════════════════════════════════
 
@@ -445,6 +529,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isStunned = true;
         stunEndTime = Time.time + duration;
         IsLaserActive = false;
+        ResetAimProgress();
         StopMovement();
         
         animHandler?.PlayStunStart();
@@ -489,6 +574,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isStunned = true;
         stunEndTime = float.MaxValue;
         IsLaserActive = false;
+        ResetAimProgress();
 
         StopMovement();
         
@@ -568,6 +654,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         IsLaserActive = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
+        ResetAimProgress();
 
         if (navAgent != null)
         {
@@ -596,6 +683,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isDead = true;
         isStunned = false;
         currentHealth = 0;
+        ResetAimProgress();
 
         if (navAgent != null)
         {

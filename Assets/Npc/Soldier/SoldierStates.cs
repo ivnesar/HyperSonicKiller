@@ -7,6 +7,11 @@ using UnityEngine;
 // Alle animator.SetTrigger/SetBool Aufrufe sind durch typsichere
 // AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
 //
+// AIM PROGRESS:
+// - Aiming.Enter(): StartAimTracking() → Wiggle beginnt bei maxRadius
+// - Firing.Enter(): SetAimProgress(1) → Laser eingelockt, kein Wiggle
+// - Idle/MovingToRange/Reloading.Enter(): ResetAimProgress() → Progress = 0
+//
 // Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
 // ════════════════════════════════════════════════════════════════════════════
@@ -27,6 +32,7 @@ namespace SoldierStates
             npc.IsAiming = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
+            npc.ResetAimProgress();
 
             npc.AnimManager?.PlayIdle();
         }
@@ -60,6 +66,7 @@ namespace SoldierStates
         {
             npc.IsAiming = false;
             npc.IsLaserActive = false;
+            npc.ResetAimProgress();
 
             npc.AnimManager?.PlayWalk();
         }
@@ -112,6 +119,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
+            npc.StartAimTracking(npc.AimDuration);
             npc.IsAiming = true;
             npc.IsLaserActive = true;
 
@@ -150,6 +158,7 @@ namespace SoldierStates
             npc.NextShotTime = 0f;
             npc.IsAiming = true;
             npc.IsLaserActive = true;
+            npc.SetAimProgress(1f); // Eingelockt — kein Wiggle während dem Feuern
 
             npc.AnimManager?.PlayFiringStance();
         }
@@ -201,6 +210,7 @@ namespace SoldierStates
             npc.IsAiming = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
+            npc.ResetAimProgress();
 
             npc.AnimManager?.PlayReload();
             npc.PlayReloadSound();
@@ -230,6 +240,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.IsAiming = false;
             npc.IsLaserActive = false;
+            // ResetAimProgress wird bereits von NpcBase.ApplyStun() aufgerufen
 
             npc.AnimManager?.PlayStunnedFromCombat();
         }
