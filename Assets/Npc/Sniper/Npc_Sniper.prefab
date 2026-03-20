@@ -727,8 +727,8 @@ GameObject:
   - component: {fileID: 3767853563656458135}
   - component: {fileID: 1935823726076951774}
   - component: {fileID: 3141529538732586769}
-  - component: {fileID: 6055471911883737851}
-  - component: {fileID: 6256440576105994518}
+  - component: {fileID: 7178067220184908088}
+  - component: {fileID: 4128161012689180827}
   - component: {fileID: 4891449849083221139}
   - component: {fileID: 4221902022032833579}
   - component: {fileID: 5996686098694072418}
@@ -736,7 +736,7 @@ GameObject:
   - component: {fileID: 1508127111980046060}
   - component: {fileID: 5241556215887614238}
   m_Layer: 6
-  m_Name: Npc_Grenadier
+  m_Name: Npc_Sniper
   m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -826,7 +826,7 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.9, z: 0}
---- !u!114 &6055471911883737851
+--- !u!114 &7178067220184908088
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -835,9 +835,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 2472838132611520362}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 364f466cada6faf439a37a56ee6156d6, type: 3}
+  m_Script: {fileID: 11500000, guid: e48759adcda5cf74b8ba56044a057f08, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GrenadierNpc
+  m_EditorClassIdentifier: Assembly-CSharp::SniperNpc
   behaviorMode: 1
   maxHealth: 100
   moveSpeed: 4
@@ -847,21 +847,21 @@ MonoBehaviour:
   useRagdollOnDeath: 1
   destroyDelay: 10
   snapTarget: {fileID: 1590548316490049355}
-  showDebugInfo: 1
-  minShootingRange: 8
-  maxShootingRange: 25
-  preferredRange: 16
-  aimDuration: 1.2
-  magazineSize: 6
-  timeBetweenShots: 0.8
+  showDebugInfo: 0
+  minShootingRange: 20
+  maxShootingRange: 50
+  preferredRange: 35
+  aimDuration: 3
   reloadDuration: 3
+  damagePerShot: 999
+  baseAccuracy: 1
+  accuracySpreadAngle: 0
   muzzlePoint: {fileID: 2080795029759614631}
-  grenadePrefab: {fileID: 4384600968460653964, guid: 7d4b175e3af6d45489fc8d9bf4df6133, type: 3}
-  losCheckMask:
+  bulletPrefab: {fileID: 1344611437300234443, guid: aaa5bdbebef87bd4d8d8e64ba3ce0604, type: 3}
+  bulletHitMask:
     serializedVersion: 2
-    m_Bits: 8320
-  grenadeZoneRadius: 2
-  grenadeZoneDuration: 2
+    m_Bits: 8328
+  muzzleAimAssistFOV: 3
   aimBone: {fileID: 8052137596577771941}
   pitchAxis: {x: 1, y: -1, z: 0}
   invertPitch: 0
@@ -872,7 +872,7 @@ MonoBehaviour:
   fireSound: {fileID: 0}
   reloadSound: {fileID: 0}
   muzzleFlash: {fileID: 0}
---- !u!114 &6256440576105994518
+--- !u!114 &4128161012689180827
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -881,10 +881,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 2472838132611520362}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ad227968ec56ddf4a96d37eeb2efa277, type: 3}
+  m_Script: {fileID: 11500000, guid: f8da3b5896139d94fb66132b6713b481, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GrenadierAnimationManager
-  animancer: {fileID: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::SniperAnimationManager
+  animancer: {fileID: 1508127111980046060}
   idle:
     _FadeDuration: 0.25
     _Speed: 1
@@ -1109,11 +1109,11 @@ MonoBehaviour:
   laserLength: 50
   transitionDuration: 0.3
   earlyWidth: 0.01
-  lockedWidth: 0.06
-  earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
-  lockedColor: {r: 1, g: 0, b: 0, a: 1}
+  lockedWidth: 0.1
+  earlyColor: {r: 0, g: 0.83348227, b: 1, a: 0.5}
+  lockedColor: {r: 0.8643136, g: 0, b: 1, a: 1}
   wiggleMaxAngle: 8
-  wiggleFrequency: 3
+  wiggleFrequency: 1
   enableWiggle: 1
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
   showDebug: 0
@@ -2574,7 +2574,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7d9da96f04ad0a5499eeba381f33f539, type: 2}
+  - {fileID: 2100000, guid: cb163e287b212b84ca35fe2afadf4609, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

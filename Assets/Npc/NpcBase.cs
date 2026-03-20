@@ -41,7 +41,8 @@ public enum NpcType
     AntiDashDrone,
     ProxyMine,
     Scientist,
-    Grenadier
+    Grenadier,
+    Sniper
 }
 
 public abstract class NpcBase : MonoBehaviour, IEnemy

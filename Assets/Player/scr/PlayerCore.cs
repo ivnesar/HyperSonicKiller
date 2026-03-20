@@ -167,7 +167,13 @@ public class PlayerCore : MonoBehaviour
         // Combat handles block logic, Health handles actual HP
         if (Combat != null && Combat.IsBlocking)
         {
-            Combat.TakeBlockDamage(damage);
+            float overflow = Combat.TakeBlockDamage(damage);
+            
+            // Überschüssiger Schaden geht an die HP weiter
+            if (overflow > 0f)
+            {
+                Health?.TakeDamage(overflow);
+            }
         }
         else
         {
