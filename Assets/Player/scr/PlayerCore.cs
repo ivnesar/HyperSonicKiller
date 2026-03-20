@@ -149,6 +149,16 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage)
     {
+        return TakeDamage(damage, Vector3.zero);
+    }
+
+    /// <summary>
+    /// Damage with attack direction — triggers camera nudge toward attacker.
+    /// attackDirection = direction FROM attacker TO player (normalized).
+    /// Pass Vector3.zero if direction is unknown.
+    /// </summary>
+    public bool TakeDamage(float damage, Vector3 attackDirection)
+    {
         if (IsDead || damage <= 0) return false;
         
         // Only invulnerable during sword dash
@@ -162,6 +172,12 @@ public class PlayerCore : MonoBehaviour
         else
         {
             Health?.TakeDamage(damage);
+        }
+
+        // Trigger hit direction nudge (Look handles state checks internally)
+        if (attackDirection != Vector3.zero && Look != null)
+        {
+            Look.NudgeTowardAttackDirection(attackDirection);
         }
         
         return true;

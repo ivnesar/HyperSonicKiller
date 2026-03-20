@@ -2,6 +2,11 @@ using UnityEngine;
 
 /// <summary>
 /// Defender NPC - Läuft mit Schild auf den Spieler zu.
+/// 
+/// ANIMANCER MIGRATION:
+/// - NpcAnimator Property entfernt → AnimManager (DefenderAnimationManager) stattdessen.
+/// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayWalk()).
+/// - Kein direkter Animator-Zugriff mehr in States.
 /// </summary>
 public class DefenderNpc : NpcBase
 {
@@ -24,7 +29,12 @@ public class DefenderNpc : NpcBase
 
     public float ApproachDistance => approachDistance;
     public float ReengageDistance => reengageDistance;
-    public Animator NpcAnimator => animator;
+
+    /// <summary>
+    /// Typed animation manager reference for DefenderStates.
+    /// Use this instead of the old NpcAnimator property.
+    /// </summary>
+    public DefenderAnimationManager AnimManager { get; private set; }
 
     #endregion
 
@@ -39,6 +49,20 @@ public class DefenderNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
     #region NpcBase Implementation
     // ════════════════════════════════════════════════════════════════════════
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        // Typsichere Referenz auf den Animation Manager
+        AnimManager = GetComponentInChildren<DefenderAnimationManager>();
+
+        if (AnimManager == null)
+        {
+            Debug.LogWarning($"[DefenderNpc] No DefenderAnimationManager found on {gameObject.name}! " +
+                             "Animations will not work.");
+        }
+    }
 
     protected override void OnStart()
     {

@@ -4,13 +4,21 @@ using UnityEngine;
 /// Handles camera/look rotation for first-person view.
 /// Includes smooth camera snap to enemy targets on hit during dash.
 /// 
-/// SNAP SYSTEM:
+/// SNAP SYSTEM (Dash hits):
 ///   - Triggered externally via SnapToTarget(Transform)
 ///   - Three phases: Transition (smooth lerp to target), Hold (camera sticks to target), Release
 ///   - During Transition + Hold: mouse input is ignored
 ///   - Uses unscaledDeltaTime so snap runs DURING HitStop (intentional — snap while frozen)
 ///   - A new snap cancels any active snap
 ///   - CancelSnap() immediately returns control to the player
+///
+/// HIT DIRECTION NUDGE (Incoming damage):
+///   - Triggered externally via NudgeTowardAttackDirection(Vector3)
+///   - Dreht den Spieler sanft in Richtung des Angreifers
+///   - Geschwindigkeitsbegrenzt (nudgeRotationSpeed): verhindert Hin-und-Her bei Beschuss aus mehreren Richtungen
+///   - Addiert sich zum normalen Maus-Input (kein Kontrollverlust)
+///   - Nur aktiv wenn NICHT im Dash (Snap und Nudge schließen sich natürlich gegenseitig aus)
+///   - nudgeStrength bestimmt wie weit gedreht wird (0-1, wobei 1 = komplett zum Angreifer)
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerLook : MonoBehaviour
@@ -34,6 +42,19 @@ public class PlayerLook : MonoBehaviour
     [Tooltip("Dauer in der die Kamera am Ziel haftet (in Sekunden, Echtzeit)")]
     [SerializeField] private float snapHoldDuration = 0.1f;
 
+    [Header("Hit Direction Nudge")]
+    [Tooltip("Maximale Drehgeschwindigkeit in Grad pro Sekunde")]
+    [SerializeField] private float nudgeRotationSpeed = 300f;
+
+    [Tooltip("Anteil des Winkels der überbrückt wird (0-1). 1 = komplett zur Quelle drehen")]
+    [SerializeField, Range(0f, 1f)] private float nudgeStrength = 0.6f;
+
+    [Tooltip("Minimaler Winkel ab dem der Nudge überhaupt ausgelöst wird (Grad)")]
+    [SerializeField] private float nudgeMinAngle = 10f;
+
+    [Tooltip("Wie schnell der Nudge ausfadet wenn kein neuer Treffer kommt (Grad/Sek Reduktion)")]
+    [SerializeField] private float nudgeDecayRate = 400f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -54,6 +75,20 @@ public class PlayerLook : MonoBehaviour
     // Rotation beim Start der Transition (für Lerp)
     private Quaternion snapStartBodyRotation;
     private float snapStartVerticalAngle;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Hit Direction Nudge State
+    // ════════════════════════════════════════════════════════════════════════
+
+    // Verbleibende horizontale und vertikale Drehung die noch angewendet werden soll.
+    // Wird pro Frame um maximal nudgeRotationSpeed Grad reduziert.
+    private float nudgeRemainingYaw;
+    private float nudgeRemainingPitch;
+
+    /// <summary>True wenn gerade ein Nudge aktiv ist.</summary>
+    public bool IsNudging => Mathf.Abs(nudgeRemainingYaw) > 0.1f || Mathf.Abs(nudgeRemainingPitch) > 0.1f;
 
     #endregion
 
@@ -103,6 +138,7 @@ public class PlayerLook : MonoBehaviour
         else
         {
             HandleLook();
+            ApplyNudge();
         }
     }
 
@@ -238,6 +274,77 @@ public class PlayerLook : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Hit Direction Nudge
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Wendet den verbleibenden Nudge pro Frame an.
+    /// Wird in Update() nach HandleLook() aufgerufen, sodass sich
+    /// Maus-Input und Nudge-Drehung addieren.
+    /// </summary>
+    private void ApplyNudge()
+    {
+        // Nichts zu tun
+        if (!IsNudging) return;
+
+        float dt = Time.deltaTime;
+        float maxStep = nudgeRotationSpeed * dt;
+
+        // ── Horizontale Drehung (Yaw) ──
+        float yawStep = Mathf.MoveTowards(0f, nudgeRemainingYaw, maxStep);
+        nudgeRemainingYaw -= yawStep;
+        transform.Rotate(Vector3.up * yawStep);
+
+        // ── Vertikale Drehung (Pitch) ──
+        float pitchStep = Mathf.MoveTowards(0f, nudgeRemainingPitch, maxStep);
+        nudgeRemainingPitch -= pitchStep;
+        currentVerticalAngle += pitchStep;
+        currentVerticalAngle = Mathf.Clamp(currentVerticalAngle, -maxVerticalAngle, maxVerticalAngle);
+        rotationTarget.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f);
+
+        // ── Decay: Nudge baut sich ab wenn er zu lange dauert ──
+        float decayStep = nudgeDecayRate * dt;
+        nudgeRemainingYaw = Mathf.MoveTowards(nudgeRemainingYaw, 0f, decayStep);
+        nudgeRemainingPitch = Mathf.MoveTowards(nudgeRemainingPitch, 0f, decayStep);
+    }
+
+    /// <summary>
+    /// Berechnet den benötigten Yaw/Pitch um in Richtung des Angreifers zu schauen,
+    /// und speichert einen Teil davon (nudgeStrength) als verbleibende Drehung.
+    /// Mehrfache schnelle Aufrufe überschreiben den Zielwinkel — durch die
+    /// geschwindigkeitsbegrenzte Drehung wird Hin-und-Her-Flippen automatisch vermieden.
+    /// </summary>
+    private void CalculateNudgeAngles(Vector3 attackDirection)
+    {
+        // Richtung umdrehen: attackDirection zeigt Angreifer → Spieler,
+        // wir wollen Spieler → Angreifer
+        Vector3 toAttacker = -attackDirection;
+
+        // ── Horizontaler Winkel (Yaw) ──
+        Vector3 flatToAttacker = new Vector3(toAttacker.x, 0f, toAttacker.z).normalized;
+        Vector3 flatForward = new Vector3(transform.forward.x, 0f, transform.forward.z).normalized;
+
+        if (flatToAttacker.sqrMagnitude < 0.001f) return;
+
+        float fullYaw = Vector3.SignedAngle(flatForward, flatToAttacker, Vector3.up);
+
+        // ── Vertikaler Winkel (Pitch) ──
+        float targetPitch = -Mathf.Asin(Mathf.Clamp(toAttacker.y, -1f, 1f)) * Mathf.Rad2Deg;
+        targetPitch = Mathf.Clamp(targetPitch, -maxVerticalAngle, maxVerticalAngle);
+        float fullPitch = targetPitch - currentVerticalAngle;
+
+        // Zu kleiner Winkel → kein Nudge
+        float totalAngle = Mathf.Sqrt(fullYaw * fullYaw + fullPitch * fullPitch);
+        if (totalAngle < nudgeMinAngle) return;
+
+        // Neuen Nudge setzen (überschreibt den vorherigen)
+        nudgeRemainingYaw = fullYaw * nudgeStrength;
+        nudgeRemainingPitch = fullPitch * nudgeStrength;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Public API
     // ════════════════════════════════════════════════════════════════════════
 
@@ -298,6 +405,35 @@ public class PlayerLook : MonoBehaviour
         currentVerticalAngle = -Mathf.Asin(direction.y) * Mathf.Rad2Deg;
         currentVerticalAngle = Mathf.Clamp(currentVerticalAngle, -maxVerticalAngle, maxVerticalAngle);
         rotationTarget.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f);
+    }
+
+    /// <summary>
+    /// Dreht die Kamera sanft in Richtung des Angreifers.
+    /// Aufgerufen von PlayerCore.TakeDamage() wenn eine Angriffsrichtung bekannt ist.
+    /// Wird ignoriert während Dash (Snap-System) oder Tod.
+    /// </summary>
+    /// <param name="attackDirection">Richtung VOM Angreifer ZUM Spieler (normalisiert)</param>
+    public void NudgeTowardAttackDirection(Vector3 attackDirection)
+    {
+        // Nicht während Dash oder Tod
+        if (core.CurrentState == PlayerCore.PlayerState.Dashing ||
+            core.CurrentState == PlayerCore.PlayerState.DashingToSword ||
+            core.IsDead)
+            return;
+
+        // Nicht während Snap
+        if (IsSnapping) return;
+
+        CalculateNudgeAngles(attackDirection);
+    }
+
+    /// <summary>
+    /// Bricht einen aktiven Nudge sofort ab.
+    /// </summary>
+    public void CancelNudge()
+    {
+        nudgeRemainingYaw = 0f;
+        nudgeRemainingPitch = 0f;
     }
 
     #endregion

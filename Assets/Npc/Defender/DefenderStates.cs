@@ -1,8 +1,11 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// DEFENDER STATES
+// DEFENDER STATES (Animancer Version)
 // ════════════════════════════════════════════════════════════════════════════
+//
+// Alle animator.SetBool Aufrufe sind durch typsichere
+// AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
 //
 // Idle → Approaching → InPosition → zurück
 //
@@ -21,6 +24,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
+            npc.AnimManager?.PlayIdle();
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
@@ -47,8 +51,7 @@ namespace DefenderStates
 
         public override void Enter(DefenderNpc npc)
         {
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsMoving", true);
+            npc.AnimManager?.PlayWalk();
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
@@ -70,12 +73,6 @@ namespace DefenderStates
             npc.MoveTowardTarget();
             return null;
         }
-
-        public override void Exit(DefenderNpc npc)
-        {
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsMoving", false);
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -89,9 +86,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
-            
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsGuarding", true);
+            npc.AnimManager?.PlayIdle();
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc)
@@ -102,12 +97,6 @@ namespace DefenderStates
                 return new Idle();
 
             return null;
-        }
-
-        public override void Exit(DefenderNpc npc)
-        {
-            if (npc.NpcAnimator != null)
-                npc.NpcAnimator.SetBool("IsGuarding", false);
         }
     }
 
@@ -122,12 +111,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
-            
-            if (npc.NpcAnimator != null)
-            {
-                npc.NpcAnimator.SetBool("IsGuarding", false);
-                npc.NpcAnimator.SetBool("IsMoving", false);
-            }
+            npc.AnimManager?.PlayStunnedFromCombat();
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc) => null;

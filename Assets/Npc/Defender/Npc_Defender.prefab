@@ -733,6 +733,8 @@ GameObject:
   - component: {fileID: 1078752966882323621}
   - component: {fileID: 7760183188333331989}
   - component: {fileID: 8516579965078543535}
+  - component: {fileID: 8583364878332715995}
+  - component: {fileID: 5651826955492156331}
   m_Layer: 6
   m_Name: Npc_Defender
   m_TagString: Enemy
@@ -767,7 +769,7 @@ Animator:
   m_GameObject: {fileID: 2472838132611520362}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 90555b2c7d6883749b5787271fc90923, type: 3}
-  m_Controller: {fileID: 9100000, guid: 27a50f75f48b83b4f898b3a3959b5409, type: 2}
+  m_Controller: {fileID: 0}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -844,6 +846,7 @@ MonoBehaviour:
   hitSound: {fileID: 0}
   useRagdollOnDeath: 1
   destroyDelay: 10
+  snapTarget: {fileID: 1590548316490049355}
   showDebugInfo: 1
   approachDistance: 1.5
   reengageDistance: 3
@@ -967,6 +970,82 @@ MonoBehaviour:
   parryEffect: {fileID: 0}
   gizmoColor: {r: 0, g: 0.8, b: 1, a: 0.25}
   alwaysShowGizmo: 0
+--- !u!114 &8583364878332715995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ad50f81b1d25c441943c37a89ba23f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Kybernetik.Animancer::Animancer.AnimancerComponent
+  _Animator: {fileID: 3767853563656458135}
+  _Transitions: {fileID: 0}
+  _ActionOnDisable: 0
+--- !u!114 &5651826955492156331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f3f3288e9adb4a43850ccf6e38184b0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DefenderAnimationManager
+  animancer: {fileID: 8583364878332715995}
+  idle:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8310422895069475490, guid: 16d3434411df40c40ab315176f070dc9, type: 3}
+    _NormalizedStartTime: NaN
+  walk:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 5716439668985258394, guid: 6cec2bc2185f5294daea54e3e5c4436e, type: 3}
+    _NormalizedStartTime: NaN
+  stunned:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 2919245319784944379, guid: 09e8be1cd6fc8d64a998e21a3e92c753, type: 3}
+    _NormalizedStartTime: NaN
+  hit:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8903082955919803346, guid: 927f30056e257974784d372de90217bd, type: 3}
+    _NormalizedStartTime: NaN
+  die:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -8903082955919803346, guid: 927f30056e257974784d372de90217bd, type: 3}
+    _NormalizedStartTime: NaN
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0
