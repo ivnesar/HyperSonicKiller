@@ -848,9 +848,9 @@ MonoBehaviour:
   destroyDelay: 10
   snapTarget: {fileID: 1590548316490049355}
   showDebugInfo: 0
-  minShootingRange: 20
+  minShootingRange: 3
   maxShootingRange: 50
-  preferredRange: 35
+  preferredRange: 15
   aimDuration: 3
   reloadDuration: 3
   damagePerShot: 999

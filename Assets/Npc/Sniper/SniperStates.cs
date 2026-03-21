@@ -128,6 +128,10 @@ namespace SniperStates
         {
             npc.RotateTowardTarget();
 
+            // Spieler dasht → Target verloren, Aiming abbrechen
+            if (npc.IsPlayerDashing)
+                return new Idle();
+
             if (!npc.HasLineOfSight())
                 return new Idle();
 

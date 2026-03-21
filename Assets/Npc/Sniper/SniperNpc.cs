@@ -48,13 +48,6 @@ public class SniperNpc : NpcBase
     [Tooltip("Schaden pro Treffer (deutlich höher als Soldier)")]
     [SerializeField] private int damagePerShot = 80;
 
-    [Header("Combat - Accuracy")]
-    [Tooltip("Basis-Trefferchance (0-1). Sniper ist genauer als Soldier.")]
-    [SerializeField] private float baseAccuracy = 0.95f;
-
-    [Tooltip("Maximaler Streuwinkel in Grad")]
-    [SerializeField] private float accuracySpreadAngle = 2f;
-
     [Header("Weapon")]
     [Tooltip("Mündungspunkt des Scharfschützengewehrs")]
     [SerializeField] private Transform muzzlePoint;
@@ -64,9 +57,6 @@ public class SniperNpc : NpcBase
 
     [Tooltip("Layer für Line-of-Sight und Bullet-Hit Check")]
     [SerializeField] private LayerMask bulletHitMask;
-
-    [Tooltip("FOV-Winkel der Mündung in Grad. Spieler innerhalb → direkt zielen.")]
-    [SerializeField] private float muzzleAimAssistFOV = 3f;
 
     [Header("Aim Bone Rotation")]
     [Tooltip("Der Bone der sich vertikal neigen soll (z.B. Stomach, Spine, Chest)")]
@@ -284,13 +274,15 @@ public class SniperNpc : NpcBase
 
     /// <summary>
     /// Feuert einen einzelnen Sniper-Schuss.
+    /// Die Kugel wird immer direkt auf den Spieler gerichtet (kein Spread).
     /// </summary>
     public void FireShot()
     {
         if (muzzlePoint == null || bulletPrefab == null) return;
 
-        Vector3 direction = CalculateFireDirection();
-        direction = ApplySpread(direction);
+        // Immer direkt auf den Spieler zielen
+        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
+        Vector3 direction = (targetPoint - muzzlePoint.position).normalized;
 
         var bullet = Instantiate(bulletPrefab, muzzlePoint.position, Quaternion.identity);
         if (bullet != null)
@@ -302,41 +294,6 @@ public class SniperNpc : NpcBase
 
         if (muzzleFlash != null)
             muzzleFlash.Play();
-    }
-
-    /// <summary>
-    /// Berechnet die Schussrichtung.
-    /// Spieler innerhalb Muzzle-FOV → direkt zum Spieler zielen.
-    /// Ansonsten → in Laufrichtung schießen.
-    /// </summary>
-    private Vector3 CalculateFireDirection()
-    {
-        Vector3 muzzleForward = muzzlePoint.forward;
-
-        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
-        Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
-
-        float angleToTarget = Vector3.Angle(muzzleForward, directionToTarget);
-
-        if (angleToTarget <= muzzleAimAssistFOV)
-        {
-            return directionToTarget;
-        }
-
-        return muzzleForward;
-    }
-
-    private Vector3 ApplySpread(Vector3 direction)
-    {
-        float spread = Random.value <= baseAccuracy
-            ? accuracySpreadAngle * 0.1f  // Sniper: sehr wenig Streuung bei Treffer
-            : accuracySpreadAngle;
-
-        return Quaternion.Euler(
-            Random.Range(-spread, spread),
-            Random.Range(-spread, spread),
-            0
-        ) * direction;
     }
 
     public void PlayReloadSound() => PlaySound(reloadSound);

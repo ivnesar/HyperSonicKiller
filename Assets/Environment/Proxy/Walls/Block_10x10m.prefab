@@ -11,12 +11,12 @@ GameObject:
   - component: {fileID: 3035508492024113665}
   - component: {fileID: 6533249018949150873}
   - component: {fileID: 1440362857338422655}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: default (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &3035508492024113665
 Transform:
@@ -171,12 +171,12 @@ GameObject:
   - component: {fileID: 6972160067094642380}
   - component: {fileID: 4857905359730131163}
   - component: {fileID: 5127655679920320795}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: default
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &6972160067094642380
 Transform:
@@ -261,12 +261,12 @@ GameObject:
   - component: {fileID: 5356332379569436908}
   - component: {fileID: 5993409841977006097}
   - component: {fileID: 6229057910292820688}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: default (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &5356332379569436908
 Transform:
@@ -351,12 +351,12 @@ GameObject:
   - component: {fileID: 5887234309713391425}
   - component: {fileID: 3719730681594325067}
   - component: {fileID: 2031443199184001395}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: default (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!4 &5887234309713391425
 Transform:
