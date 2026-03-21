@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 676095325aa0f0249bb9c30081e9c42b
+guid: 09e8be1cd6fc8d64a998e21a3e92c753
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -12,7 +12,7 @@ ModelImporter:
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
-    resampleCurves: 1
+    resampleCurves: 0
     optimizeGameObjects: 0
     removeConstantScaleCurves: 0
     motionNodeName: 
@@ -29,7 +29,36 @@ ModelImporter:
     animationWrapMode: 0
     extraExposedTransformPaths: []
     extraUserProperties: []
-    clipAnimations: []
+    clipAnimations:
+    - serializedVersion: 16
+      name: DEF05_stunned
+      takeName: DEF05_stunned
+      internalID: 2919245319784944379
+      firstFrame: 0
+      lastFrame: 6
+      wrapMode: 0
+      orientationOffsetY: 0
+      level: 0
+      cycleOffset: 0
+      loop: 0
+      hasAdditiveReferencePose: 0
+      loopTime: 1
+      loopBlend: 0
+      loopBlendOrientation: 0
+      loopBlendPositionY: 0
+      loopBlendPositionXZ: 0
+      keepOriginalOrientation: 0
+      keepOriginalPositionY: 1
+      keepOriginalPositionXZ: 0
+      heightFromFeet: 0
+      mirror: 0
+      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+      curves: []
+      events: []
+      transformMask: []
+      maskType: 3
+      maskSource: {instanceID: 0}
+      additiveReferencePoseFrame: 0
     isReadable: 0
   meshes:
     lODScreenPercentages: []
@@ -49,7 +78,7 @@ ModelImporter:
     generateSecondaryUV: 0
     useFileUnits: 1
     keepQuads: 0
-    weldVertices: 0
+    weldVertices: 1
     bakeAxisConversion: 0
     preserveHierarchy: 0
     skinWeightsMode: 0
@@ -235,19 +264,83 @@ ModelImporter:
         value: {x: 0, y: 0, z: 0}
         length: 0
         modified: 0
+    - boneName: thump_l_1
+      humanName: Left Thumb Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: thump_l_2
+      humanName: Left Thumb Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: index_finger_l_1
+      humanName: Left Index Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: index_finger_l_2
+      humanName: Left Index Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: thump_r_1
+      humanName: Right Thumb Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: thump_r_2
+      humanName: Right Thumb Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: index_finger_r_1
+      humanName: Right Index Proximal
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
+    - boneName: index_finger_r_2
+      humanName: Right Index Intermediate
+      limit:
+        min: {x: 0, y: 0, z: 0}
+        max: {x: 0, y: 0, z: 0}
+        value: {x: 0, y: 0, z: 0}
+        length: 0
+        modified: 0
     skeleton:
-    - name: psxG8Mdef05_rigged_fullbody(Clone)
+    - name: psxG8Mdef05_rigged(Clone)
       parentName: 
       position: {x: 0, y: 0, z: 0}
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1}
-    - name: G8Mdef
-      parentName: psxG8Mdef05_rigged_fullbody(Clone)
+    - name: G8F
+      parentName: psxG8Mdef05_rigged(Clone)
       position: {x: -0, y: 0, z: 0}
       rotation: {x: 0, y: -0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: root
-      parentName: psxG8Mdef05_rigged_fullbody(Clone)
+      parentName: psxG8Mdef05_rigged(Clone)
       position: {x: -0, y: 0, z: 0}
       rotation: {x: 0, y: -0, z: -0, w: 1}
       scale: {x: 100, y: 100, z: 100}
@@ -306,6 +399,36 @@ ModelImporter:
       position: {x: 0.00024358039, y: -0.000067592766, z: -0.002634803}
       rotation: {x: 0.13445018, y: -0.37271065, z: 0.05467498, w: 0.9165264}
       scale: {x: 1, y: 0.9999999, z: 0.99999994}
+    - name: index_finger_r_1
+      parentName: hand_r
+      position: {x: -0.00086286094, y: -0.000055975248, z: -0.0008223492}
+      rotation: {x: -0.026854644, y: 0.48140508, z: 0.01466904, w: 0.87596387}
+      scale: {x: 0.9999999, y: 1, z: 0.99999994}
+    - name: index_finger_r_2
+      parentName: index_finger_r_1
+      position: {x: 0.00005616586, y: -0.000022848124, z: -0.00047501983}
+      rotation: {x: 0.010135003, y: -0.5023414, z: -0.0058886055, w: 0.8645899}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: index_finger_r_3
+      parentName: index_finger_r_2
+      position: {x: -0.00048017615, y: -0.000027623997, z: -0.000382557}
+      rotation: {x: 0, y: -0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1}
+    - name: thump_r_1
+      parentName: hand_r
+      position: {x: 0.000005945856, y: 0.0000009417998, z: -0.0008681789}
+      rotation: {x: -0.07334521, y: 0.02579921, z: 0.01683804, w: 0.9968307}
+      scale: {x: 0.9999999, y: 1.0000001, z: 0.99999994}
+    - name: thump_r_2
+      parentName: thump_r_1
+      position: {x: -0.000009325591, y: -0.00001640884, z: -0.00037895623}
+      rotation: {x: 0.035449762, y: 0.00027950204, z: -0.000009959049, w: 0.9993714}
+      scale: {x: 1.0000001, y: 1, z: 1.0000002}
+    - name: thump_r_3
+      parentName: thump_r_2
+      position: {x: -0.000011487737, y: -0.000036575973, z: -0.00033864318}
+      rotation: {x: -0.12700227, y: 0.0022219387, z: 0.00028452216, w: 0.9918999}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
     - name: neck
       parentName: chest
       position: {x: 0.000399097, y: -0.000006193971, z: -0.003525322}
@@ -336,6 +459,36 @@ ModelImporter:
       position: {x: 0.00024358039, y: -0.000067592766, z: -0.002634803}
       rotation: {x: 0.13445018, y: -0.37271065, z: 0.05467498, w: 0.9165264}
       scale: {x: 1, y: 0.9999999, z: 0.99999994}
+    - name: index_finger_l_1
+      parentName: hand_l
+      position: {x: -0.00086286094, y: -0.000055975248, z: -0.0008223492}
+      rotation: {x: -0.026854496, y: 0.48140526, z: 0.01466896, w: 0.8759638}
+      scale: {x: 0.9999999, y: 1, z: 0.99999994}
+    - name: index_finger_l_2
+      parentName: index_finger_l_1
+      position: {x: 0.00005616586, y: -0.000022848124, z: -0.00047501983}
+      rotation: {x: 0.010135003, y: -0.5023414, z: -0.0058886055, w: 0.8645899}
+      scale: {x: 1, y: 1, z: 1.0000001}
+    - name: index_finger_l_3
+      parentName: index_finger_l_2
+      position: {x: -0.00048017615, y: -0.000027623997, z: -0.000382557}
+      rotation: {x: 0, y: -0, z: -0, w: 1}
+      scale: {x: 1, y: 1, z: 1}
+    - name: thump_l_1
+      parentName: hand_l
+      position: {x: 0.000005945856, y: 0.0000009417998, z: -0.0008681789}
+      rotation: {x: -0.07334675, y: 0.025797954, z: 0.016838036, w: 0.9968306}
+      scale: {x: 0.9999999, y: 1.0000001, z: 0.99999994}
+    - name: thump_l_2
+      parentName: thump_l_1
+      position: {x: -0.000009325591, y: -0.00001640884, z: -0.00037895623}
+      rotation: {x: 0.035449762, y: 0.00027950204, z: -0.000009959049, w: 0.9993714}
+      scale: {x: 1.0000001, y: 1, z: 1.0000002}
+    - name: thump_l_3
+      parentName: thump_l_2
+      position: {x: -0.000011487737, y: -0.000036575973, z: -0.00033864318}
+      rotation: {x: -0.12700227, y: 0.0022219387, z: 0.00028452216, w: 0.9918999}
+      scale: {x: 1, y: 1.0000001, z: 1.0000001}
     - name: thigh_l
       parentName: pelvis
       position: {x: 0.00010608324, y: -0.0009753378, z: 0.00070762745}
@@ -368,11 +521,11 @@ ModelImporter:
     hasTranslationDoF: 0
     hasExtraRoot: 1
     skeletonHasParents: 1
-  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: 90555b2c7d6883749b5787271fc90923, type: 3}
   autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 3
   humanoidOversampling: 1
-  avatarSetup: 1
+  avatarSetup: 2
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1
   importBlendShapeDeformPercent: 1
   remapMaterialsIfMaterialImportModeIsNone: 0

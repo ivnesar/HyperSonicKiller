@@ -729,12 +729,13 @@ GameObject:
   - component: {fileID: 3141529538732586769}
   - component: {fileID: 7178067220184908088}
   - component: {fileID: 4128161012689180827}
-  - component: {fileID: 4891449849083221139}
   - component: {fileID: 4221902022032833579}
   - component: {fileID: 5996686098694072418}
   - component: {fileID: 6565262033440337451}
   - component: {fileID: 1508127111980046060}
   - component: {fileID: 5241556215887614238}
+  - component: {fileID: 1163485433373802548}
+  - component: {fileID: 1044951156349196268}
   m_Layer: 6
   m_Name: Npc_Sniper
   m_TagString: Enemy
@@ -854,14 +855,11 @@ MonoBehaviour:
   aimDuration: 3
   reloadDuration: 3
   damagePerShot: 999
-  baseAccuracy: 1
-  accuracySpreadAngle: 0
   muzzlePoint: {fileID: 2080795029759614631}
   bulletPrefab: {fileID: 1344611437300234443, guid: aaa5bdbebef87bd4d8d8e64ba3ce0604, type: 3}
   bulletHitMask:
     serializedVersion: 2
     m_Bits: 8328
-  muzzleAimAssistFOV: 3
   aimBone: {fileID: 8052137596577771941}
   pitchAxis: {x: 1, y: -1, z: 0}
   invertPitch: 0
@@ -969,31 +967,6 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
---- !u!114 &4891449849083221139
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2472838132611520362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbe2a735714d1bf4abfa9c1d59454343, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollController
-  totalMass: 70
-  ragdollDrag: 0.5
-  ragdollAngularDrag: 0.5
-  impactForceMultiplier: 1
-  maxImpactForce: 500
-  upwardForceBias: 0.3
-  meleeImpactForce: 300
-  thrownSwordImpactForce: 400
-  bulletImpactForce: 50
-  accumulateBulletImpacts: 1
-  explosionImpactForce: 500
-  mainRigidbody: {fileID: 0}
-  showDebugInfo: 0
 --- !u!114 &4221902022032833579
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1117,6 +1090,45 @@ MonoBehaviour:
   enableWiggle: 1
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
   showDebug: 0
+--- !u!114 &1163485433373802548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed82dc4b5017f2d43a3fa636a8c89fb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcImpactTracker
+  meleeImpactForce: 300
+  thrownSwordImpactForce: 400
+  bulletImpactForce: 50
+  accumulateBulletImpacts: 1
+  explosionImpactForce: 500
+  showDebugInfo: 0
+--- !u!114 &1044951156349196268
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb292f7ab65108c43b29b07d80468c87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
+  fullBodyRagdollPrefab: {fileID: 7890016569643223389, guid: 6c557b5db2b59f347a6afc31dfc51dce, type: 3}
+  slicedPairs: []
+  droppableEquipment: []
+  ragdollDestroyDelay: 10
+  upwardForceBias: 0.3
+  slicedImpactMultiplier: 0.5
+  equipmentDropForce: 2
+  equipmentDestroyDelay: 15
+  showDebugInfo: 0
 --- !u!1 &2472908500150121730
 GameObject:
   m_ObjectHideFlags: 0

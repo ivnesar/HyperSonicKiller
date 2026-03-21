@@ -594,23 +594,13 @@ public class GenTwoNpc : NpcBase
     {
         if (isDead) return;
 
-        isDead = true;
+        // GenTwo-spezifisches Cleanup vor dem Tod
         isStunned = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 
-        if (useRagdollOnDeath && ragdollController != null)
-        {
-            ragdollController.ActivateRagdollWithAccumulatedImpact();
-            animHandler?.DisableForRagdoll();
-        }
-        else
-        {
-            animHandler?.PlayDeath();
-        }
-
-        if (destroyDelay >= 0)
-            Destroy(gameObject, destroyDelay);
+        // Alles Weitere (Swapper, Impact, Destroy) erledigt NpcBase
+        base.Die();
     }
 
     #endregion

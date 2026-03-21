@@ -13,8 +13,8 @@ using UnityEngine.AI;
 // ANIMANCER MIGRATION:
 // - Alle direkten Animator-Zugriffe (SetTrigger, SetBool, SetFloat)
 //   sind durch INpcAnimationHandler-Aufrufe ersetzt.
-// - Das 'animator' Feld existiert noch für Subsysteme wie NpcRagdollController,
-//   wird aber NICHT mehr für Animationssteuerung verwendet.
+// - Das 'animator' Feld existiert noch für Subsysteme die den Animator
+//   direkt brauchen, wird aber NICHT für Animationssteuerung verwendet.
 // - Konkrete NPCs (SoldierNpc, GenTwoNpc) finden ihren AnimationManager
 //   über GetComponentInChildren<T>() und exponieren ihn typsicher.
 //
@@ -87,7 +87,8 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
     protected NavMeshAgent navAgent;
     protected AudioSource audioSource;
-    protected NpcRagdollController ragdollController;
+    protected NpcImpactTracker impactTracker;
+    protected NpcRagdollSwapper ragdollSwapper;
     protected Transform playerTransform;
 
     /// <summary>
@@ -101,7 +102,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// <summary>
     /// Rohe Animator-Referenz. Wird NICHT für Animationssteuerung verwendet
     /// (dafür gibt es animHandler). Existiert für Subsysteme die den Animator
-    /// direkt brauchen (z.B. NpcRagdollController Zustandsprüfung).
+    /// direkt brauchen.
     /// </summary>
     protected Animator animator;
 
@@ -119,6 +120,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     protected bool hasSwordEmbedded;
     protected int pendingSwordRemovalDamage;
     protected bool hasPendingSwordDamage;
+
+    // Death Type Tracking — wird in Damage-Methoden gesetzt, von Die() gelesen
+    protected NpcDeathType lastDeathType = NpcDeathType.WholeBody;
 
     // Pathfinding
     private bool canReachPlayer;
@@ -213,7 +217,8 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         navAgent = GetComponent<NavMeshAgent>();
         animator = GetComponentInChildren<Animator>();
         audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
-        ragdollController = GetComponent<NpcRagdollController>();
+        impactTracker = GetComponent<NpcImpactTracker>();
+        ragdollSwapper = GetComponent<NpcRagdollSwapper>();
 
         // Animation handler finden (AnimancerComponent-basierter Manager)
         animHandler = GetComponentInChildren<INpcAnimationHandler>();
@@ -477,6 +482,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         pendingSwordRemovalDamage = 0;
 
         currentHealth -= damage;
+        lastDeathType = NpcDeathType.WholeBody;
         
         animHandler?.PlayHitReaction();
         PlaySound(hitSound);
@@ -514,9 +520,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (isDead) return;
 
         currentHealth -= Mathf.RoundToInt(damage);
+        lastDeathType = NpcDeathType.WholeBody;
         
-        if (ragdollController != null)
-            ragdollController.RegisterMeleeImpact(hitPoint);
+        if (impactTracker != null)
+            impactTracker.RegisterMeleeImpact(hitPoint);
         
         animHandler?.PlayHitReaction();
         PlaySound(hitSound);
@@ -544,9 +551,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (isDead) return;
 
         currentHealth -= damage;
+        lastDeathType = NpcDeathType.Sliced;
         
-        if (playerTransform != null && ragdollController != null)
-            ragdollController.RegisterMeleeImpact(playerTransform.position);
+        if (playerTransform != null && impactTracker != null)
+            impactTracker.RegisterMeleeImpact(playerTransform.position);
 
         animHandler?.PlayHitReaction();
         PlaySound(hitSound);
@@ -559,9 +567,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (isDead) return;
 
         currentHealth -= damage;
+        lastDeathType = NpcDeathType.WholeBody;
         
-        if (ragdollController != null)
-            ragdollController.RegisterThrownSwordImpact(swordDirection, hitPoint);
+        if (impactTracker != null)
+            impactTracker.RegisterThrownSwordImpact(swordDirection, hitPoint);
 
         if (currentHealth <= 0) Die();
     }
@@ -611,6 +620,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (damage > 0)
         {
             currentHealth -= damage;
+            lastDeathType = NpcDeathType.WholeBody;
             
             animHandler?.PlayHitReaction();
             PlaySound(hitSound);
@@ -630,9 +640,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (isDead) return;
 
         currentHealth -= damage;
+        lastDeathType = NpcDeathType.WholeBody;
         
-        if (ragdollController != null)
-            ragdollController.RegisterBulletImpact(bulletDirection, hitPoint);
+        if (impactTracker != null)
+            impactTracker.RegisterBulletImpact(bulletDirection, hitPoint);
         
         animHandler?.PlayHitReaction();
         PlaySound(hitSound);
@@ -664,15 +675,33 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             navAgent.enabled = false;
         }
 
-        if (useRagdollOnDeath && ragdollController != null)
+        // ── Ragdoll Swap: Neues System (ersetzt NPC durch Ragdoll-Prefabs) ──
+        if (ragdollSwapper != null && ragdollSwapper.IsConfigured)
         {
-            ragdollController.ActivateRagdollWithAccumulatedImpact();
+            // Animation stoppen BEVOR Bones kopiert werden
+            // (DisableForRagdoll stoppt Animancer, die Pose bleibt stehen)
             animHandler?.DisableForRagdoll();
+
+            // Impact-Daten vom ImpactTracker holen (falls vorhanden)
+            Vector3 impactDir = Vector3.forward;
+            float impactMag = 0f;
+            Vector3? impactPoint = null;
+
+            if (impactTracker != null)
+            {
+                GetAccumulatedImpact(out impactDir, out impactMag, out impactPoint);
+            }
+
+            // Swap durchführen — spawnt Ragdolls und zerstört dieses GameObject
+            ragdollSwapper.PerformSwap(lastDeathType, impactDir, impactMag, impactPoint);
+
+            // WICHTIG: Nach PerformSwap wird dieses GameObject zerstört.
+            // Kein Code nach dieser Zeile wird ausgeführt.
+            return;
         }
-        else
-        {
-            animHandler?.PlayDeath();
-        }
+
+        // ── Fallback: Kein Swapper vorhanden (z.B. AntiDashDrone, ProxyMine) ──
+        animHandler?.PlayDeath();
 
         if (destroyDelay >= 0)
             Destroy(gameObject, destroyDelay);
@@ -693,18 +722,45 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             navAgent.enabled = false;
         }
 
-        if (useRagdollOnDeath && ragdollController != null)
+        // ── Ragdoll Swap: Neues System ──
+        if (ragdollSwapper != null && ragdollSwapper.IsConfigured)
         {
-            ragdollController.ActivateRagdollWithImpact(impactDirection, forceMagnitude, impactPoint);
             animHandler?.DisableForRagdoll();
+            ragdollSwapper.PerformSwap(lastDeathType, impactDirection, forceMagnitude, impactPoint);
+            return;
         }
-        else
-        {
-            animHandler?.PlayDeath();
-        }
+
+        // ── Fallback: Kein Swapper vorhanden ──
+        animHandler?.PlayDeath();
 
         if (destroyDelay >= 0)
             Destroy(gameObject, destroyDelay);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Ragdoll Swap Helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Liest die akkumulierten Impact-Daten aus dem NpcImpactTracker.
+    /// Wird von Die() genutzt um die Daten an den NpcRagdollSwapper weiterzugeben.
+    /// </summary>
+    private void GetAccumulatedImpact(out Vector3 direction, out float magnitude, out Vector3? point)
+    {
+        if (impactTracker != null && impactTracker.HasAccumulatedImpact)
+        {
+            direction = impactTracker.AccumulatedImpactForce.normalized;
+            magnitude = impactTracker.AccumulatedImpactForce.magnitude;
+            point = impactTracker.LastImpactPoint;
+        }
+        else
+        {
+            direction = Vector3.forward;
+            magnitude = 0f;
+            point = null;
+        }
     }
 
     #endregion

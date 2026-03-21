@@ -156,13 +156,13 @@ public class ExplosionSphere : MonoBehaviour
             Vector3 hitPoint = hit.ClosestPoint(transform.position);
             damageable.TakeDamage(npcDamage, hitPoint, hitDirection);
 
-            // Ragdoll Impact registrieren (falls vorhanden)
-            NpcRagdollController ragdoll = hit.GetComponent<NpcRagdollController>();
-            if (ragdoll == null) ragdoll = hit.GetComponentInParent<NpcRagdollController>();
+            // Impact registrieren (falls vorhanden)
+            NpcImpactTracker impactTracker = hit.GetComponent<NpcImpactTracker>();
+            if (impactTracker == null) impactTracker = hit.GetComponentInParent<NpcImpactTracker>();
 
-            if (ragdoll != null)
+            if (impactTracker != null)
             {
-                ragdoll.RegisterExplosionImpact(transform.position);
+                impactTracker.RegisterExplosionImpact(transform.position);
             }
         }
     }

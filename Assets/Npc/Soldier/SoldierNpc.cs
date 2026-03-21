@@ -3,8 +3,14 @@ using UnityEngine;
 /// <summary>
 /// Soldier NPC - Schießt auf den Spieler aus der Distanz.
 /// Benötigt freie Sichtlinie zum Schießen.
-/// Enthält dynamische Bone-Rotation für vertikales Zielen.
-/// 
+///
+/// AIM-IK MIGRATION:
+/// - Alte manuelle Aim-Bone-Rotation (LateUpdate, UpdateAimBoneRotation,
+///   CalculateTargetPitch) komplett entfernt.
+/// - Aiming wird jetzt über AimController gesteuert,
+///   der die AimIK-Komponente von RootMotion Final IK wrapped.
+/// - States setzen npc.IsAiming → SoldierNpc leitet das an AimController weiter.
+///
 /// ANIMANCER MIGRATION:
 /// - NpcAnimator Property entfernt → AnimManager (SoldierAnimationManager) stattdessen.
 /// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayFire()).
@@ -43,28 +49,6 @@ public class SoldierNpc : NpcBase
     [Tooltip("FOV-Winkel der Mündung in Grad. Wenn Spieler innerhalb dieses Winkels ist, wird direkt auf ihn gezielt.")]
     [SerializeField] private float muzzleAimAssistFOV = 5f;
 
-    [Header("Aim Bone Rotation")]
-    [Tooltip("Der Bone der sich vertikal neigen soll (z.B. Stomach, Spine, Chest)")]
-    [SerializeField] private Transform aimBone;
-    
-    [Tooltip("Lokale Rotationsachse für Pitch (Up/Down). Abhängig vom Rig.")]
-    [SerializeField] private Vector3 pitchAxis = Vector3.right;
-    
-    [Tooltip("Invertiert die Pitch-Richtung falls nötig")]
-    [SerializeField] private bool invertPitch = false;
-    
-    [Tooltip("Maximale Neigung nach oben in Grad")]
-    [SerializeField] private float maxPitchUp = 45f;
-    
-    [Tooltip("Maximale Neigung nach unten in Grad")]
-    [SerializeField] private float maxPitchDown = 30f;
-    
-    [Tooltip("Geschwindigkeit der Pitch-Interpolation")]
-    [SerializeField] private float pitchSmoothSpeed = 8f;
-    
-    [Tooltip("Geschwindigkeit beim Ein-/Ausblenden des Aim-Pitch")]
-    [SerializeField] private float aimBlendSpeed = 6f;
-
     [Header("Audio/VFX")]
     [SerializeField] private AudioClip fireSound;
     [SerializeField] private AudioClip reloadSound;
@@ -84,12 +68,15 @@ public class SoldierNpc : NpcBase
     public int ShotsPerSalvo => shotsPerSalvo;
     public float ReloadDuration => reloadDuration;
 
-    
     /// <summary>
     /// Typed animation manager reference for SoldierStates.
-    /// Use this instead of the old NpcAnimator property.
     /// </summary>
     public SoldierAnimationManager AnimManager { get; private set; }
+
+    /// <summary>
+    /// AimIK-Controller für Oberkörper-Rotation zum Ziel.
+    /// </summary>
+    public AimController AimController { get; private set; }
 
     #endregion
 
@@ -101,13 +88,9 @@ public class SoldierNpc : NpcBase
     public int ShotsFiredInSalvo { get; set; }
     public float NextShotTime { get; set; }
 
-    // Aim Bone Rotation
-    private float currentPitch = 0f;
-    private float aimBlendWeight = 0f;
-    
     /// <summary>
-    /// Wird von States gesetzt um die Bone-Rotation zu aktivieren/deaktivieren.
-    /// True = Bone neigt sich zum Spieler, False = Bone kehrt zur Animation zurück.
+    /// Wird von States gesetzt um AimIK zu aktivieren/deaktivieren.
+    /// True = AimIK blendet ein, False = AimIK blendet aus.
     /// </summary>
     public bool IsAiming { get; set; }
 
@@ -132,11 +115,18 @@ public class SoldierNpc : NpcBase
 
         // Typsichere Referenz auf den Animation Manager
         AnimManager = GetComponentInChildren<SoldierAnimationManager>();
-
         if (AnimManager == null)
         {
             Debug.LogWarning($"[SoldierNpc] No SoldierAnimationManager found on {gameObject.name}! " +
                              "Animations will not work.");
+        }
+
+        // AimController finden
+        AimController = GetComponent<AimController>();
+        if (AimController == null)
+        {
+            Debug.LogWarning($"[SoldierNpc] No AimController found on {gameObject.name}! " +
+                             "Aim-IK will not work. Add AimController component.");
         }
     }
 
@@ -156,9 +146,17 @@ public class SoldierNpc : NpcBase
         var nextState = currentState.Update(this);
         if (nextState != null)
             ChangeState(nextState);
+
+        // AimController jeden Frame mit der aktuellen Zielposition füttern
+        UpdateAimController();
     }
 
-    protected override void OnStunStart() => ChangeState(new SoldierStates.Stunned());
+    protected override void OnStunStart()
+    {
+        AimController?.DisableImmediate();
+        ChangeState(new SoldierStates.Stunned());
+    }
+
     protected override void OnStunEnd() => ChangeState(new SoldierStates.Idle());
 
     public override string GetCurrentStateName() => currentState?.StateName ?? "None";
@@ -168,72 +166,25 @@ public class SoldierNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Aim Bone Rotation
+    #region AimIK Steuerung
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// LateUpdate wird NACH der Animation aufgerufen.
-    /// Hier addieren wir unsere Pitch-Rotation zur Animation-Rotation.
+    /// Aktualisiert den AimController basierend auf IsAiming und der Zielposition.
+    /// Wird jeden Frame aus UpdateBehavior() aufgerufen.
     /// </summary>
-    private void LateUpdate()
+    private void UpdateAimController()
     {
-        if (isDead) return;
-        
-        UpdateAimBoneRotation();
-    }
+        if (AimController == null) return;
 
-    private void UpdateAimBoneRotation()
-    {
-        // Blend-Weight aktualisieren (smooth ein-/ausblenden)
-        float targetBlend = IsAiming ? 1f : 0f;
-        aimBlendWeight = Mathf.MoveTowards(aimBlendWeight, targetBlend, aimBlendSpeed * Time.deltaTime);
+        // Weight-Steuerung: States setzen IsAiming, wir leiten es weiter
+        if (IsAiming)
+            AimController.EnableAim();
+        else
+            AimController.DisableAim();
 
-        // Früher Ausstieg wenn komplett ausgeblendet und kein Bone
-        if (aimBlendWeight < 0.001f || aimBone == null) return;
-
-        // Ziel-Pitch berechnen
-        float targetPitch = CalculateTargetPitch();
-        
-        // Smooth zum Ziel interpolieren
-        currentPitch = Mathf.Lerp(currentPitch, targetPitch, pitchSmoothSpeed * Time.deltaTime);
-
-        // Finale Rotation mit Blend-Weight anwenden
-        float finalPitch = currentPitch * aimBlendWeight;
-        
-        // Rotation auf die konfigurierte Achse anwenden
-        Quaternion pitchRotation = Quaternion.AngleAxis(finalPitch, pitchAxis.normalized);
-        aimBone.localRotation *= pitchRotation;
-    }
-
-    /// <summary>
-    /// Berechnet den benötigten Pitch-Winkel zum Spieler.
-    /// Positiv = nach oben, Negativ = nach unten.
-    /// </summary>
-    private float CalculateTargetPitch()
-    {
-        if (playerTransform == null || aimBone == null) return 0f;
-
-        // Richtung vom Bone zum Ziel (Brusthöhe) — nutzt gelockte Position falls aktiv
-        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
-        Vector3 toTarget = targetPoint - aimBone.position;
-
-        // Horizontale Distanz (XZ-Ebene)
-        float horizontalDistance = new Vector2(toTarget.x, toTarget.z).magnitude;
-        
-        // Vertikaler Unterschied
-        float verticalDifference = toTarget.y;
-
-        // Pitch-Winkel berechnen (Arctan von vertikal/horizontal)
-        float pitchAngle = Mathf.Atan2(verticalDifference, horizontalDistance) * Mathf.Rad2Deg;
-
-        // Invertieren falls nötig
-        if (invertPitch)
-            pitchAngle = -pitchAngle;
-
-        // Auf erlaubten Bereich begrenzen
-        pitchAngle = Mathf.Clamp(pitchAngle, -maxPitchDown, maxPitchUp);
-
-        return pitchAngle;
+        // Zielposition aktualisieren (nutzt gelockte Position falls aktiv)
+        AimController.SetTargetPosition(EffectiveTargetPosition);
     }
 
     #endregion
@@ -269,20 +220,16 @@ public class SoldierNpc : NpcBase
     {
         if (playerTransform == null) return false;
         
-        // Fallback wenn kein muzzlePoint gesetzt
         Vector3 origin = muzzlePoint != null ? muzzlePoint.position : transform.position + Vector3.up * 1.2f;
-        Vector3 targetPoint = TargetPosition + Vector3.up * 1f; // Brusthöhe des Spielers
+        Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
         Vector3 direction = targetPoint - origin;
         float distance = direction.magnitude;
 
-        // Raycast: Trifft er etwas auf dem Weg zum Spieler?
         if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, bulletHitMask))
         {
-            // Freie Sicht nur wenn wir den Spieler direkt treffen
             return hit.collider.CompareTag("Player");
         }
 
-        // Nichts in der Maske getroffen = freie Sicht
         return true;
     }
 
@@ -305,7 +252,6 @@ public class SoldierNpc : NpcBase
         if (bullet != null)
             bullet.Initialize(direction, damagePerShot, transform, bulletHitMask);
 
-        // Animation über den Manager statt direkt über den Animator
         AnimManager?.PlayFireShot();
         
         PlaySound(fireSound);
@@ -321,23 +267,18 @@ public class SoldierNpc : NpcBase
     /// </summary>
     private Vector3 CalculateFireDirection()
     {
-        // Mündungsrichtung (Lauf-Forward)
         Vector3 muzzleForward = muzzlePoint.forward;
         
-        // Richtung zum Ziel (Brusthöhe) — nutzt gelockte Position falls aktiv
         Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
         Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
         
-        // Winkel zwischen Mündung und Ziel berechnen
         float angleToTarget = Vector3.Angle(muzzleForward, directionToTarget);
         
-        // Ziel innerhalb FOV → direkt drauf zielen (Aim-Assist)
         if (angleToTarget <= muzzleAimAssistFOV)
         {
             return directionToTarget;
         }
         
-        // Ziel außerhalb FOV → in Laufrichtung schießen
         return muzzleForward;
     }
 
@@ -373,6 +314,7 @@ public class SoldierNpc : NpcBase
     public new void StartAimTracking(float duration) => base.StartAimTracking(duration);
     public new void SetAimProgress(float progress) => base.SetAimProgress(progress);
     public new void ResetAimProgress() => base.ResetAimProgress();
+
     // ── Target Lock Helpers ──
 
     /// <summary>
@@ -402,6 +344,28 @@ public class SoldierNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Death — AimIK abschalten
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// AimIK sofort abschalten bevor NpcBase den Ragdoll-Swap durchführt.
+    /// Verhindert dass der IK-Solver auf einen toten/ragdolled NPC wirkt.
+    /// </summary>
+    protected override void Die()
+    {
+        AimController?.DisableImmediate();
+        base.Die();
+    }
+
+    public override void DieWithImpact(Vector3 impactDirection, float forceMagnitude, Vector3? impactPoint = null)
+    {
+        AimController?.DisableImmediate();
+        base.DieWithImpact(impactDirection, forceMagnitude, impactPoint);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Debug
     // ════════════════════════════════════════════════════════════════════════
 
@@ -427,15 +391,6 @@ public class SoldierNpc : NpcBase
             
             Gizmos.color = HasLineOfSight() ? Color.green : Color.red;
             Gizmos.DrawLine(origin, targetPoint);
-        }
-
-        // Aim Bone Visualisierung
-        if (Application.isPlaying && aimBone != null && playerTransform != null)
-        {
-            Vector3 targetPoint = TargetPosition + Vector3.up * 1f;
-            Gizmos.color = IsAiming ? Color.cyan : Color.gray;
-            Gizmos.DrawLine(aimBone.position, targetPoint);
-            Gizmos.DrawWireSphere(aimBone.position, 0.1f);
         }
     }
 
