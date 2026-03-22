@@ -40,8 +40,6 @@ public class SoldierAnimationManager : MonoBehaviour, INpcAnimationHandler
     [SerializeField] private ClipTransition aim;
     [SerializeField] private ClipTransition fire;
     [SerializeField] private ClipTransition reload;
-    [SerializeField] private ClipTransition hit;
-    [SerializeField] private ClipTransition die;
 
     // ── Movement ─────────────────────────────────────────────────────────
 
@@ -96,7 +94,7 @@ public class SoldierAnimationManager : MonoBehaviour, INpcAnimationHandler
 
     public void PlayHitReaction()
     {
-        PlayOneShotInstant(hit);
+        // Soldier ist ein One-Shot-Kill — keine Hit-Reaktion nötig.
     }
 
     public void PlayStunStart()
@@ -111,10 +109,8 @@ public class SoldierAnimationManager : MonoBehaviour, INpcAnimationHandler
 
     public void PlayDeath()
     {
-        if (die == null || die.Clip == null) return;
-
-        isPlayingOneShot = false;
-        animancer.Play(die, 0f);
+        // Tod wird komplett über NpcRagdollSwapper abgewickelt.
+        // DisableForRagdoll() wird stattdessen von NpcBase aufgerufen.
     }
 
     public void UpdateMovement(float normalizedSpeed)
@@ -235,6 +231,8 @@ public class SoldierAnimationManager : MonoBehaviour, INpcAnimationHandler
 
     /// <summary>
     /// Plays a one-shot instantly (fadeDuration = 0). For combat reactions.
+    /// Forces restart even if the same clip is already playing (important for
+    /// rapid repeated calls like FireShot during a salvo).
     /// </summary>
     private void PlayOneShotInstant(ClipTransition clip)
     {
@@ -242,6 +240,7 @@ public class SoldierAnimationManager : MonoBehaviour, INpcAnimationHandler
 
         isPlayingOneShot = true;
         AnimancerState state = animancer.Play(clip, 0f);
+        state.Time = 0f; // Force restart wenn gleicher Clip schon läuft
         state.Events(this).OnEnd = OnOneShotEnded;
     }
 
