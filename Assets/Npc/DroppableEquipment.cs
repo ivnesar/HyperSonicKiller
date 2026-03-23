@@ -4,13 +4,17 @@ using UnityEngine;
 // DROPPABLE EQUIPMENT - Equipment das beim NPC-Tod fallen gelassen wird
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Verknüpft ein Bone-Transform am lebenden NPC (wo die Waffe sitzt)
-// mit einem "losen" Prefab, das beim Tod instanziiert wird.
+// Referenziert ein Child-GameObject am lebenden NPC (z.B. die Waffe in der Hand).
+// Beim Tod wird das Objekt aus der NPC-Hierarchie gelöst (unparented) und
+// die Physics-Komponenten werden aktiviert, sodass es realistisch zu Boden fällt.
 //
-// Das Prefab sollte haben:
+// SETUP AM EQUIPMENT-OBJEKT (z.B. AM16):
 //   - Mesh/Renderer (sichtbar)
-//   - Rigidbody (damit es fällt)
-//   - Collider (damit es auf dem Boden liegen bleibt)
+//   - Rigidbody mit Is Kinematic = TRUE (wird beim Drop auf false gesetzt)
+//   - Collider mit Enabled = FALSE (wird beim Drop aktiviert)
+//
+// SETUP IM INSPECTOR (auf NpcRagdollSwapper):
+//   - "Equipment Object" = das Child-GameObject in der NPC-Hierarchie zuweisen
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -20,15 +24,12 @@ public class DroppableEquipment
     [Tooltip("Beschreibung (z.B. 'Gewehr', 'Helm'). Nur zur Übersicht im Inspector.")]
     public string label = "Weapon";
 
-    [Tooltip("Transform am lebenden NPC, wo das Equipment sitzt (z.B. Hand-Bone). " +
-             "Position und Rotation werden beim Tod kopiert.")]
-    public Transform attachPoint;
-
-    [Tooltip("Prefab das beim Tod instanziiert wird. Sollte Mesh + Rigidbody + Collider haben.")]
-    public GameObject droppedPrefab;
+    [Tooltip("Das Equipment-GameObject als Kind des NPC (z.B. Waffe am Hand-Bone). " +
+             "Muss Rigidbody (isKinematic=true) und Collider (enabled=false) haben.")]
+    public GameObject equipmentObject;
 
     /// <summary>
-    /// Prüft ob die nötigen Referenzen zugewiesen sind.
+    /// Prüft ob die nötige Referenz zugewiesen ist.
     /// </summary>
-    public bool IsValid => attachPoint != null && droppedPrefab != null;
+    public bool IsValid => equipmentObject != null;
 }

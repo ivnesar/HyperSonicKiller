@@ -7,20 +7,17 @@
 /// 
 /// Replaces all direct Animator access in NpcBase with type-safe method calls.
 /// No more string-based triggers or bool parameters.
+/// 
+/// NOTE: PlayHitReaction and PlayDeath were removed because all NPCs
+/// are one-shot kills with ragdoll death (handled by NpcRagdollSwapper).
 /// </summary>
 public interface INpcAnimationHandler
 {
-    /// <summary>Play a hit reaction (e.g. flinch). Typically instant, no fade.</summary>
-    void PlayHitReaction();
-
     /// <summary>Transition to the stunned animation loop.</summary>
     void PlayStunStart();
 
     /// <summary>Exit stunned state, return to idle.</summary>
     void PlayStunEnd();
-
-    /// <summary>Play death animation (only used when ragdoll is disabled).</summary>
-    void PlayDeath();
 
     /// <summary>
     /// Update the movement animation based on navAgent speed.

@@ -484,7 +484,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         currentHealth -= damage;
         lastDeathType = NpcDeathType.WholeBody;
         
-        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -525,7 +524,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (impactTracker != null)
             impactTracker.RegisterMeleeImpact(hitPoint);
         
-        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -556,7 +554,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (playerTransform != null && impactTracker != null)
             impactTracker.RegisterMeleeImpact(playerTransform.position);
 
-        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -622,7 +619,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             currentHealth -= damage;
             lastDeathType = NpcDeathType.WholeBody;
             
-            animHandler?.PlayHitReaction();
             PlaySound(hitSound);
 
             if (currentHealth <= 0)
@@ -645,7 +641,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (impactTracker != null)
             impactTracker.RegisterBulletImpact(bulletDirection, hitPoint);
         
-        animHandler?.PlayHitReaction();
         PlaySound(hitSound);
 
         if (currentHealth <= 0) Die();
@@ -701,7 +696,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
 
         // ── Fallback: Kein Swapper vorhanden (z.B. AntiDashDrone, ProxyMine) ──
-        animHandler?.PlayDeath();
 
         if (destroyDelay >= 0)
             Destroy(gameObject, destroyDelay);
@@ -731,7 +725,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         }
 
         // ── Fallback: Kein Swapper vorhanden ──
-        animHandler?.PlayDeath();
 
         if (destroyDelay >= 0)
             Destroy(gameObject, destroyDelay);
