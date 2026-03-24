@@ -113,6 +113,7 @@ MonoBehaviour:
   showDebugInfo: 1
   approachDistance: 1.5
   reengageDistance: 3
+  shieldHitReactionDuration: 0.5
 --- !u!114 &5996686098694072418
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -202,6 +203,15 @@ MonoBehaviour:
       _Callbacks: []
       _Names: []
     _Clip: {fileID: -5425641625827534475, guid: f44a8b5ae4ae2544e932748582cca4fe, type: 3}
+    _NormalizedStartTime: NaN
+  shieldHitReaction:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -2139681066607371323, guid: dc2c5c803a0320b459edf7c468910ad5, type: 3}
     _NormalizedStartTime: NaN
   references:
     version: 2

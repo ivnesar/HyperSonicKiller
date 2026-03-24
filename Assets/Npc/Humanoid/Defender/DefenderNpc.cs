@@ -30,6 +30,10 @@ public class DefenderNpc : NpcBase
     [Tooltip("Fängt wieder an zu laufen ab dieser Distanz")]
     [SerializeField] private float reengageDistance = 3f;
 
+    [Header("Shield Hit Reaction")]
+    [Tooltip("Wie lange der Defender nach einem Schild-Treffer stehen bleibt (in Sekunden).")]
+    [SerializeField] private float shieldHitReactionDuration = 0.5f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -38,6 +42,7 @@ public class DefenderNpc : NpcBase
 
     public float ApproachDistance => approachDistance;
     public float ReengageDistance => reengageDistance;
+    public float ShieldHitReactionDuration => shieldHitReactionDuration;
 
     /// <summary>
     /// Typed animation manager reference for DefenderStates.
@@ -62,7 +67,6 @@ public class DefenderNpc : NpcBase
     {
         base.Awake();
 
-        // Typsichere Referenz auf den Animation Manager
         AnimManager = GetComponentInChildren<DefenderAnimationManager>();
         if (AnimManager == null)
         {
@@ -110,6 +114,27 @@ public class DefenderNpc : NpcBase
         currentState?.Exit(this);
         currentState = newState;
         currentState?.Enter(this);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Shield Combat
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Vom Combat-System aufrufen, wenn der Spieler den Schild trifft.
+    /// Wechselt in den ShieldHitReaction-State (kurzes Stagger, dann weiter).
+    /// Ignoriert den Aufruf, wenn der Defender gerade gestunned oder tot ist.
+    /// </summary>
+    public void OnShieldBlocked()
+    {
+        if (IsDead || IsStunned) return;
+
+        // Nicht unterbrechen, wenn bereits in einer Hit-Reaction
+        if (currentState is DefenderStates.ShieldHitReaction) return;
+
+        ChangeState(new DefenderStates.ShieldHitReaction());
     }
 
     #endregion

@@ -6,11 +6,18 @@ using UnityEngine;
 ///
 /// LAYER SETUP:
 ///   Layer 0 (Base):       Idle, Walk, Stunned — Fullbody, no mask.
-///   Layer 1 (Upper Body): Reserved for future use (e.g. shield bash, block reaction).
+///   Layer 1 (Upper Body): ShieldBlock (looping base), ShieldHitReaction (one-shot).
 ///
-/// Currently the Defender only uses fullbody animations (Idle, Walk, Stunned).
-/// The upper layer is prepared but inactive — it can be used later for
-/// upper-body overrides without affecting the legs (e.g. shield raise while walking).
+/// The upper layer is ALWAYS active during normal gameplay (Idle, Walk, InPosition)
+/// with the ShieldBlock pose as the looping base clip. This means:
+///   - Legs are controlled by the base layer (walk cycle, idle)
+///   - Upper body is controlled by the upper layer (shield block pose)
+///
+/// When the player hits the shield, a ShieldHitReaction one-shot plays on the
+/// upper layer. After the one-shot finishes, it automatically returns to ShieldBlock.
+///
+/// During Stunned, the upper layer is deactivated — the stunned animation
+/// controls the entire body.
 ///
 /// SETUP:
 ///   1. Add AnimancerComponent to the Defender model (child with the Animator).
@@ -31,8 +38,7 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
     [SerializeField] private AnimancerComponent animancer;
 
     [Header("Upper Body Mask")]
-    [Tooltip("AvatarMask for upper body layer. Must include Spine/Chest/Arms/Head, exclude Hips/Legs. " +
-             "Currently reserved for future use (shield reactions while walking).")]
+    [Tooltip("AvatarMask for upper body layer. Must include Spine/Chest/Arms/Head, exclude Hips/Legs.")]
     [SerializeField] private AvatarMask upperBodyMask;
 
     // ── Base Clips (Layer 0 — Fullbody, looping) ─────────────────────────
@@ -42,11 +48,14 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
     [SerializeField] private ClipTransition walk;
     [SerializeField] private ClipTransition stunned;
 
-    // ── Upper Body Clips (Layer 1 — Masked, reserved) ───────────────────
+    // ── Upper Body Clips (Layer 1 — Masked) ─────────────────────────────
 
-    [Header("Upper Body Clips — Layer 1 (Masked, reserved for future use)")]
-    [Tooltip("Optional: Shield block/raise animation. Not used yet.")]
+    [Header("Upper Body Clips — Layer 1 (Masked)")]
+    [Tooltip("Looping shield block pose. Always active on upper layer during normal states.")]
     [SerializeField] private ClipTransition shieldBlock;
+
+    [Tooltip("One-shot hit reaction when player hits the shield. Returns to ShieldBlock after.")]
+    [SerializeField] private ClipTransition shieldHitReaction;
 
     #endregion
 
@@ -63,7 +72,7 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
 
     /// <summary>
     /// The looping clip that should be active on the upper layer when no one-shot plays.
-    /// null = upper layer inactive (weight 0), legs get full control.
+    /// null = upper layer inactive (weight 0), base layer gets full control.
     /// </summary>
     private ClipTransition currentUpperBaseClip;
 
@@ -88,26 +97,23 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
         if (upperBodyMask == null)
         {
             Debug.LogWarning($"[DefenderAnimationManager] No Upper Body Mask assigned on {gameObject.name}. " +
-                             "Upper layer will affect the whole body if used later.");
+                             "Upper layer will affect the whole body.");
         }
 
-        // Layer-Referenzen sofort in Awake holen,
-        // damit sie bereit sind wenn NpcBase.Start() → OnStart() aufgerufen wird.
         EnsureLayersInitialized();
     }
 
     private void Start()
     {
-        // Sicherheitshalber nochmal — falls Awake-Reihenfolge ungewöhnlich war
         EnsureLayersInitialized();
 
-        // Start: Idle auf Base-Layer, Upper-Layer inaktiv
+        // Start: Idle auf Base-Layer, ShieldBlock auf Upper-Layer
         baseLayer.Play(idle);
-        upperLayer.Weight = 0f;
+        ActivateShieldLayer();
     }
 
     /// <summary>
-    /// Holt Layer-Referenzen und setzt die Mask. Idempotent — kann mehrfach aufgerufen werden.
+    /// Holt Layer-Referenzen und setzt die Mask. Idempotent.
     /// </summary>
     private void EnsureLayersInitialized()
     {
@@ -139,6 +145,7 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
     public void PlayStunEnd()
     {
         baseLayer.Play(idle);
+        ActivateShieldLayer();
     }
 
     public void UpdateMovement(float normalizedSpeed)
@@ -163,33 +170,70 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Idle: Base=Idle, Upper=off.
+    /// Idle: Base=Idle, Upper=ShieldBlock.
     /// Called by Idle.Enter() and InPosition.Enter().
     /// </summary>
     public void PlayIdle()
     {
-        ClearUpperLayer();
         baseLayer.Play(idle);
+        ActivateShieldLayer();
     }
 
     /// <summary>
-    /// Walk: Base=Walk, Upper=off.
+    /// Walk: Base=Walk, Upper=ShieldBlock.
     /// Called by Approaching.Enter().
     /// </summary>
     public void PlayWalk()
     {
-        ClearUpperLayer();
         baseLayer.Play(walk);
+        ActivateShieldLayer();
     }
 
     /// <summary>
-    /// Play stunned loop and clear upper layer.
+    /// Play stunned loop and clear upper layer (fullbody stunned).
     /// Called by Stunned.Enter().
     /// </summary>
     public void PlayStunnedFromCombat()
     {
         ClearUpperLayer();
         baseLayer.Play(stunned);
+    }
+
+    /// <summary>
+    /// Plays the shield hit reaction as a one-shot on the upper layer.
+    /// After the one-shot finishes, automatically returns to ShieldBlock.
+    /// Called by ShieldHitReaction state or combat system.
+    /// </summary>
+    public void PlayShieldHitReaction()
+    {
+        PlayUpperOneShot(shieldHitReaction);
+    }
+
+    /// <summary>
+    /// True while the shield hit reaction one-shot is still playing.
+    /// Used by ShieldHitReaction state to know when the animation is done.
+    /// </summary>
+    public bool IsPlayingHitReaction => isPlayingUpperOneShot;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Internal — Shield Layer Management
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Activates the upper layer with ShieldBlock as the looping base clip.
+    /// If an existing shield layer is already active, does nothing extra.
+    /// </summary>
+    private void ActivateShieldLayer()
+    {
+        if (shieldBlock == null || shieldBlock.Clip == null)
+        {
+            Debug.LogWarning($"[DefenderAnimationManager] No ShieldBlock clip assigned on {gameObject.name}!");
+            return;
+        }
+
+        SetUpperBaseClip(shieldBlock);
     }
 
     #endregion
@@ -225,24 +269,16 @@ public class DefenderAnimationManager : MonoBehaviour, INpcAnimationHandler
     {
         if (clip == null || clip.Clip == null) return;
 
+        // Stelle sicher, dass ShieldBlock als Base-Clip gesetzt ist,
+        // damit nach dem One-Shot dorthin zurückgekehrt wird.
+        if (currentUpperBaseClip == null)
+        {
+            currentUpperBaseClip = shieldBlock;
+        }
+
         isPlayingUpperOneShot = true;
         upperLayer.Weight = 1f;
         AnimancerState state = upperLayer.Play(clip);
-        state.Events(this).OnEnd = OnUpperOneShotEnded;
-    }
-
-    /// <summary>
-    /// Plays a one-shot on the upper layer instantly (no fade).
-    /// Forces restart even if same clip is already playing.
-    /// </summary>
-    private void PlayUpperOneShotInstant(ClipTransition clip)
-    {
-        if (clip == null || clip.Clip == null) return;
-
-        isPlayingUpperOneShot = true;
-        upperLayer.Weight = 1f;
-        AnimancerState state = upperLayer.Play(clip, 0f);
-        state.Time = 0f;
         state.Events(this).OnEnd = OnUpperOneShotEnded;
     }
 

@@ -7,7 +7,12 @@ using UnityEngine;
 // Alle animator.SetBool Aufrufe sind durch typsichere
 // AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
 //
+// Upper-Layer (ShieldBlock) ist in allen normalen States aktiv.
+// Nur Stunned deaktiviert ihn für fullbody-Kontrolle.
+//
 // Idle → Approaching → InPosition → zurück
+//              ↕              ↕
+//       ShieldHitReaction (kurzes Stagger, dann zurück)
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -115,5 +120,52 @@ namespace DefenderStates
         }
 
         public override INpcState<DefenderNpc> Update(DefenderNpc npc) => null;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // SHIELD HIT REACTION
+    // ─────────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Kurze Reaktion wenn der Spieler den Schild trifft.
+    /// Defender bleibt stehen, spielt Hit-Reaction auf dem Upper-Layer,
+    /// und kehrt dann zum vorherigen Verhalten zurück.
+    /// 
+    /// Dauer wird über DefenderNpc.ShieldHitReactionDuration gesteuert.
+    /// </summary>
+    public class ShieldHitReaction : NpcStateBase<DefenderNpc>
+    {
+        public override string StateName => "ShieldHitReaction";
+        public override int StateID => 4;
+
+        private float timer;
+
+        public override void Enter(DefenderNpc npc)
+        {
+            npc.StopMovement();
+            timer = npc.ShieldHitReactionDuration;
+
+            // Base-Layer bleibt auf Idle (Beine stehen still),
+            // Upper-Layer spielt die Hit-Reaction als One-Shot
+            npc.AnimManager?.PlayShieldHitReaction();
+        }
+
+        public override INpcState<DefenderNpc> Update(DefenderNpc npc)
+        {
+            timer -= Time.deltaTime;
+
+            if (timer <= 0f)
+            {
+                // Zurück zum normalen Verhalten basierend auf Distanz
+                if (npc.IsCloseEnough())
+                    return new InPosition();
+
+                if (npc.CanReachPlayer && npc.CurrentBehaviorMode == BehaviorMode.Pursuing)
+                    return new Approaching();
+
+                return new Idle();
+            }
+
+            return null;
+        }
     }
 }
