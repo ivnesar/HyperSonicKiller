@@ -18,6 +18,8 @@ using System.Collections.Generic;
 //   5. Impact-Kraft vom NpcImpactTracker übertragen
 //   6. Equipment aus NPC-Hierarchie lösen (Unparent + Physics aktivieren)
 //   7. Original-NPC zerstören
+//   8. Nach physicsFreezeDelay: Ragdolls + Equipment werden eingefroren
+//      (Rigidbodies → kinematisch, keine aktive Physics-Simulation mehr)
 //
 // WORLD-SPACE POSE TRANSFER:
 //   Die alte Version nutzte localPosition/localRotation — das funktioniert nur
@@ -61,8 +63,10 @@ public class NpcRagdollSwapper : MonoBehaviour
     [SerializeField] private DroppableEquipment[] droppableEquipment;
 
     [Header("Ragdoll Settings")]
-    [Tooltip("Sekunden bis die gespawnten Ragdolls zerstört werden.")]
-    [SerializeField] private float ragdollDestroyDelay = 10f;
+    [Tooltip("Sekunden bis die Physics der Ragdolls und des Equipments eingefroren wird. " +
+             "Nach dieser Zeit werden alle Rigidbodies kinematisch — spart Performance " +
+             "und verhindert Physics-Glitches.")]
+    [SerializeField] private float physicsFreezeDelay = 5f;
 
     [Tooltip("Aufwärts-Anteil bei der Impact-Kraft (0 = kein Aufwärts, 1 = stark nach oben).")]
     [Range(0f, 1f)]
@@ -280,7 +284,7 @@ public class NpcRagdollSwapper : MonoBehaviour
         ApplyBonePose(ragdoll, snapshots);
 
         SpawnedRagdoll spawnedRagdoll = ragdoll.AddComponent<SpawnedRagdoll>();
-        spawnedRagdoll.Initialize(ragdollDestroyDelay, upwardForceBias);
+        spawnedRagdoll.Initialize(physicsFreezeDelay, upwardForceBias);
 
         if (impactMag > 0f)
         {
@@ -314,7 +318,7 @@ public class NpcRagdollSwapper : MonoBehaviour
             ApplyBonePose(upper, snapshots);
 
             SpawnedRagdoll upperRagdoll = upper.AddComponent<SpawnedRagdoll>();
-            upperRagdoll.Initialize(ragdollDestroyDelay, upwardForceBias);
+            upperRagdoll.Initialize(physicsFreezeDelay, upwardForceBias);
 
             if (slicedForce > 0f)
             {
@@ -338,7 +342,7 @@ public class NpcRagdollSwapper : MonoBehaviour
             ApplyBonePose(lower, snapshots);
 
             SpawnedRagdoll lowerRagdoll = lower.AddComponent<SpawnedRagdoll>();
-            lowerRagdoll.Initialize(ragdollDestroyDelay, upwardForceBias);
+            lowerRagdoll.Initialize(physicsFreezeDelay, upwardForceBias);
 
             if (slicedForce > 0f)
             {
@@ -432,6 +436,10 @@ public class NpcRagdollSwapper : MonoBehaviour
             {
                 col.enabled = true;
             }
+
+            // Physics nach Delay einfrieren (gleiche Zeit wie Ragdolls)
+            EquipmentPhysicsFreeze freeze = obj.AddComponent<EquipmentPhysicsFreeze>();
+            freeze.Initialize(physicsFreezeDelay);
 
             if (showDebugInfo)
                 Debug.Log($"[RagdollSwapper] Equipment released: {equip.label} " +

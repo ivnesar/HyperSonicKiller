@@ -9,7 +9,15 @@ using UnityEngine;
 //   - Layer auf "Dead" setzen (rekursiv)
 //   - Ragdoll-Rigidbodies aktivieren (isKinematic = false)
 //   - Impact-Kraft anwenden
-//   - Automatisches Zerstören nach Delay
+//   - Nach einer einstellbaren Zeit die Physics einfrieren
+//     (Rigidbodies → kinematisch, Collider bleiben erhalten)
+//
+// PHYSICS FREEZE:
+//   Nach dem Freeze-Delay werden alle Rigidbodies auf isKinematic = true
+//   gesetzt. Dadurch nimmt Unity sie aus der aktiven Physics-Simulation.
+//   Die Collider bleiben bestehen, damit andere Objekte nicht durch
+//   die Ragdolls fallen. Das spart Performance und verhindert
+//   späte Physics-Glitches (Ragdolls die plötzlich wegfliegen etc.).
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -22,6 +30,10 @@ public class SpawnedRagdoll : MonoBehaviour
     private Rigidbody[] rigidbodies;
     private Rigidbody mainRigidbody;
 
+    private float freezeDelay;
+    private float freezeTimer;
+    private bool isFrozen;
+
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────
@@ -32,9 +44,9 @@ public class SpawnedRagdoll : MonoBehaviour
     /// Initialisiert das gespawnte Ragdoll.
     /// Wird direkt nach dem Instantiate vom NpcRagdollSwapper aufgerufen.
     /// </summary>
-    /// <param name="destroyDelay">Sekunden bis das Ragdoll zerstört wird.</param>
+    /// <param name="freezeDelay">Sekunden bis die Physics eingefroren wird.</param>
     /// <param name="upwardForceBias">Aufwärts-Anteil der Impact-Kraft (0-1).</param>
-    public void Initialize(float destroyDelay, float upwardForceBias = 0.3f)
+    public void Initialize(float freezeDelay, float upwardForceBias = 0.3f)
     {
         // Alle Rigidbodies cachen
         rigidbodies = GetComponentsInChildren<Rigidbody>();
@@ -48,11 +60,10 @@ public class SpawnedRagdoll : MonoBehaviour
         // Ragdoll aktivieren — Rigidbodies auf nicht-kinematisch
         ActivateRagdoll();
 
-        // Destroy-Timer
-        if (destroyDelay >= 0f)
-        {
-            Destroy(gameObject, destroyDelay);
-        }
+        // Freeze-Timer starten
+        this.freezeDelay = freezeDelay;
+        freezeTimer = 0f;
+        isFrozen = false;
     }
 
     /// <summary>
@@ -81,6 +92,53 @@ public class SpawnedRagdoll : MonoBehaviour
 
         // Verteilte Kraft auf alle anderen Bones
         ApplyDistributedForce(adjustedDirection, finalForce * 0.3f, impactPoint);
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────
+    #region Unity Lifecycle
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void Update()
+    {
+        if (isFrozen) return;
+
+        freezeTimer += Time.deltaTime;
+
+        if (freezeTimer >= freezeDelay)
+        {
+            FreezePhysics();
+        }
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────
+    #region Physics Freeze
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Friert alle Rigidbodies ein (isKinematic = true).
+    /// Danach wird auch die Update-Schleife gestoppt,
+    /// weil nichts mehr zu tun ist.
+    /// </summary>
+    private void FreezePhysics()
+    {
+        if (rigidbodies == null) return;
+
+        foreach (var rb in rigidbodies)
+        {
+            if (rb == null) continue;
+
+            rb.isKinematic = true;
+        }
+
+        isFrozen = true;
+
+        // Update wird nicht mehr gebraucht — Komponente deaktivieren
+        // spart den Update-Call-Overhead
+        enabled = false;
     }
 
     #endregion
