@@ -24,6 +24,13 @@ using UnityEngine.AI;
 // - NpcLaserPointer liest AimProgress um den Wiggle-Radius zu steuern.
 // - 0 = Aim gerade gestartet (max Wiggle), 1 = eingelockt (kein Wiggle).
 //
+// AIM-IK STEUERUNG (zentral für alle NPCs):
+// - AimController wird automatisch gefunden (wenn vorhanden auf dem Prefab).
+// - States setzen IsAimActive = true/false um AimIK ein-/auszuschalten.
+// - NpcBase leitet IsAimActive und TargetPosition jeden Frame an den AimController weiter.
+// - Dash-Override läuft im AimController (smooth Blend-Out wenn Spieler dasht).
+// - NPCs ohne AimController (z.B. AntiDashDrone, ProxyMine) sind nicht betroffen.
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 public enum BehaviorMode
@@ -106,6 +113,18 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// </summary>
     protected Animator animator;
 
+    /// <summary>
+    /// AimIK-Controller für Oberkörper-Rotation zum Ziel.
+    /// Automatisch gefunden — null wenn kein AimController auf dem Prefab liegt.
+    /// </summary>
+    protected AimController aimController;
+
+    /// <summary>
+    /// Cached PlayerCore-Referenz für Dash-Erkennung und andere Spieler-Queries.
+    /// Wird in Start() einmalig gesucht und steht allen Subklassen zur Verfügung.
+    /// </summary>
+    protected PlayerCore playerCore;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -177,6 +196,15 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     public bool IsLaserActive { get; set; }
 
     /// <summary>
+    /// Steuert den AimIK-Controller.
+    /// States setzen dies auf true/false um AimIK ein-/auszuschalten.
+    /// NpcBase leitet den Wert jeden Frame an den AimController weiter.
+    /// 
+    /// Wird automatisch in ApplyStun() und Die() auf false gesetzt.
+    /// </summary>
+    public bool IsAimActive { get; set; }
+
+    /// <summary>
     /// Fortschritt der Zielerfassung: 0 = gerade angefangen, 1 = eingelockt.
     /// Wird von NpcLaserPointer gelesen um den Wiggle-Radius zu steuern.
     /// 
@@ -204,6 +232,20 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// </summary>
     public bool CanReachPlayer => canReachPlayer;
 
+    /// <summary>
+    /// True wenn der Spieler gerade dasht (Attack-Dash oder Sword-Dash).
+    /// Steht allen Subklassen zur Verfügung.
+    /// </summary>
+    public bool IsPlayerDashing
+    {
+        get
+        {
+            if (playerCore == null) return false;
+            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing
+                || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+        }
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -223,6 +265,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         // Animation handler finden (AnimancerComponent-basierter Manager)
         animHandler = GetComponentInChildren<INpcAnimationHandler>();
 
+        // AimController finden (optional — nicht alle NPCs haben einen)
+        aimController = GetComponent<AimController>();
+
         currentHealth = maxHealth;
 
         if (navAgent != null)
@@ -238,7 +283,16 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         // Spieler finden
         var player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
+        {
             playerTransform = player.transform;
+            playerCore = player.GetComponent<PlayerCore>();
+        }
+
+        // PlayerCore an AimController weitergeben für Dash-Erkennung
+        if (aimController != null && playerCore != null)
+        {
+            aimController.SetPlayerCore(playerCore);
+        }
 
         // Initialer Pfad-Check
         UpdatePathCheckImmediate();
@@ -255,6 +309,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         // Aim Progress automatisch aktualisieren
         UpdateAimProgress();
+
+        // AimIK-Steuerung (zentral für alle NPCs)
+        UpdateAimController();
 
         // Stun-Handling
         if (isStunned)
@@ -444,6 +501,47 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region AimIK Steuerung
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Zentrale AimIK-Steuerung, wird jeden Frame aus Update() aufgerufen.
+    /// Leitet IsAimActive und die Zielposition an den AimController weiter.
+    /// 
+    /// Subklassen können GetAimTargetPosition() überschreiben, um eine
+    /// andere Zielposition zu verwenden (z.B. LockedTargetPosition beim Soldier).
+    /// 
+    /// Der Dash-Override läuft intern im AimController — hier muss nichts
+    /// extra geprüft werden.
+    /// </summary>
+    private void UpdateAimController()
+    {
+        if (aimController == null) return;
+
+        // Weight-Steuerung: States setzen IsAimActive, wir leiten es weiter
+        if (IsAimActive)
+            aimController.EnableAim();
+        else
+            aimController.DisableAim();
+
+        // Zielposition aktualisieren
+        aimController.SetTargetPosition(GetAimTargetPosition());
+    }
+
+    /// <summary>
+    /// Gibt die Zielposition für den AimController zurück.
+    /// Default: Live-Spielerposition.
+    /// Subklassen können dies überschreiben für spezielle Logik
+    /// (z.B. Soldier mit LockedTargetPosition bei Dash-Lock).
+    /// </summary>
+    protected virtual Vector3 GetAimTargetPosition()
+    {
+        return TargetPosition;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Stun System
     // ════════════════════════════════════════════════════════════════════════
 
@@ -536,8 +634,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isStunned = true;
         stunEndTime = Time.time + duration;
         IsLaserActive = false;
+        IsAimActive = false;
         ResetAimProgress();
         StopMovement();
+
+        aimController?.DisableImmediate();
         
         animHandler?.PlayStunStart();
         
@@ -582,9 +683,12 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isStunned = true;
         stunEndTime = float.MaxValue;
         IsLaserActive = false;
+        IsAimActive = false;
         ResetAimProgress();
 
         StopMovement();
+
+        aimController?.DisableImmediate();
         
         animHandler?.PlayStunStart();
         
@@ -660,9 +764,12 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         NpcRegistry.Unregister(this);
         isStunned = false;
         IsLaserActive = false;
+        IsAimActive = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
         ResetAimProgress();
+
+        aimController?.DisableImmediate();
 
         if (navAgent != null)
         {
@@ -708,7 +815,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isDead = true;
         isStunned = false;
         currentHealth = 0;
+        IsAimActive = false;
         ResetAimProgress();
+
+        aimController?.DisableImmediate();
 
         if (navAgent != null)
         {

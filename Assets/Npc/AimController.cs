@@ -3,22 +3,28 @@ using RootMotion.FinalIK;
 
 /// <summary>
 /// Generischer Wrapper für die AimIK-Komponente von RootMotion Final IK.
-/// Kann von jedem NPC-Typ verwendet werden (Soldier, Sniper, Grenadier, etc.).
+/// Kann von jedem NPC-Typ verwendet werden (Soldier, Defender, Sniper, etc.).
 ///
 /// Bietet eine einfache API: EnableAim(), DisableAim(), SetTargetPosition().
 /// Kümmert sich intern um Weight-Blending und Target-Interpolation.
 ///
-/// Vorteile gegenüber manueller Bone-Rotation:
-/// - Verteilt Rotation über mehrere Spine-Bones (natürlicheres Ergebnis)
-/// - Volle 3D-Richtung (nicht nur Pitch)
-/// - Smoothes Weight-Blending eingebaut
-/// - Arbeitet additiv auf Animationen (Animancer-kompatibel)
+/// AIM-IK STEUERUNG:
+///   - NpcBase setzt IsAimActive (bool) basierend auf dem aktuellen NPC-State.
+///   - NpcBase ruft jeden Frame UpdateAimController() auf, das EnableAim/DisableAim
+///     und SetTargetPosition weiterleitet.
+///   - Der AimController blendet den Weight smooth ein/aus.
+///
+/// DASH-OVERRIDE:
+///   - Wenn der Spieler dasht, blendet der AimController den Weight smooth auf 0
+///     über dashBlendOutDuration, UNABHÄNGIG von IsAimActive.
+///   - Wenn der Dash endet und IsAimActive noch true ist, blendet er smooth zurück.
+///   - Die Dash-Erkennung läuft über PlayerCore, das in NpcBase gecached wird.
 ///
 /// SETUP:
 ///   1. AimIK-Komponente auf das Model-Kind (mit Animator) legen.
 ///   2. In AimIK:
-///      - "Transform" = Muzzle/Waffe (das was zum Ziel zeigen soll)
-///      - "Axis" = lokale Forward-Achse der Waffe (meist Vector3.forward)
+///      - "Transform" = Muzzle/Waffe oder Chest-Bone (das was zum Ziel zeigen soll)
+///      - "Axis" = lokale Forward-Achse (meist Vector3.forward)
 ///      - "Bones" = Spine-Kette (z.B. Spine → Chest → UpperChest)
 ///      - "Clamp Weight" = 0.3–0.5 (verhindert extreme Verdrehung)
 ///   3. Diese Komponente auf dasselbe GameObject wie die NPC-Klasse legen.
@@ -54,6 +60,10 @@ public class AimController : MonoBehaviour
     [Tooltip("Geschwindigkeit mit der das AimTarget der Zielposition folgt.")]
     [SerializeField] private float targetFollowSpeed = 12f;
 
+    [Header("Dash Override")]
+    [Tooltip("Dauer in Sekunden, über die der AimIK-Weight auf 0 ausblendet wenn der Spieler dasht.")]
+    [SerializeField] private float dashBlendOutDuration = 0.2f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -63,6 +73,17 @@ public class AimController : MonoBehaviour
     private float currentWeight;
     private float targetWeight;
     private bool isInitialized;
+
+    /// <summary>
+    /// Referenz auf PlayerCore für Dash-Erkennung.
+    /// Wird von NpcBase über SetPlayerCore() gesetzt.
+    /// </summary>
+    private PlayerCore playerCore;
+
+    /// <summary>
+    /// True wenn der Dash-Override aktiv ist (Spieler dasht → Weight wird auf 0 erzwungen).
+    /// </summary>
+    private bool isDashOverrideActive;
 
     #endregion
 
@@ -102,8 +123,26 @@ public class AimController : MonoBehaviour
     {
         if (!isInitialized) return;
 
+        // Dash-Override prüfen
+        UpdateDashOverride();
+
+        // Effektiven Target-Weight bestimmen
+        float effectiveTarget = isDashOverrideActive ? 0f : targetWeight;
+
+        // Blend-Speed bestimmen: bei Dash-Override nutze dashBlendOutDuration
+        float speed;
+        if (isDashOverrideActive && currentWeight > 0f)
+        {
+            // Smooth auf 0 über dashBlendOutDuration
+            speed = dashBlendOutDuration > 0f ? (1f / dashBlendOutDuration) : 100f;
+        }
+        else
+        {
+            speed = blendSpeed;
+        }
+
         // Weight smooth blenden
-        currentWeight = Mathf.MoveTowards(currentWeight, targetWeight, blendSpeed * Time.deltaTime);
+        currentWeight = Mathf.MoveTowards(currentWeight, effectiveTarget, speed * Time.deltaTime);
         aimIK.solver.IKPositionWeight = currentWeight;
     }
 
@@ -119,11 +158,44 @@ public class AimController : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Dash Override
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Prüft ob der Spieler gerade dasht und setzt den Dash-Override entsprechend.
+    /// </summary>
+    private void UpdateDashOverride()
+    {
+        if (playerCore == null)
+        {
+            isDashOverrideActive = false;
+            return;
+        }
+
+        bool playerIsDashing = playerCore.CurrentState == PlayerCore.PlayerState.Dashing
+                            || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+
+        isDashOverrideActive = playerIsDashing;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Public API
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// Setzt die PlayerCore-Referenz für Dash-Erkennung.
+    /// Wird von NpcBase.Start() aufgerufen.
+    /// </summary>
+    public void SetPlayerCore(PlayerCore core)
+    {
+        playerCore = core;
+    }
+
+    /// <summary>
     /// Aktiviert das Aiming. Weight blendet smooth auf 1.
+    /// Wird vom Dash-Override übersteuert wenn der Spieler dasht.
     /// </summary>
     public void EnableAim()
     {
@@ -140,7 +212,7 @@ public class AimController : MonoBehaviour
 
     /// <summary>
     /// Setzt die Zielposition (Weltkoordinaten).
-    /// Wird jeden Frame vom NPC aufgerufen.
+    /// Wird jeden Frame von NpcBase aufgerufen.
     /// </summary>
     public void SetTargetPosition(Vector3 worldPosition)
     {

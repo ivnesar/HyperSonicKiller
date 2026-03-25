@@ -10,6 +10,11 @@ using UnityEngine;
 // Upper-Layer (ShieldBlock) ist in allen normalen States aktiv.
 // Nur Stunned deaktiviert ihn für fullbody-Kontrolle.
 //
+// AIM-IK:
+// - IsAimActive = true in allen normalen States (Idle, Walk, InPosition, ShieldHitReaction)
+// - IsAimActive = false nur bei Stunned
+// - Dash-Override läuft automatisch im AimController
+//
 // Idle → Approaching → InPosition → zurück
 //              ↕              ↕
 //       ShieldHitReaction (kurzes Stagger, dann zurück)
@@ -29,6 +34,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
+            npc.IsAimActive = true;
             npc.AnimManager?.PlayIdle();
         }
 
@@ -56,6 +62,7 @@ namespace DefenderStates
 
         public override void Enter(DefenderNpc npc)
         {
+            npc.IsAimActive = true;
             npc.AnimManager?.PlayWalk();
         }
 
@@ -91,6 +98,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
+            npc.IsAimActive = true;
             npc.AnimManager?.PlayIdle();
         }
 
@@ -116,6 +124,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
+            npc.IsAimActive = false;
             npc.AnimManager?.PlayStunnedFromCombat();
         }
 
@@ -130,6 +139,9 @@ namespace DefenderStates
     /// Defender bleibt stehen, spielt Hit-Reaction auf dem Upper-Layer,
     /// und kehrt dann zum vorherigen Verhalten zurück.
     /// 
+    /// AimIK bleibt aktiv — der Oberkörper zeigt weiterhin zum Spieler,
+    /// die Hit-Reaction-Animation überlagert das auf dem Upper-Layer.
+    /// 
     /// Dauer wird über DefenderNpc.ShieldHitReactionDuration gesteuert.
     /// </summary>
     public class ShieldHitReaction : NpcStateBase<DefenderNpc>
@@ -142,6 +154,7 @@ namespace DefenderStates
         public override void Enter(DefenderNpc npc)
         {
             npc.StopMovement();
+            npc.IsAimActive = true;
             timer = npc.ShieldHitReactionDuration;
 
             // Base-Layer bleibt auf Idle (Beine stehen still),

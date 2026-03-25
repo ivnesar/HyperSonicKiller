@@ -7,6 +7,10 @@ using UnityEngine;
 // Alle animator.SetTrigger/SetBool Aufrufe sind durch typsichere
 // AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
 //
+// AIM-IK:
+// - States setzen npc.IsAimActive (von NpcBase) um AimIK ein-/auszuschalten.
+// - NpcBase leitet den Wert automatisch an den AimController weiter.
+//
 // AIM PROGRESS:
 // - Aiming.Enter(): StartAimTracking() → Wiggle beginnt bei maxRadius
 // - Firing.Enter(): SetAimProgress(1) → Laser eingelockt, kein Wiggle
@@ -29,7 +33,7 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -64,7 +68,7 @@ namespace SoldierStates
 
         public override void Enter(SoldierNpc npc)
         {
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.ResetAimProgress();
 
@@ -120,7 +124,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
             npc.StartAimTracking(npc.AimDuration);
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
 
             npc.AnimManager?.PlayAim();
@@ -156,7 +160,7 @@ namespace SoldierStates
             npc.StopMovement();
             npc.ShotsFiredInSalvo = 0;
             npc.NextShotTime = 0f;
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
             npc.SetAimProgress(1f); // Eingelockt — kein Wiggle während dem Feuern
 
@@ -207,7 +211,7 @@ namespace SoldierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -238,7 +242,7 @@ namespace SoldierStates
         public override void Enter(SoldierNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             // ResetAimProgress wird bereits von NpcBase.ApplyStun() aufgerufen
 

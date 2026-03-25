@@ -4,18 +4,16 @@ using UnityEngine;
 // SNIPER STATES
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Gleicher State-Flow wie der Soldier:
-//   Idle → MovingToRange → Aiming → Firing → Reloading → zurück
-//
-// Unterschiede zum Soldier:
-//   - Aiming: Deutlich längere Aim-Dauer (mehr Warnung für den Spieler)
-//   - Firing: Genau 1 Schuss, dann sofort Reloading
-//   - Größere Reichweiten → MovingToRange hat mehr Laufweg
+// AIM-IK:
+// - States setzen npc.IsAimActive (von NpcBase) um AimIK ein-/auszuschalten.
+// - NpcBase leitet den Wert automatisch an den AimController weiter.
 //
 // AIM PROGRESS:
 // - Aiming.Enter(): StartAimTracking() → Wiggle beginnt bei maxRadius
 // - Firing.Enter(): SetAimProgress(1) → eingelockt
 // - Idle/MovingToRange/Reloading.Enter(): ResetAimProgress() → Progress = 0
+//
+// Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -32,7 +30,7 @@ namespace SniperStates
         public override void Enter(SniperNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -67,7 +65,7 @@ namespace SniperStates
 
         public override void Enter(SniperNpc npc)
         {
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.ResetAimProgress();
 
@@ -118,7 +116,7 @@ namespace SniperStates
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
             npc.StartAimTracking(npc.AimDuration);
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
 
             npc.AnimManager?.PlayAim();
@@ -158,7 +156,7 @@ namespace SniperStates
         public override void Enter(SniperNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
             npc.SetAimProgress(1f);
             hasFired = false;
@@ -179,7 +177,6 @@ namespace SniperStates
                 npc.FireShot();
                 hasFired = true;
 
-                // Nach dem Schuss sofort in Reloading
                 return new Reloading();
             }
 
@@ -199,7 +196,7 @@ namespace SniperStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -230,7 +227,7 @@ namespace SniperStates
         public override void Enter(SniperNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
 
             npc.AnimManager?.PlayStunnedFromCombat();

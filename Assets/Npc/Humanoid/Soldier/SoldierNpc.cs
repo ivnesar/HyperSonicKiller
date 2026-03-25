@@ -4,17 +4,17 @@ using UnityEngine;
 /// Soldier NPC - Schießt auf den Spieler aus der Distanz.
 /// Benötigt freie Sichtlinie zum Schießen.
 ///
-/// AIM-IK MIGRATION:
-/// - Alte manuelle Aim-Bone-Rotation (LateUpdate, UpdateAimBoneRotation,
-///   CalculateTargetPitch) komplett entfernt.
-/// - Aiming wird jetzt über AimController gesteuert,
-///   der die AimIK-Komponente von RootMotion Final IK wrapped.
-/// - States setzen npc.IsAiming → SoldierNpc leitet das an AimController weiter.
+/// AIM-IK:
+///   - AimIK wird zentral über NpcBase gesteuert (IsAimActive + AimController).
+///   - States setzen npc.IsAimActive = true/false.
+///   - Der Soldier überschreibt GetAimTargetPosition() um die LockedTargetPosition
+///     zu berücksichtigen (Dash-Lock: Soldier zielt auf die letzte bekannte Position
+///     wenn der Spieler zu dashen beginnt).
+///   - Dash-Override (smooth Blend-Out) läuft automatisch im AimController.
 ///
-/// ANIMANCER MIGRATION:
-/// - NpcAnimator Property entfernt → AnimManager (SoldierAnimationManager) stattdessen.
-/// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayFire()).
-/// - FireShot() nutzt AnimManager.PlayFireShot() statt animator.SetTrigger("Fire").
+/// ANIMANCER:
+///   - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayFire()).
+///   - FireShot() nutzt AnimManager.PlayFireShot().
 /// </summary>
 public class SoldierNpc : NpcBase
 {
@@ -73,11 +73,6 @@ public class SoldierNpc : NpcBase
     /// </summary>
     public SoldierAnimationManager AnimManager { get; private set; }
 
-    /// <summary>
-    /// AimIK-Controller für Oberkörper-Rotation zum Ziel.
-    /// </summary>
-    public AimController AimController { get; private set; }
-
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -88,14 +83,7 @@ public class SoldierNpc : NpcBase
     public int ShotsFiredInSalvo { get; set; }
     public float NextShotTime { get; set; }
 
-    /// <summary>
-    /// Wird von States gesetzt um AimIK zu aktivieren/deaktivieren.
-    /// True = AimIK blendet ein, False = AimIK blendet aus.
-    /// </summary>
-    public bool IsAiming { get; set; }
-
     // ── Target Lock (Dash-Reaktion) ──
-    private PlayerCore playerCore;
     
     /// <summary>
     /// Wenn gesetzt, schießt/zielt der Soldier auf diese Position statt auf die Live-Position.
@@ -120,22 +108,10 @@ public class SoldierNpc : NpcBase
             Debug.LogWarning($"[SoldierNpc] No SoldierAnimationManager found on {gameObject.name}! " +
                              "Animations will not work.");
         }
-
-        // AimController finden
-        AimController = GetComponent<AimController>();
-        if (AimController == null)
-        {
-            Debug.LogWarning($"[SoldierNpc] No AimController found on {gameObject.name}! " +
-                             "Aim-IK will not work. Add AimController component.");
-        }
     }
 
     protected override void OnStart()
     {
-        // PlayerCore-Referenz cachen für Dash-Erkennung
-        if (playerTransform != null)
-            playerCore = playerTransform.GetComponent<PlayerCore>();
-        
         ChangeState(new SoldierStates.Idle());
     }
 
@@ -146,14 +122,10 @@ public class SoldierNpc : NpcBase
         var nextState = currentState.Update(this);
         if (nextState != null)
             ChangeState(nextState);
-
-        // AimController jeden Frame mit der aktuellen Zielposition füttern
-        UpdateAimController();
     }
 
     protected override void OnStunStart()
     {
-        AimController?.DisableImmediate();
         ChangeState(new SoldierStates.Stunned());
     }
 
@@ -166,25 +138,17 @@ public class SoldierNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region AimIK Steuerung
+    #region AimIK — Target Override
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Aktualisiert den AimController basierend auf IsAiming und der Zielposition.
-    /// Wird jeden Frame aus UpdateBehavior() aufgerufen.
+    /// Überschreibt die Zielposition für den AimController.
+    /// Nutzt die gelockte Position (Dash-Lock) falls aktiv,
+    /// ansonsten die Live-Spielerposition.
     /// </summary>
-    private void UpdateAimController()
+    protected override Vector3 GetAimTargetPosition()
     {
-        if (AimController == null) return;
-
-        // Weight-Steuerung: States setzen IsAiming, wir leiten es weiter
-        if (IsAiming)
-            AimController.EnableAim();
-        else
-            AimController.DisableAim();
-
-        // Zielposition aktualisieren (nutzt gelockte Position falls aktiv)
-        AimController.SetTargetPosition(EffectiveTargetPosition);
+        return EffectiveTargetPosition;
     }
 
     #endregion
@@ -324,44 +288,9 @@ public class SoldierNpc : NpcBase
     public Vector3 EffectiveTargetPosition => LockedTargetPosition ?? TargetPosition;
 
     /// <summary>
-    /// True wenn der Spieler gerade dasht (Attack-Dash oder Sword-Dash).
-    /// </summary>
-    public bool IsPlayerDashing
-    {
-        get
-        {
-            if (playerCore == null) return false;
-            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing
-                || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
-        }
-    }
-
-    /// <summary>
     /// Rotiert den NPC zu einer beliebigen Weltposition (statt immer zum Spieler).
     /// </summary>
     public void RotateTowardPosition(Vector3 worldPosition) => RotateToward(worldPosition);
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Death — AimIK abschalten
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// AimIK sofort abschalten bevor NpcBase den Ragdoll-Swap durchführt.
-    /// Verhindert dass der IK-Solver auf einen toten/ragdolled NPC wirkt.
-    /// </summary>
-    protected override void Die()
-    {
-        AimController?.DisableImmediate();
-        base.Die();
-    }
-
-    public override void DieWithImpact(Vector3 impactDirection, float forceMagnitude, Vector3? impactPoint = null)
-    {
-        AimController?.DisableImmediate();
-        base.DieWithImpact(impactDirection, forceMagnitude, impactPoint);
-    }
 
     #endregion
 

@@ -12,12 +12,22 @@ using System.Collections.Generic;
 //
 // ABLAUF (alles in einem Frame):
 //   1. Todesart bestimmen (Sliced vs WholeBody)
-//   2. Bone-Pose vom lebenden NPC kopieren
+//   2. Bone-Pose vom lebenden NPC kopieren (WORLD-SPACE)
 //   3. Ragdoll-Prefab(s) spawnen an gleicher Position/Rotation
-//   4. Kopierte Pose auf neue Ragdolls übertragen (Bone-Name-Matching)
+//   4. Kopierte Pose auf neue Ragdolls übertragen (World-Space, Parent-First)
 //   5. Impact-Kraft vom NpcImpactTracker übertragen
 //   6. Equipment aus NPC-Hierarchie lösen (Unparent + Physics aktivieren)
 //   7. Original-NPC zerstören
+//
+// WORLD-SPACE POSE TRANSFER:
+//   Die alte Version nutzte localPosition/localRotation — das funktioniert nur
+//   wenn die Bone-Hierarchien identisch sind. IK-Systeme (AimIK, Final IK)
+//   und manuelle Bone-Rotationen (Aim Pitch) verändern die Bones in World-Space,
+//   was bei Local-Space-Transfer zu Pose-Mismatches führte.
+//
+//   Die neue Version kopiert position/rotation (World-Space) und setzt sie
+//   in Parent-First-Reihenfolge auf die Ragdolls. Dadurch wird die exakte
+//   Todes-Pose übertragen — inklusive aller IK-Modifikationen.
 //
 // SETUP:
 //   1. Diese Komponente auf das NPC-Prefab legen (neben NpcBase)
@@ -140,11 +150,11 @@ public class NpcRagdollSwapper : MonoBehaviour
         if (showDebugInfo)
             Debug.Log($"[RagdollSwapper] {gameObject.name}: Swap starten — Typ: {deathType}");
 
-        // ── 1. Bone-Pose vom lebenden NPC kopieren ──
+        // ── 1. Bone-Pose vom lebenden NPC kopieren (World-Space) ──
         Dictionary<string, BoneSnapshot> boneSnapshots = CaptureBonePose();
 
         if (showDebugInfo)
-            Debug.Log($"[RagdollSwapper] {boneSnapshots.Count} Bones kopiert.");
+            Debug.Log($"[RagdollSwapper] {boneSnapshots.Count} Bones kopiert (World-Space).");
 
         // ── 2. Ragdoll(s) spawnen je nach Todesart ──
         if (deathType == NpcDeathType.Sliced && TryGetRandomSlicedPair(out SlicedRagdollPair pair))
@@ -170,21 +180,24 @@ public class NpcRagdollSwapper : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Bone Pose Capture
+    #region Bone Pose Capture (World-Space)
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Snapshot einer einzelnen Bone-Transformation.
+    /// Snapshot einer einzelnen Bone-Transformation in World-Space.
+    /// World-Space statt Local-Space garantiert, dass IK-Modifikationen
+    /// (AimIK, manuelle Bone-Rotationen) korrekt übertragen werden,
+    /// auch wenn die Ragdoll-Hierarchie minimal abweicht.
     /// </summary>
     private struct BoneSnapshot
     {
-        public Vector3 localPosition;
-        public Quaternion localRotation;
-        public Vector3 localScale;
+        public Vector3 worldPosition;
+        public Quaternion worldRotation;
+        public Vector3 localScale; // Scale bleibt lokal — wird nie von IK verändert
     }
 
     /// <summary>
-    /// Kopiert die aktuelle Pose aller Bones im NPC-Skelett.
+    /// Kopiert die aktuelle Pose aller Bones im NPC-Skelett in World-Space.
     /// Nutzt den Bone-Namen als Key — darum müssen die Namen
     /// zwischen NPC und Ragdoll-Prefabs identisch sein.
     /// </summary>
@@ -200,8 +213,8 @@ public class NpcRagdollSwapper : MonoBehaviour
 
             snapshots[bone.name] = new BoneSnapshot
             {
-                localPosition = bone.localPosition,
-                localRotation = bone.localRotation,
+                worldPosition = bone.position,
+                worldRotation = bone.rotation,
                 localScale = bone.localScale
             };
         }
@@ -210,11 +223,17 @@ public class NpcRagdollSwapper : MonoBehaviour
     }
 
     /// <summary>
-    /// Überträgt die gespeicherte Pose auf ein Ragdoll-Prefab.
+    /// Überträgt die gespeicherte World-Space-Pose auf ein Ragdoll-Prefab.
     /// Matcht Bones per Name.
+    /// 
+    /// WICHTIG: GetComponentsInChildren liefert Transforms in Hierarchie-Reihenfolge
+    /// (Parent vor Children, Depth-First). Dadurch wird jeder Parent-Bone zuerst
+    /// positioniert, bevor seine Children gesetzt werden. Das verhindert, dass
+    /// ein späterer Parent-Move die bereits gesetzte Child-Position verschiebt.
     /// </summary>
     private void ApplyBonePose(GameObject ragdollInstance, Dictionary<string, BoneSnapshot> snapshots)
     {
+        // GetComponentsInChildren liefert Parent-First-Reihenfolge — genau was wir brauchen
         Transform[] ragdollBones = ragdollInstance.GetComponentsInChildren<Transform>();
         int matchedCount = 0;
 
@@ -222,8 +241,8 @@ public class NpcRagdollSwapper : MonoBehaviour
         {
             if (snapshots.TryGetValue(bone.name, out BoneSnapshot snapshot))
             {
-                bone.localPosition = snapshot.localPosition;
-                bone.localRotation = snapshot.localRotation;
+                bone.position = snapshot.worldPosition;
+                bone.rotation = snapshot.worldRotation;
                 bone.localScale = snapshot.localScale;
                 matchedCount++;
             }

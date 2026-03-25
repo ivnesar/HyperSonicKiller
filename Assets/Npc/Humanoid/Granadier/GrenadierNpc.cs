@@ -7,7 +7,6 @@ using UnityEngine;
 // Verhält sich wie der Soldier:
 //   - Braucht freie Sichtlinie zum Spieler
 //   - Gleicher State-Flow: Idle → MovingToRange → Aiming → Firing → Reloading
-//   - AimIK über AimController für Oberkörper-Rotation zum Ziel
 //
 // Unterschiede zum Soldier:
 //   - Einstellbare Magazingröße (Default 1, MGL-Style bis 6)
@@ -16,16 +15,12 @@ using UnityEngine;
 //   - Größere Reichweite, längere Aim-Dauer, längeres Reload
 //   - Kein Muzzle-FOV Aim-Assist (Granate fliegt sowieso zum Ziel)
 //
-// AIM-IK MIGRATION:
-//   - Alte manuelle Aim-Bone-Rotation (LateUpdate, UpdateAimBoneRotation,
-//     CalculateTargetPitch) komplett entfernt.
-//   - Aiming wird jetzt über AimController gesteuert,
-//     der die AimIK-Komponente von RootMotion Final IK wrapped.
-//   - States setzen npc.IsAiming → GrenadierNpc leitet das an AimController weiter.
-//
-// RAGDOLL MIGRATION:
-//   - NpcRagdollController entfernt → NpcImpactTracker + NpcRagdollSwapper stattdessen.
-//   - Ragdoll-Physik läuft nur noch auf gespawnten Prefabs.
+// AIM-IK:
+//   - AimIK wird zentral über NpcBase gesteuert (IsAimActive + AimController).
+//   - States setzen npc.IsAimActive = true/false.
+//   - Der Grenadier überschreibt GetAimTargetPosition() um die LockedTargetPosition
+//     zu berücksichtigen (Dash-Lock).
+//   - Dash-Override (smooth Blend-Out) läuft automatisch im AimController.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -94,11 +89,6 @@ public class GrenadierNpc : NpcBase
     /// </summary>
     public GrenadierAnimationManager AnimManager { get; private set; }
 
-    /// <summary>
-    /// AimIK-Controller für Oberkörper-Rotation zum Ziel.
-    /// </summary>
-    public AimController AimController { get; private set; }
-
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -107,21 +97,11 @@ public class GrenadierNpc : NpcBase
 
     private INpcState<GrenadierNpc> currentState;
 
-    // Magazine Tracking (vom Firing-State benutzt)
     /// <summary>Wie viele Granaten bereits in dieser Salve abgefeuert wurden.</summary>
     public int ShotsFiredInMagazine { get; set; }
 
     /// <summary>Frühester Zeitpunkt für den nächsten Schuss (Time.time).</summary>
     public float NextShotTime { get; set; }
-
-    /// <summary>
-    /// Wird von States gesetzt um AimIK zu aktivieren/deaktivieren.
-    /// True = AimIK blendet ein, False = AimIK blendet aus.
-    /// </summary>
-    public bool IsAiming { get; set; }
-
-    // Dash-Erkennung für Target-Lock
-    private PlayerCore playerCore;
 
     /// <summary>
     /// Wenn gesetzt, zielt der Grenadier auf diese Position statt auf die Live-Position.
@@ -139,29 +119,16 @@ public class GrenadierNpc : NpcBase
     {
         base.Awake();
 
-        // Typsichere Referenz auf den Animation Manager
         AnimManager = GetComponentInChildren<GrenadierAnimationManager>();
         if (AnimManager == null)
         {
             Debug.LogWarning($"[GrenadierNpc] No GrenadierAnimationManager found on {gameObject.name}! " +
                              "Animations will not work.");
         }
-
-        // AimController finden
-        AimController = GetComponent<AimController>();
-        if (AimController == null)
-        {
-            Debug.LogWarning($"[GrenadierNpc] No AimController found on {gameObject.name}! " +
-                             "Aim-IK will not work. Add AimController component.");
-        }
     }
 
     protected override void OnStart()
     {
-        // PlayerCore-Referenz cachen für Dash-Erkennung
-        if (playerTransform != null)
-            playerCore = playerTransform.GetComponent<PlayerCore>();
-
         ChangeState(new GrenadierStates.Idle());
     }
 
@@ -172,14 +139,10 @@ public class GrenadierNpc : NpcBase
         var nextState = currentState.Update(this);
         if (nextState != null)
             ChangeState(nextState);
-
-        // AimController jeden Frame mit der aktuellen Zielposition füttern
-        UpdateAimController();
     }
 
     protected override void OnStunStart()
     {
-        AimController?.DisableImmediate();
         ChangeState(new GrenadierStates.Stunned());
     }
 
@@ -192,25 +155,16 @@ public class GrenadierNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region AimIK Steuerung
+    #region AimIK — Target Override
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Aktualisiert den AimController basierend auf IsAiming und der Zielposition.
-    /// Wird jeden Frame aus UpdateBehavior() aufgerufen.
+    /// Überschreibt die Zielposition für den AimController.
+    /// Nutzt die gelockte Position (Dash-Lock) falls aktiv.
     /// </summary>
-    private void UpdateAimController()
+    protected override Vector3 GetAimTargetPosition()
     {
-        if (AimController == null) return;
-
-        // Weight-Steuerung: States setzen IsAiming, wir leiten es weiter
-        if (IsAiming)
-            AimController.EnableAim();
-        else
-            AimController.DisableAim();
-
-        // Zielposition aktualisieren (nutzt gelockte Position falls aktiv)
-        AimController.SetTargetPosition(EffectiveTargetPosition);
+        return EffectiveTargetPosition;
     }
 
     #endregion
@@ -238,9 +192,6 @@ public class GrenadierNpc : NpcBase
         return dist >= minShootingRange && dist <= maxShootingRange;
     }
 
-    /// <summary>
-    /// Prüft ob der Grenadier freie Sicht zum Spieler hat.
-    /// </summary>
     public bool HasLineOfSight()
     {
         if (playerTransform == null) return false;
@@ -258,33 +209,23 @@ public class GrenadierNpc : NpcBase
         return true;
     }
 
-    /// <summary>
-    /// Prüft ob der Grenadier schießen kann (in Reichweite UND freie Sicht).
-    /// </summary>
     public bool CanShoot()
     {
         return IsInShootingRange() && HasLineOfSight();
     }
 
-    /// <summary>
-    /// Feuert eine Anti-Dash Granate auf die aktuelle Spielerposition.
-    /// </summary>
     public void FireGrenade()
     {
         if (muzzlePoint == null || grenadePrefab == null) return;
 
-        // Zielpunkt: aktuelle Spielerposition am Boden
         Vector3 target = EffectiveTargetPosition;
 
-        // Granate instanziieren
         AntiDashGrenade grenade = Instantiate(grenadePrefab, muzzlePoint.position, Quaternion.identity);
         grenade.SetZoneParameters(grenadeZoneRadius, grenadeZoneDuration);
         grenade.Initialize(target);
 
-        // Animation
         AnimManager?.PlayFireShot();
 
-        // Sound & VFX
         PlaySound(fireSound);
         if (muzzleFlash != null)
             muzzleFlash.Play();
@@ -312,50 +253,9 @@ public class GrenadierNpc : NpcBase
 
     // ── Target Lock Helpers ──
 
-    /// <summary>
-    /// Effektive Zielposition: gelockte Position oder Live-Spielerposition.
-    /// </summary>
     public Vector3 EffectiveTargetPosition => LockedTargetPosition ?? TargetPosition;
 
-    /// <summary>
-    /// True wenn der Spieler gerade dasht (Attack-Dash oder Sword-Dash).
-    /// </summary>
-    public bool IsPlayerDashing
-    {
-        get
-        {
-            if (playerCore == null) return false;
-            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing
-                || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
-        }
-    }
-
-    /// <summary>
-    /// Rotiert den NPC zu einer beliebigen Weltposition (statt immer zum Spieler).
-    /// </summary>
     public void RotateTowardPosition(Vector3 worldPosition) => RotateToward(worldPosition);
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Death — AimIK abschalten
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// AimIK sofort abschalten bevor NpcBase den Ragdoll-Swap durchführt.
-    /// Verhindert dass der IK-Solver auf einen toten/ragdolled NPC wirkt.
-    /// </summary>
-    protected override void Die()
-    {
-        AimController?.DisableImmediate();
-        base.Die();
-    }
-
-    public override void DieWithImpact(Vector3 impactDirection, float forceMagnitude, Vector3? impactPoint = null)
-    {
-        AimController?.DisableImmediate();
-        base.DieWithImpact(impactDirection, forceMagnitude, impactPoint);
-    }
 
     #endregion
 
@@ -367,7 +267,6 @@ public class GrenadierNpc : NpcBase
     {
         base.OnDrawGizmosSelected();
 
-        // Schussreichweiten
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
@@ -377,7 +276,6 @@ public class GrenadierNpc : NpcBase
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, maxShootingRange);
 
-        // Line of Sight
         if (Application.isPlaying && playerTransform != null)
         {
             Vector3 origin = muzzlePoint != null ? muzzlePoint.position : transform.position + Vector3.up * 1.2f;

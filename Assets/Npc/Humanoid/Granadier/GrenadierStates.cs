@@ -4,21 +4,16 @@ using UnityEngine;
 // GRENADIER STATES (Animancer 2-Layer Version)
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Alle animator.SetTrigger/SetBool Aufrufe sind durch typsichere
-// AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
+// AIM-IK:
+// - States setzen npc.IsAimActive (von NpcBase) um AimIK ein-/auszuschalten.
+// - NpcBase leitet den Wert automatisch an den AimController weiter.
 //
 // AIM PROGRESS:
 // - Aiming.Enter(): StartAimTracking() → Wiggle beginnt bei maxRadius
 // - Firing.Enter(): SetAimProgress(1) → Laser eingelockt, kein Wiggle
 // - Idle/MovingToRange/Reloading.Enter(): ResetAimProgress() → Progress = 0
 //
-// Gleicher State-Flow wie der Soldier:
-//   Idle → MovingToRange → Aiming → Firing → Reloading → zurück
-//
-// Unterschiede zum Soldier:
-//   - Einstellbare Magazingröße (Default 1)
-//   - Firing: Feuert Granaten bis Magazin leer, dann Reloading
-//   - Bei magazineSize == 1 verhält sich Firing wie ein Einzelschuss
+// Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -35,7 +30,7 @@ namespace GrenadierStates
         public override void Enter(GrenadierNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -70,7 +65,7 @@ namespace GrenadierStates
 
         public override void Enter(GrenadierNpc npc)
         {
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.ResetAimProgress();
 
@@ -121,7 +116,7 @@ namespace GrenadierStates
             npc.StopMovement();
             npc.SetStateTimer(npc.AimDuration);
             npc.StartAimTracking(npc.AimDuration);
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
 
             npc.AnimManager?.PlayAim();
@@ -157,7 +152,7 @@ namespace GrenadierStates
             npc.StopMovement();
             npc.ShotsFiredInMagazine = 0;
             npc.NextShotTime = 0f;
-            npc.IsAiming = true;
+            npc.IsAimActive = true;
             npc.IsLaserActive = true;
             npc.SetAimProgress(1f);
 
@@ -174,19 +169,20 @@ namespace GrenadierStates
 
             npc.RotateTowardPosition(npc.EffectiveTargetPosition);
 
-            // Sichtlinie verloren → direkt nachladen
             if (!npc.HasLineOfSight())
                 return new Reloading();
 
-            // Schuss abfeuern wenn bereit
             if (Time.time >= npc.NextShotTime && npc.ShotsFiredInMagazine < npc.MagazineSize)
             {
                 npc.FireGrenade();
                 npc.ShotsFiredInMagazine++;
                 npc.NextShotTime = Time.time + npc.TimeBetweenShots;
+
+                // Nach jedem Schuss: Zielposition zurücksetzen,
+                // damit die nächste Granate die aktuelle Spielerposition nutzt.
+                npc.LockedTargetPosition = null;
             }
 
-            // Magazin leer → nachladen
             if (npc.ShotsFiredInMagazine >= npc.MagazineSize)
                 return new Reloading();
 
@@ -206,7 +202,7 @@ namespace GrenadierStates
         {
             npc.StopMovement();
             npc.SetStateTimer(npc.ReloadDuration);
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
             npc.LockedTargetPosition = null;
             npc.ResetAimProgress();
@@ -237,7 +233,7 @@ namespace GrenadierStates
         public override void Enter(GrenadierNpc npc)
         {
             npc.StopMovement();
-            npc.IsAiming = false;
+            npc.IsAimActive = false;
             npc.IsLaserActive = false;
 
             npc.AnimManager?.PlayStunnedFromCombat();

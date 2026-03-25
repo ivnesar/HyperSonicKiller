@@ -3,19 +3,21 @@ using UnityEngine;
 /// <summary>
 /// Defender NPC - Läuft mit Schild auf den Spieler zu.
 ///
-/// ANIMANCER MIGRATION:
-///   - NpcAnimator Property entfernt → AnimManager (DefenderAnimationManager) stattdessen.
+/// ANIMANCER:
 ///   - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayWalk()).
+///   - 2-Layer-System: Base-Layer (Beine), Upper-Layer (Oberkörper mit ShieldBlock).
 ///   - Kein direkter Animator-Zugriff mehr in States.
 ///
-/// RAGDOLL MIGRATION:
+/// AIM-IK:
+///   - AimIK wird zentral über NpcBase gesteuert (IsAimActive + AimController).
+///   - Der Defender nutzt AimIK damit der Oberkörper dem Spieler zugewandt bleibt.
+///   - States setzen IsAimActive = true/false (in den meisten States true,
+///     bei Stunned false).
+///   - AimIK arbeitet additiv auf der ShieldBlock-Pose des Upper-Layers.
+///
+/// RAGDOLL:
 ///   - NpcRagdollController entfernt → NpcImpactTracker + NpcRagdollSwapper stattdessen.
 ///   - Ragdoll-Physik läuft nur noch auf gespawnten Prefabs.
-///
-/// KEIN AIM-IK:
-///   Der Defender zielt nicht auf den Spieler — er läuft nur mit dem Schild auf ihn zu.
-///   Die Body-Rotation zum Spieler wird über RotateTowardTarget() in den States gesteuert.
-///   AimIK und AimController werden NICHT benötigt (nicht auf dem Prefab).
 /// </summary>
 public class DefenderNpc : NpcBase
 {
