@@ -23,7 +23,6 @@ public class SoldierNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
-    [SerializeField] private float minShootingRange = 6f;
     [SerializeField] private float maxShootingRange = 18f;
     [SerializeField] private float preferredRange = 12f;
 
@@ -60,7 +59,6 @@ public class SoldierNpc : NpcBase
     #region Public Accessors
     // ════════════════════════════════════════════════════════════════════════
 
-    public float MinShootingRange => minShootingRange;
     public float MaxShootingRange => maxShootingRange;
     public float PreferredRange => preferredRange;
     public float AimDuration => aimDuration;
@@ -172,8 +170,7 @@ public class SoldierNpc : NpcBase
 
     public bool IsInShootingRange()
     {
-        float dist = DistanceToTarget;
-        return dist >= minShootingRange && dist <= maxShootingRange;
+        return DistanceToTarget <= maxShootingRange;
     }
 
     /// <summary>
@@ -303,9 +300,6 @@ public class SoldierNpc : NpcBase
         base.OnDrawGizmosSelected();
 
         // Schussreichweiten
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, minShootingRange);
-
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, preferredRange);
 

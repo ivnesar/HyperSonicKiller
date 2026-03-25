@@ -31,7 +31,6 @@ public class GrenadierNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
-    [SerializeField] private float minShootingRange = 8f;
     [SerializeField] private float maxShootingRange = 25f;
     [SerializeField] private float preferredRange = 16f;
 
@@ -76,7 +75,6 @@ public class GrenadierNpc : NpcBase
     #region Public Accessors
     // ════════════════════════════════════════════════════════════════════════
 
-    public float MinShootingRange => minShootingRange;
     public float MaxShootingRange => maxShootingRange;
     public float PreferredRange => preferredRange;
     public float AimDuration => aimDuration;
@@ -188,8 +186,7 @@ public class GrenadierNpc : NpcBase
 
     public bool IsInShootingRange()
     {
-        float dist = DistanceToTarget;
-        return dist >= minShootingRange && dist <= maxShootingRange;
+        return DistanceToTarget <= maxShootingRange;
     }
 
     public bool HasLineOfSight()
@@ -266,9 +263,6 @@ public class GrenadierNpc : NpcBase
     protected override void OnDrawGizmosSelected()
     {
         base.OnDrawGizmosSelected();
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, preferredRange);

@@ -12,7 +12,7 @@ using UnityEngine;
 // Unterschiede zum Soldier:
 //   - 1 Schuss pro Zyklus (kein Salvo)
 //   - Hoher Schaden pro Treffer
-//   - Sehr große Reichweite (20-50m)
+//   - Sehr große Reichweite (bis 50m)
 //   - Deutlich längere Aim-Phase (mehr Warnung für den Spieler)
 //   - Eigenes Projektil (SniperBullet): schneller, eigener Trail
 //   - Höhere Basis-Accuracy (Scharfschütze trifft besser)
@@ -33,7 +33,6 @@ public class SniperNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Combat - Ranges")]
-    [SerializeField] private float minShootingRange = 20f;
     [SerializeField] private float maxShootingRange = 50f;
     [SerializeField] private float preferredRange = 35f;
 
@@ -69,7 +68,6 @@ public class SniperNpc : NpcBase
     #region Public Accessors
     // ════════════════════════════════════════════════════════════════════════
 
-    public float MinShootingRange => minShootingRange;
     public float MaxShootingRange => maxShootingRange;
     public float PreferredRange => preferredRange;
     public float AimDuration => aimDuration;
@@ -173,8 +171,7 @@ public class SniperNpc : NpcBase
 
     public bool IsInShootingRange()
     {
-        float dist = DistanceToTarget;
-        return dist >= minShootingRange && dist <= maxShootingRange;
+        return DistanceToTarget <= maxShootingRange;
     }
 
     public bool HasLineOfSight()
@@ -252,9 +249,6 @@ public class SniperNpc : NpcBase
     protected override void OnDrawGizmosSelected()
     {
         base.OnDrawGizmosSelected();
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, minShootingRange);
 
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, preferredRange);

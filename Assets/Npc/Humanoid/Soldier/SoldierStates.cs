@@ -95,12 +95,6 @@ namespace SoldierStates
             {
                 npc.MoveTowardTarget();
             }
-            else if (npc.DistanceToTarget < npc.MinShootingRange)
-            {
-                Vector3 retreatDir = -npc.GetDirectionToTarget();
-                Vector3 retreatPos = npc.transform.position + retreatDir * 5f;
-                npc.MoveToward(retreatPos, 0.7f);
-            }
 
             return null;
         }
