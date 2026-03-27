@@ -45,8 +45,18 @@ public class SoldierNpc : NpcBase
     [Tooltip("Layer für Line-of-Sight Check (sollte Player + Hindernisse enthalten)")]
     [SerializeField] private LayerMask bulletHitMask;
     
-    [Tooltip("FOV-Winkel der Mündung in Grad. Wenn Spieler innerhalb dieses Winkels ist, wird direkt auf ihn gezielt.")]
-    [SerializeField] private float muzzleAimAssistFOV = 5f;
+    [Header("Aim Assist — Bone-Based FOV")]
+    [Tooltip("Referenz-Bone für den FOV-Check (z.B. Chest). AimIK bewegt diesen Bone mit, " +
+             "daher ist seine Forward-Richtung zuverlässiger als die der Mündung.")]
+    [SerializeField] private Transform aimReferenceBone;
+
+    [Tooltip("Lokale Forward-Achse des Referenz-Bones. Standard (0,0,1) = transform.forward. " +
+             "Anpassen falls der Bone eine andere Achsenrotation hat.")]
+    [SerializeField] private Vector3 aimReferenceForwardAxis = Vector3.forward;
+
+    [Tooltip("FOV-Winkel in Grad. Wenn der Spieler innerhalb dieses Winkels liegt, " +
+             "wird direkt auf ihn gezielt. Außerhalb → Kugel fliegt in Bone-Forward-Richtung.")]
+    [SerializeField] private float aimAssistFOV = 15f;
 
     [Header("Audio/VFX")]
     [SerializeField] private AudioClip fireSound;
@@ -222,25 +232,48 @@ public class SoldierNpc : NpcBase
     }
 
     /// <summary>
-    /// Berechnet die Schussrichtung.
-    /// Wenn der Spieler innerhalb des Muzzle-FOV ist → direkt zum Spieler zielen.
-    /// Ansonsten → in Laufrichtung schießen (kann verfehlen).
+    /// Berechnet die Schussrichtung basierend auf dem Referenz-Bone-FOV.
+    /// 
+    /// 1. Ermittelt die Forward-Richtung des Referenz-Bones (z.B. Chest).
+    ///    Der Bone wird von AimIK mitbewegt → zeigt zuverlässig Richtung Ziel.
+    /// 2. Prüft ob der Spieler innerhalb des FOV-Winkels liegt.
+    ///    - JA → Kugel fliegt direkt zum Spieler (aim-assisted).
+    ///    - NEIN → Kugel fliegt in Bone-Forward-Richtung (verfehlt, z.B. bei Dash).
+    /// 3. Fallback: Wenn kein Referenz-Bone gesetzt ist → immer Richtung Spieler.
     /// </summary>
     private Vector3 CalculateFireDirection()
     {
-        Vector3 muzzleForward = muzzlePoint.forward;
+        // Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
+        // Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
+        //
+        // if (aimReferenceBone == null)
+        //     return directionToTarget;
+        //
+        // Vector3 boneForward = aimReferenceBone.TransformDirection(aimReferenceForwardAxis.normalized);
+        //
+        // Vector3 boneToTarget = (targetPoint - aimReferenceBone.position).normalized;
+        //
+        // float angleToTarget = Vector3.Angle(boneForward, boneToTarget);
+        //
+        // if (angleToTarget <= aimAssistFOV)
+        // {
+        //     // Spieler im FOV → direkt zum Spieler zielen
+        //     return directionToTarget;
+        // }
+        //
+        // Vector3 farPoint = aimReferenceBone.position + boneForward * 100f;
+        // return (farPoint - muzzlePoint.position).normalized;
         
-        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
-        Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
-        
-        float angleToTarget = Vector3.Angle(muzzleForward, directionToTarget);
-        
-        if (angleToTarget <= muzzleAimAssistFOV)
+        // Da AimIK die Mündung (muzzlePoint) im Prefab entlang der lokalen
+        // Z-negativ Achse (0, 0, -1) ausrichtet, ist das exakt unsere Schussrichtung.
+        if (muzzlePoint != null)
         {
-            return directionToTarget;
+            return -muzzlePoint.forward;
         }
-        
-        return muzzleForward;
+
+        // Fallback, falls kein muzzlePoint existiert
+        Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
+        return (targetPoint - transform.position).normalized;
     }
 
     private Vector3 ApplySpread(Vector3 direction)
@@ -314,6 +347,25 @@ public class SoldierNpc : NpcBase
             
             Gizmos.color = HasLineOfSight() ? Color.green : Color.red;
             Gizmos.DrawLine(origin, targetPoint);
+        }
+
+        // Bone-FOV Visualisierung
+        if (aimReferenceBone != null)
+        {
+            Vector3 bonePos = aimReferenceBone.position;
+            Vector3 boneForward = aimReferenceBone.TransformDirection(aimReferenceForwardAxis.normalized);
+            float vizLength = 3f;
+
+            // Zentrale Forward-Linie
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawRay(bonePos, boneForward * vizLength);
+
+            // FOV-Kegel-Ränder (links/rechts und oben/unten)
+            Gizmos.color = new Color(0f, 1f, 1f, 0.4f);
+            Vector3 rightEdge = Quaternion.AngleAxis(aimAssistFOV, Vector3.up) * boneForward;
+            Vector3 leftEdge = Quaternion.AngleAxis(-aimAssistFOV, Vector3.up) * boneForward;
+            Gizmos.DrawRay(bonePos, rightEdge * vizLength);
+            Gizmos.DrawRay(bonePos, leftEdge * vizLength);
         }
     }
 
