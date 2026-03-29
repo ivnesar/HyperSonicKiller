@@ -6,7 +6,11 @@ using System.Linq;
 /// <summary>
 /// Editor-Tool zum Kopieren von Ragdoll-Komponenten (Rigidbody, Collider, Joints)
 /// von einem Source-Prefab/GameObject auf ein Target-Prefab/GameObject.
-/// Unterstützt Prefab-Assets direkt (ohne sie in die Szene ziehen zu müssen).
+/// 
+/// Die Zuordnung erfolgt über Bone-Namen (case-insensitive).
+/// Es werden NUR Komponenten auf bereits existierende Bones kopiert.
+/// Bones die im Target nicht existieren werden übersprungen.
+/// Es werden KEINE neuen GameObjects erstellt.
 /// </summary>
 public class RagdollCopier : EditorWindow
 {
@@ -28,8 +32,8 @@ public class RagdollCopier : EditorWindow
     {
         { "Head",   new[] { "head", "neck" } },
         { "Torso",  new[] { "pelvis", "stomach", "chest" } },
-        { "ArmL",   new[] { "clavicle_l", "arm_l", "forarm_l", "hand_l" } },
-        { "ArmR",   new[] { "clavicle_r", "arm_r", "forarm_r", "hand_r" } },
+        { "ArmL",   new[] { "clavicle_l", "arm_l", "forearm_l", "hand_l" } },
+        { "ArmR",   new[] { "clavicle_r", "arm_r", "forearm_r", "hand_r" } },
         { "LegL",   new[] { "thigh_l", "calf_l", "foot_l", "toe_l" } },
         { "LegR",   new[] { "thigh_r", "calf_r", "foot_r", "toe_r" } },
     };
@@ -48,7 +52,9 @@ public class RagdollCopier : EditorWindow
         EditorGUILayout.HelpBox(
             "Kopiert Ragdoll-Komponenten (Rigidbody, Collider, Joints) vom Source " +
             "auf das Target. Die Zuordnung erfolgt über übereinstimmende Bone-Namen.\n" +
-            "Funktioniert direkt mit Prefab-Assets aus dem Project-Fenster.",
+            "Funktioniert direkt mit Prefab-Assets aus dem Project-Fenster.\n\n" +
+            "Es werden nur Komponenten kopiert – keine neuen GameObjects erstellt.\n" +
+            "Bones die im Target nicht existieren werden übersprungen.",
             MessageType.Info);
 
         EditorGUILayout.Space(10);
@@ -153,16 +159,6 @@ public class RagdollCopier : EditorWindow
     }
 
     /// <summary>
-    /// Prüft ob ein Child-Objekt (z.B. "Foot Collider") zu einem aktiven Körperteil gehört,
-    /// basierend auf dem Parent-Bone-Namen.
-    /// </summary>
-    private bool IsChildOfEnabledBone(Transform child)
-    {
-        if (child.parent == null) return false;
-        return IsBoneEnabled(child.parent.name);
-    }
-
-    /// <summary>
     /// Prüft ob ein GameObject ein Prefab-Asset auf der Festplatte ist.
     /// </summary>
     private bool IsPrefabAsset(GameObject obj)
@@ -173,67 +169,37 @@ public class RagdollCopier : EditorWindow
     #region Bone Matching
 
     /// <summary>
-    /// Baut ein Dictionary: Bone-Name -> Transform.
-    /// Bei doppelten Namen wird der relative Pfad als zusätzlicher Key gespeichert.
+    /// Baut ein Dictionary: Bone-Name (lowercase) -> Transform.
+    /// Sucht rekursiv alle Kinder durch. Bei doppelten Namen
+    /// wird der ERSTE Treffer behalten (typischerweise der echte Skeleton-Bone).
     /// </summary>
     private Dictionary<string, Transform> BuildBoneMap(GameObject root)
     {
         var map = new Dictionary<string, Transform>();
         var allTransforms = root.GetComponentsInChildren<Transform>(true);
 
-        // Zähle wie oft jeder Name vorkommt
-        var nameCount = new Dictionary<string, int>();
         foreach (var t in allTransforms)
         {
-            if (!nameCount.ContainsKey(t.name))
-                nameCount[t.name] = 0;
-            nameCount[t.name]++;
-        }
+            string key = t.name.ToLower();
 
-        foreach (var t in allTransforms)
-        {
-            // Einfachen Namen immer als Key wenn er eindeutig ist
-            if (nameCount[t.name] == 1)
+            // Erster Treffer gewinnt – bei Duplikaten den ersten behalten
+            if (!map.ContainsKey(key))
             {
-                map[t.name] = t;
-            }
-            else
-            {
-                // Bei Duplikaten: relativen Pfad verwenden
-                string path = GetRelativePath(root.transform, t);
-                map[path] = t;
+                map[key] = t;
             }
         }
 
         return map;
     }
 
-    private string GetRelativePath(Transform root, Transform child)
-    {
-        var parts = new List<string>();
-        var current = child;
-        while (current != null && current != root)
-        {
-            parts.Add(current.name);
-            current = current.parent;
-        }
-        parts.Reverse();
-        return string.Join("/", parts);
-    }
-
     /// <summary>
-    /// Findet ein passendes Transform im Target für ein Source-Transform.
-    /// Prüft erst einfachen Namen, dann relativen Pfad.
+    /// Findet ein passendes Transform im Target anhand des Namens (case-insensitive).
     /// </summary>
-    private Transform FindMatchingBone(Transform sourceBone, Dictionary<string, Transform> targetMap, GameObject sourceRoot)
+    private Transform FindMatchingBone(string boneName, Dictionary<string, Transform> targetMap)
     {
-        // Einfachen Namen probieren
-        if (targetMap.TryGetValue(sourceBone.name, out Transform match))
-            return match;
+        string key = boneName.ToLower();
 
-        // Relativen Pfad probieren
-        string path = GetRelativePath(sourceRoot.transform, sourceBone);
-        if (targetMap.TryGetValue(path, out match))
+        if (targetMap.TryGetValue(key, out Transform match))
             return match;
 
         return null;
@@ -293,12 +259,23 @@ public class RagdollCopier : EditorWindow
 
         var targetMap = BuildBoneMap(targetRoot);
 
+        // ============================================================
+        // Schritt 0: Vorhandene Ragdoll-Komponenten entfernen
+        // ============================================================
+        if (!dryRun)
+        {
+            int removed = RemoveRagdollComponents(targetRoot, targetIsPrefabAsset);
+            if (removed > 0)
+                Log($"  {removed} vorhandene Komponenten entfernt (Duplikat-Schutz).");
+        }
+
         int copiedRigidbodies = 0;
         int copiedColliders = 0;
         int copiedJoints = 0;
-        int copiedChildObjects = 0;
+        int copiedFootColliders = 0;
         int skippedFiltered = 0;
         int skippedNoMatch = 0;
+        int skippedNotABone = 0;
 
         // ============================================================
         // Schritt 1: Rigidbodies (müssen VOR Joints existieren)
@@ -306,16 +283,21 @@ public class RagdollCopier : EditorWindow
         var sourceRigidbodies = source.GetComponentsInChildren<Rigidbody>(true);
         foreach (var srcRb in sourceRigidbodies)
         {
+            // Nur bekannte Bone-Namen verarbeiten
             if (!IsBoneEnabled(srcRb.transform.name))
             {
-                skippedFiltered++;
+                // Ist es überhaupt ein bekannter Bone (nur gerade deaktiviert)?
+                if (IsKnownBoneName(srcRb.transform.name))
+                    skippedFiltered++;
+                else
+                    skippedNotABone++;
                 continue;
             }
 
-            Transform targetBone = FindMatchingBone(srcRb.transform, targetMap, source);
+            Transform targetBone = FindMatchingBone(srcRb.transform.name, targetMap);
             if (targetBone == null)
             {
-                Log($"  KEIN MATCH: Rigidbody auf '{srcRb.transform.name}'");
+                Log($"  ÜBERSPRUNGEN: Bone '{srcRb.transform.name}' existiert nicht im Target");
                 skippedNoMatch++;
                 continue;
             }
@@ -337,7 +319,7 @@ public class RagdollCopier : EditorWindow
         }
 
         // ============================================================
-        // Schritt 2: Colliders auf Bones UND Child-Collider-Objekte
+        // Schritt 2: Colliders (nur auf existierende Bones)
         // ============================================================
         var allSourceTransforms = source.GetComponentsInChildren<Transform>(true);
         foreach (var srcTransform in allSourceTransforms)
@@ -345,111 +327,124 @@ public class RagdollCopier : EditorWindow
             var srcColliders = srcTransform.GetComponents<Collider>();
             if (srcColliders.Length == 0) continue;
 
-            // Ist dieses Objekt ein bekannter Bone?
-            bool isBone = IsBoneEnabled(srcTransform.name);
-
-            // Oder ein Extra-Child unter einem aktiven Bone? (z.B. "Foot Collider" unter "foot_r")
-            bool isChildOfBone = !isBone && IsChildOfEnabledBone(srcTransform);
-
-            if (!isBone && !isChildOfBone)
+            // Nur bekannte Bone-Namen verarbeiten – keine Child-GOs
+            if (!IsBoneEnabled(srcTransform.name))
             {
-                skippedFiltered++;
+                if (IsKnownBoneName(srcTransform.name))
+                    skippedFiltered++;
+                else
+                    skippedNotABone++;
                 continue;
             }
 
-            if (isBone)
+            Transform targetBone = FindMatchingBone(srcTransform.name, targetMap);
+            if (targetBone == null)
             {
-                // Normaler Bone: Collider direkt auf das passende Target-Bone kopieren
-                Transform targetBone = FindMatchingBone(srcTransform, targetMap, source);
-                if (targetBone == null)
-                {
-                    Log($"  KEIN MATCH: Collider auf '{srcTransform.name}'");
-                    skippedNoMatch++;
-                    continue;
-                }
-
-                foreach (var srcCol in srcColliders)
-                {
-                    if (dryRun)
-                    {
-                        Log($"  {srcCol.GetType().Name} -> '{targetBone.name}'");
-                    }
-                    else
-                    {
-                        CopyCollider(srcCol, targetBone.gameObject, targetIsPrefabAsset);
-                    }
-                    copiedColliders++;
-                }
+                Log($"  ÜBERSPRUNGEN: Bone '{srcTransform.name}' existiert nicht im Target");
+                skippedNoMatch++;
+                continue;
             }
-            else
+
+            foreach (var srcCol in srcColliders)
             {
-                // Extra-Child (z.B. "Foot Collider"): neues Child-GameObject im Target erstellen
-                Transform targetParent = FindMatchingBone(srcTransform.parent, targetMap, source);
-                if (targetParent == null)
-                {
-                    Log($"  KEIN MATCH: Parent '{srcTransform.parent.name}' für Child '{srcTransform.name}'");
-                    skippedNoMatch++;
-                    continue;
-                }
-
-                // Prüfen ob gleichnamiges Child schon existiert
-                Transform existingChild = targetParent.Find(srcTransform.name);
-                if (existingChild != null && existingChild.GetComponent<Collider>() != null)
-                    continue;
-
                 if (dryRun)
                 {
-                    string colTypes = string.Join(", ", srcColliders.Select(c => c.GetType().Name));
-                    Log($"  Child '{srcTransform.name}' -> unter '{targetParent.name}' ({colTypes})");
+                    Log($"  {srcCol.GetType().Name} -> '{targetBone.name}'");
                 }
                 else
                 {
-                    var newChild = new GameObject(srcTransform.name);
-                    if (!targetIsPrefabAsset)
-                        Undo.RegisterCreatedObjectUndo(newChild, "Child-Collider erstellen");
-
-                    newChild.transform.SetParent(targetParent);
-                    newChild.transform.localPosition = srcTransform.localPosition;
-                    newChild.transform.localRotation = srcTransform.localRotation;
-                    newChild.transform.localScale = srcTransform.localScale;
-
-                    foreach (var srcCol in srcColliders)
-                    {
-                        CopyCollider(srcCol, newChild, targetIsPrefabAsset);
-                    }
-
-                    // Falls das Child auch einen Rigidbody hat
-                    var srcChildRb = srcTransform.GetComponent<Rigidbody>();
-                    if (srcChildRb != null)
-                    {
-                        var newRb = AddComponent<Rigidbody>(newChild, targetIsPrefabAsset);
-                        CopyRigidbody(srcChildRb, newRb);
-                    }
+                    CopyCollider(srcCol, targetBone.gameObject, targetIsPrefabAsset);
                 }
-                copiedChildObjects++;
-                copiedColliders += srcColliders.Length;
+                copiedColliders++;
             }
+        }
+
+        // ============================================================
+        // Schritt 2b: "Foot Collider" Child-GOs kopieren (Ausnahme)
+        // ============================================================
+        // Suche in der Source nach GOs mit exaktem Namen "Foot Collider".
+        // Wenn der Parent-Bone (foot_l / foot_r) im Target existiert und
+        // aktiv ist, wird das GO mit Collidern und optionalem Rigidbody
+        // als neues Child erstellt.
+        foreach (var srcTransform in allSourceTransforms)
+        {
+            if (srcTransform.name != "Foot Collider") continue;
+            if (srcTransform.parent == null) continue;
+
+            // Prüfen ob der Parent-Bone aktiviert ist
+            if (!IsBoneEnabled(srcTransform.parent.name)) continue;
+
+            // Parent-Bone im Target finden
+            Transform targetParent = FindMatchingBone(srcTransform.parent.name, targetMap);
+            if (targetParent == null)
+            {
+                Log($"  ÜBERSPRUNGEN: Parent '{srcTransform.parent.name}' für 'Foot Collider' nicht im Target");
+                continue;
+            }
+
+            // Prüfen ob gleichnamiges Child schon existiert
+            Transform existingChild = targetParent.Find("Foot Collider");
+            if (existingChild != null)
+            {
+                Log($"  ÜBERSPRUNGEN: 'Foot Collider' unter '{targetParent.name}' existiert bereits");
+                continue;
+            }
+
+            var srcColliders = srcTransform.GetComponents<Collider>();
+            if (srcColliders.Length == 0) continue;
+
+            if (dryRun)
+            {
+                string colTypes = string.Join(", ", srcColliders.Select(c => c.GetType().Name));
+                Log($"  Foot Collider -> unter '{targetParent.name}' ({colTypes})");
+            }
+            else
+            {
+                var newChild = new GameObject("Foot Collider");
+                if (!targetIsPrefabAsset)
+                    Undo.RegisterCreatedObjectUndo(newChild, "Foot Collider erstellen");
+
+                newChild.transform.SetParent(targetParent);
+                newChild.transform.localPosition = srcTransform.localPosition;
+                newChild.transform.localRotation = srcTransform.localRotation;
+                newChild.transform.localScale = srcTransform.localScale;
+
+                foreach (var srcCol in srcColliders)
+                {
+                    CopyCollider(srcCol, newChild, targetIsPrefabAsset);
+                }
+
+                // Falls das Child auch einen Rigidbody hat
+                var srcChildRb = srcTransform.GetComponent<Rigidbody>();
+                if (srcChildRb != null)
+                {
+                    var newRb = AddComponent<Rigidbody>(newChild, targetIsPrefabAsset);
+                    CopyRigidbody(srcChildRb, newRb);
+                }
+            }
+            copiedFootColliders++;
+            copiedColliders += srcColliders.Length;
         }
 
         // ============================================================
         // Schritt 3: Joints (nachdem alle Rigidbodies existieren)
         // ============================================================
-        // Target-Map neu aufbauen (neue Child-Objekte sind jetzt drin)
-        targetMap = BuildBoneMap(targetRoot);
-
         var sourceJoints = source.GetComponentsInChildren<Joint>(true);
         foreach (var srcJoint in sourceJoints)
         {
             if (!IsBoneEnabled(srcJoint.transform.name))
             {
-                skippedFiltered++;
+                if (IsKnownBoneName(srcJoint.transform.name))
+                    skippedFiltered++;
+                else
+                    skippedNotABone++;
                 continue;
             }
 
-            Transform targetBone = FindMatchingBone(srcJoint.transform, targetMap, source);
+            Transform targetBone = FindMatchingBone(srcJoint.transform.name, targetMap);
             if (targetBone == null)
             {
-                Log($"  KEIN MATCH: {srcJoint.GetType().Name} auf '{srcJoint.transform.name}'");
+                Log($"  ÜBERSPRUNGEN: Bone '{srcJoint.transform.name}' existiert nicht im Target");
                 skippedNoMatch++;
                 continue;
             }
@@ -458,7 +453,7 @@ public class RagdollCopier : EditorWindow
             Rigidbody targetConnectedBody = null;
             if (srcJoint.connectedBody != null)
             {
-                Transform connectedTarget = FindMatchingBone(srcJoint.connectedBody.transform, targetMap, source);
+                Transform connectedTarget = FindMatchingBone(srcJoint.connectedBody.name, targetMap);
                 if (connectedTarget != null)
                 {
                     targetConnectedBody = connectedTarget.GetComponent<Rigidbody>();
@@ -487,14 +482,16 @@ public class RagdollCopier : EditorWindow
         // ============================================================
         Log("");
         Log("=== Zusammenfassung ===");
-        Log($"  Rigidbodies:   {copiedRigidbodies}");
-        Log($"  Colliders:     {copiedColliders}");
-        Log($"  Joints:        {copiedJoints}");
-        Log($"  Child-Objekte: {copiedChildObjects}");
+        Log($"  Rigidbodies:     {copiedRigidbodies}");
+        Log($"  Colliders:       {copiedColliders}");
+        Log($"  Joints:          {copiedJoints}");
+        Log($"  Foot Colliders:  {copiedFootColliders}");
         if (skippedFiltered > 0)
             Log($"  Gefiltert (Körperteil aus): {skippedFiltered}");
         if (skippedNoMatch > 0)
-            Log($"  Kein Match gefunden: {skippedNoMatch}");
+            Log($"  Kein Match im Target: {skippedNoMatch}");
+        if (skippedNotABone > 0)
+            Log($"  Übersprungen (kein bekannter Bone): {skippedNotABone}");
 
         if (!dryRun)
         {
@@ -512,6 +509,21 @@ public class RagdollCopier : EditorWindow
         }
 
         Repaint();
+    }
+
+    /// <summary>
+    /// Prüft ob ein Name in irgendeiner Körperteil-Gruppe vorkommt
+    /// (unabhängig davon ob die Gruppe gerade aktiv ist).
+    /// </summary>
+    private bool IsKnownBoneName(string name)
+    {
+        string lower = name.ToLower();
+        foreach (var group in BodyPartBones.Values)
+        {
+            if (group.Any(b => lower == b))
+                return true;
+        }
+        return false;
     }
 
     #endregion
@@ -700,41 +712,7 @@ public class RagdollCopier : EditorWindow
             Undo.SetCurrentGroupName("Ragdoll entfernen");
         }
 
-        int removed = 0;
-
-        // Reihenfolge wichtig: Joints -> Rigidbodies -> Colliders (wegen Abhängigkeiten)
-        foreach (var joint in targetRoot.GetComponentsInChildren<Joint>(true))
-        {
-            if (!IsBoneEnabled(joint.transform.name)) continue;
-            Log($"  Entferne {joint.GetType().Name} von '{joint.gameObject.name}'");
-            if (targetIsPrefabAsset)
-                Object.DestroyImmediate(joint);
-            else
-                Undo.DestroyObjectImmediate(joint);
-            removed++;
-        }
-
-        foreach (var rb in targetRoot.GetComponentsInChildren<Rigidbody>(true))
-        {
-            if (!IsBoneEnabled(rb.transform.name) && !IsChildOfEnabledBone(rb.transform)) continue;
-            Log($"  Entferne Rigidbody von '{rb.gameObject.name}'");
-            if (targetIsPrefabAsset)
-                Object.DestroyImmediate(rb);
-            else
-                Undo.DestroyObjectImmediate(rb);
-            removed++;
-        }
-
-        foreach (var col in targetRoot.GetComponentsInChildren<Collider>(true))
-        {
-            if (!IsBoneEnabled(col.transform.name) && !IsChildOfEnabledBone(col.transform)) continue;
-            Log($"  Entferne {col.GetType().Name} von '{col.gameObject.name}'");
-            if (targetIsPrefabAsset)
-                Object.DestroyImmediate(col);
-            else
-                Undo.DestroyObjectImmediate(col);
-            removed++;
-        }
+        int removed = RemoveRagdollComponents(targetRoot, targetIsPrefabAsset);
 
         if (targetIsPrefabAsset && targetAssetPath != null)
         {
@@ -749,6 +727,67 @@ public class RagdollCopier : EditorWindow
 
         Log($"  {removed} Komponenten entfernt.");
         Repaint();
+    }
+
+    /// <summary>
+    /// Entfernt alle Ragdoll-Komponenten (Joints, Rigidbodies, Collider, Foot Collider GOs)
+    /// von den aktuell aktiven Körperteilen auf dem übergebenen targetRoot.
+    /// Kann sowohl standalone als auch vor dem Kopieren aufgerufen werden.
+    /// </summary>
+    private int RemoveRagdollComponents(GameObject targetRoot, bool isPrefabEdit)
+    {
+        int removed = 0;
+
+        // Reihenfolge wichtig: Joints -> Rigidbodies -> Colliders (wegen Abhängigkeiten)
+        foreach (var joint in targetRoot.GetComponentsInChildren<Joint>(true))
+        {
+            if (!IsBoneEnabled(joint.transform.name)) continue;
+            Log($"  Entferne {joint.GetType().Name} von '{joint.gameObject.name}'");
+            if (isPrefabEdit)
+                Object.DestroyImmediate(joint);
+            else
+                Undo.DestroyObjectImmediate(joint);
+            removed++;
+        }
+
+        foreach (var rb in targetRoot.GetComponentsInChildren<Rigidbody>(true))
+        {
+            if (!IsBoneEnabled(rb.transform.name)) continue;
+            Log($"  Entferne Rigidbody von '{rb.gameObject.name}'");
+            if (isPrefabEdit)
+                Object.DestroyImmediate(rb);
+            else
+                Undo.DestroyObjectImmediate(rb);
+            removed++;
+        }
+
+        foreach (var col in targetRoot.GetComponentsInChildren<Collider>(true))
+        {
+            if (!IsBoneEnabled(col.transform.name)) continue;
+            Log($"  Entferne {col.GetType().Name} von '{col.gameObject.name}'");
+            if (isPrefabEdit)
+                Object.DestroyImmediate(col);
+            else
+                Undo.DestroyObjectImmediate(col);
+            removed++;
+        }
+
+        // Foot Collider Child-GOs entfernen (gehören zum Parent-Bone)
+        var footColliders = targetRoot.GetComponentsInChildren<Transform>(true)
+            .Where(t => t.name == "Foot Collider" && t.parent != null && IsBoneEnabled(t.parent.name))
+            .ToArray(); // ToArray() weil wir während der Iteration zerstören
+
+        foreach (var fc in footColliders)
+        {
+            Log($"  Entferne Foot Collider GO unter '{fc.parent.name}'");
+            if (isPrefabEdit)
+                Object.DestroyImmediate(fc.gameObject);
+            else
+                Undo.DestroyObjectImmediate(fc.gameObject);
+            removed++;
+        }
+
+        return removed;
     }
 
     #endregion

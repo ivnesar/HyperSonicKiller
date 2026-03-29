@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6559535187418182467}
   - component: {fileID: 7716406821046304997}
   - component: {fileID: 3777180452972811170}
+  - component: {fileID: 7328644735183554913}
   m_Layer: 0
   m_Name: AM16
   m_TagString: Untagged
@@ -82,6 +83,22 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &7328644735183554913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1807232858432694443}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4735fde27a053af40bc52a688fdddde0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DroppedEquipment
+  impactForce: 3
+  directionOffset: {x: 0, y: 0.3, z: 1}
+  dropForce: 2
+  freezeDelay: 5
 --- !u!1001 &5694491992902493410
 PrefabInstance:
   m_ObjectHideFlags: 0

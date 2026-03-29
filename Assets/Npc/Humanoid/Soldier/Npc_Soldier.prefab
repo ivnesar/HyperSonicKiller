@@ -318,8 +318,8 @@ MonoBehaviour:
   fullBodyRagdollPrefab: {fileID: 7890016569643223389, guid: 6c557b5db2b59f347a6afc31dfc51dce, type: 3}
   slicedPairs:
   - label: diagonal
-    upperHalfPrefab: {fileID: 1937247742522431491, guid: 26d8019db0cf08a4abc24534f82f3eb2, type: 3}
-    lowerHalfPrefab: {fileID: 732299771639741879, guid: 47fe0c4d3f35fc44d94c2799bc1dbc5f, type: 3}
+    upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
+    lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
   droppableEquipment:
   - label: AM16
     equipmentObject: {fileID: 531835101737661252}

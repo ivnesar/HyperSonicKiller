@@ -795,7 +795,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
             }
 
             // Swap durchführen — spawnt Ragdolls und zerstört dieses GameObject
-            ragdollSwapper.PerformSwap(lastDeathType, impactDir, impactMag, impactPoint);
+            ragdollSwapper.PerformSwap(lastDeathType, impactDir, impactPoint);
 
             // WICHTIG: Nach PerformSwap wird dieses GameObject zerstört.
             // Kein Code nach dieser Zeile wird ausgeführt.
@@ -830,7 +830,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         if (ragdollSwapper != null && ragdollSwapper.IsConfigured)
         {
             animHandler?.DisableForRagdoll();
-            ragdollSwapper.PerformSwap(lastDeathType, impactDirection, forceMagnitude, impactPoint);
+            ragdollSwapper.PerformSwap(lastDeathType, impactDirection, impactPoint);
             return;
         }
 

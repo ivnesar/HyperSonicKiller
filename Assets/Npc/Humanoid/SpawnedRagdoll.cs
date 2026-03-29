@@ -1,16 +1,42 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// SPAWNED RAGDOLL - Komponente für gespawnte Ragdoll-Instanzen
+// SPAWNED RAGDOLL - Komponente für Ragdoll-Prefabs
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Wird vom NpcRagdollSwapper auf jedes gespawnte Ragdoll-Prefab gelegt.
+// Wird direkt auf Ragdoll-Prefabs gelegt (nicht mehr per AddComponent).
+// Alle Impact- und Freeze-Werte werden am Prefab selbst eingestellt.
+//
 // Übernimmt:
 //   - Layer auf "Dead" setzen (rekursiv)
 //   - Ragdoll-Rigidbodies aktivieren (isKinematic = false)
-//   - Impact-Kraft anwenden
+//   - Impact-Kraft anwenden (Richtung kommt vom NpcRagdollSwapper)
 //   - Nach einer einstellbaren Zeit die Physics einfrieren
 //     (Rigidbodies → kinematisch, Collider bleiben erhalten)
+//
+// ABLAUF IM SPIEL:
+//   1. Ragdoll wird vom NpcRagdollSwapper instanziiert
+//   2. Swapper überträgt die Bone-Pose
+//   3. Swapper ruft Activate() auf → Ragdoll wird physikalisch aktiv
+//   4. Swapper ruft ApplyImpact(direction, impactPoint) auf
+//      → Ragdoll berechnet die Kraft selbst aus seinen eigenen Werten
+//   5. Nach freezeDelay friert das Ragdoll sich selbst ein
+//
+// DIRECTION OFFSET:
+//   Die Flugrichtung wird über einen Offset-Vektor relativ zur
+//   Impact-Richtung gesteuert. Die Z-Achse des Offsets zeigt in
+//   Impact-Richtung (forward), X = rechts, Y = oben.
+//
+//   Beispiele (wenn der Angriff von vorne kommt):
+//     (0, 0, 1)     → direkt nach hinten weg (entlang Impact)
+//     (0, 0.5, 1)   → nach hinten + leicht nach oben
+//     (0.3, 0.2, 1) → nach hinten + leicht rechts + leicht oben
+//     (0, 1, 0)     → nur nach oben (kein Rückwärts-Impuls)
+//
+// STANDALONE-TEST:
+//   activateOnStart = true setzen → das Ragdoll aktiviert sich in Start()
+//   selbst, ohne dass ein Swapper nötig ist. Praktisch zum Testen in
+//   einer Testszene.
 //
 // PHYSICS FREEZE:
 //   Nach dem Freeze-Delay werden alle Rigidbodies auf isKinematic = true
@@ -24,30 +50,92 @@ using UnityEngine;
 public class SpawnedRagdoll : MonoBehaviour
 {
     // ────────────────────────────────────────────────────────────────────────
+    #region Inspector Fields
+    // ────────────────────────────────────────────────────────────────────────
+
+    [Header("Impact")]
+    [Tooltip("Stärke der Impact-Kraft beim Tod. " +
+             "Fullbody-Ragdolls brauchen typischerweise mehr als halbe Ragdolls.")]
+    [SerializeField] private float impactForce = 10f;
+
+    [Tooltip("Richtungs-Offset relativ zur Impact-Richtung.\n" +
+             "Z = forward (Impact-Richtung), X = rechts, Y = oben.\n" +
+             "Beispiel: (0, 0.3, 1) = nach hinten + leicht nach oben.")]
+    [SerializeField] private Vector3 directionOffset = new Vector3(0f, 0.3f, 1f);
+
+    [Header("Physics Freeze")]
+    [Tooltip("Sekunden bis die Physics eingefroren wird. " +
+             "Nach dieser Zeit werden alle Rigidbodies kinematisch.")]
+    [SerializeField] private float freezeDelay = 5f;
+
+    [Header("Standalone Test")]
+    [Tooltip("Wenn true, aktiviert sich das Ragdoll in Start() selbst " +
+             "(ohne NpcRagdollSwapper). Nur zum Testen in einer Testszene gedacht.")]
+    [SerializeField] private bool activateOnStart = false;
+
+    [Tooltip("Impact-Richtung für den Standalone-Test. " +
+             "Wird nur verwendet wenn activateOnStart = true.")]
+    [SerializeField] private Vector3 testImpactDirection = Vector3.forward;
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────
     #region Runtime Data
     // ────────────────────────────────────────────────────────────────────────
 
     private Rigidbody[] rigidbodies;
     private Rigidbody mainRigidbody;
 
-    private float freezeDelay;
     private float freezeTimer;
+    private bool isActivated;
     private bool isFrozen;
 
     #endregion
 
     // ────────────────────────────────────────────────────────────────────────
-    #region Initialization
+    #region Unity Lifecycle
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void Start()
+    {
+        if (activateOnStart)
+        {
+            Activate();
+            ApplyImpact(testImpactDirection);
+        }
+    }
+
+    private void Update()
+    {
+        if (!isActivated || isFrozen) return;
+
+        freezeTimer += Time.deltaTime;
+
+        if (freezeTimer >= freezeDelay)
+        {
+            FreezePhysics();
+        }
+    }
+
+    #endregion
+
+    // ────────────────────────────────────────────────────────────────────────
+    #region Public API
     // ────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Initialisiert das gespawnte Ragdoll.
-    /// Wird direkt nach dem Instantiate vom NpcRagdollSwapper aufgerufen.
+    /// Aktiviert das Ragdoll: Layer setzen, Rigidbodies wecken, Freeze-Timer starten.
+    /// 
+    /// Im Spiel wird das vom NpcRagdollSwapper NACH dem Pose-Transfer aufgerufen.
+    /// Im Standalone-Test passiert das automatisch in Start().
+    /// 
+    /// WICHTIG: Erst aufrufen wenn die Bone-Pose bereits übertragen wurde,
+    /// sonst fallen die Bones in der Default-Pose runter.
     /// </summary>
-    /// <param name="freezeDelay">Sekunden bis die Physics eingefroren wird.</param>
-    /// <param name="upwardForceBias">Aufwärts-Anteil der Impact-Kraft (0-1).</param>
-    public void Initialize(float freezeDelay, float upwardForceBias = 0.3f)
+    public void Activate()
     {
+        if (isActivated) return;
+
         // Alle Rigidbodies cachen
         rigidbodies = GetComponentsInChildren<Rigidbody>();
 
@@ -61,55 +149,44 @@ public class SpawnedRagdoll : MonoBehaviour
         ActivateRagdoll();
 
         // Freeze-Timer starten
-        this.freezeDelay = freezeDelay;
         freezeTimer = 0f;
         isFrozen = false;
+        isActivated = true;
     }
 
     /// <summary>
-    /// Wendet eine Impact-Kraft auf das Ragdoll an.
-    /// Sollte NACH Initialize() aufgerufen werden.
+    /// Wendet die Impact-Kraft auf das Ragdoll an.
+    /// 
+    /// Die finale Flugrichtung wird aus der Impact-Richtung + directionOffset
+    /// berechnet. Der Offset ist relativ zur Impact-Richtung:
+    /// Z = forward (Impact-Richtung), X = rechts, Y = oben.
+    /// 
+    /// Sollte NACH Activate() aufgerufen werden.
     /// </summary>
-    public void ApplyImpact(Vector3 forceDirection, float forceMagnitude, float upwardBias, Vector3? impactPoint = null)
+    /// <param name="direction">Richtung des Impacts (vom Angriff).</param>
+    /// <param name="impactPoint">Optionaler Trefferpunkt für gerichtete Kraft.</param>
+    public void ApplyImpact(Vector3 direction, Vector3? impactPoint = null)
     {
         if (rigidbodies == null || rigidbodies.Length == 0) return;
+        if (impactForce <= 0f) return;
 
-        Vector3 adjustedDirection = (forceDirection + Vector3.up * upwardBias).normalized;
-        float finalForce = forceMagnitude;
+        Vector3 finalDirection = CalculateImpactDirection(direction);
 
         if (impactPoint.HasValue && mainRigidbody != null)
         {
             mainRigidbody.AddForceAtPosition(
-                adjustedDirection * finalForce,
+                finalDirection * impactForce,
                 impactPoint.Value,
                 ForceMode.Impulse
             );
         }
         else if (mainRigidbody != null)
         {
-            mainRigidbody.AddForce(adjustedDirection * finalForce, ForceMode.Impulse);
+            mainRigidbody.AddForce(finalDirection * impactForce, ForceMode.Impulse);
         }
 
         // Verteilte Kraft auf alle anderen Bones
-        ApplyDistributedForce(adjustedDirection, finalForce * 0.3f, impactPoint);
-    }
-
-    #endregion
-
-    // ────────────────────────────────────────────────────────────────────────
-    #region Unity Lifecycle
-    // ────────────────────────────────────────────────────────────────────────
-
-    private void Update()
-    {
-        if (isFrozen) return;
-
-        freezeTimer += Time.deltaTime;
-
-        if (freezeTimer >= freezeDelay)
-        {
-            FreezePhysics();
-        }
+        ApplyDistributedForce(finalDirection, impactForce * 0.3f, impactPoint);
     }
 
     #endregion
@@ -130,7 +207,6 @@ public class SpawnedRagdoll : MonoBehaviour
         foreach (var rb in rigidbodies)
         {
             if (rb == null) continue;
-
             rb.isKinematic = true;
         }
 
@@ -146,6 +222,31 @@ public class SpawnedRagdoll : MonoBehaviour
     // ────────────────────────────────────────────────────────────────────────
     #region Internal
     // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Berechnet die finale Impact-Richtung aus der Angriffsrichtung
+    /// und dem directionOffset.
+    /// 
+    /// Der Offset wird in ein Koordinatensystem transformiert, in dem
+    /// die Z-Achse der Impact-Richtung entspricht. So dreht sich der
+    /// Offset automatisch mit der Angriffsrichtung mit.
+    /// </summary>
+    private Vector3 CalculateImpactDirection(Vector3 impactDirection)
+    {
+        Vector3 forward = impactDirection.normalized;
+
+        // Fallback wenn Impact-Richtung zu kurz ist
+        if (forward.sqrMagnitude < 0.001f)
+            return directionOffset.normalized;
+
+        // Koordinatensystem aufbauen: forward = Impact-Richtung
+        Quaternion rotation = Quaternion.LookRotation(forward, Vector3.up);
+
+        // Offset in dieses Koordinatensystem transformieren
+        Vector3 worldOffset = rotation * directionOffset;
+
+        return worldOffset.normalized;
+    }
 
     private void ActivateRagdoll()
     {
