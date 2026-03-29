@@ -152,6 +152,9 @@ public class SpawnedRagdoll : MonoBehaviour
         freezeTimer = 0f;
         isFrozen = false;
         isActivated = true;
+        
+        var bloodDecals = GetComponent<RagdollBloodDecals>();
+        if (bloodDecals != null) bloodDecals.Initialize();
     }
 
     /// <summary>

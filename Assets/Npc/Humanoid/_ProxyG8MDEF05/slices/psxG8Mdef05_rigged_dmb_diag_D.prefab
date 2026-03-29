@@ -186,6 +186,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6537021430004749717}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5179995989670767696}
     - targetCorrespondingSourceObject: {fileID: 3256684802130647663, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7974586619094861393}
@@ -888,6 +891,11 @@ ConfigurableJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
+--- !u!4 &3707709870366774474 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -761880400047250340, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
+  m_PrefabInstance: {fileID: 5051120870852014230}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &4984138911476637138 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -8993098819772715708, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
@@ -1217,6 +1225,36 @@ MonoBehaviour:
   freezeDelay: 5
   activateOnStart: 0
   testImpactDirection: {x: 0, y: 0, z: -1}
+--- !u!114 &5179995989670767696
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5393138045400583623}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 330884206a5e894489648e26720c1a7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RagdollBloodDecals
+  bloodBones:
+  - {fileID: 3707709870366774474}
+  - {fileID: 5393163103460524580}
+  decalMaterial: {fileID: 2100000, guid: f312a2db52207074391b344807a2f6bd, type: 2}
+  decalSizeMin: 0.6
+  decalSizeMax: 1.2
+  decalDepth: 0.5
+  surfaceLayers:
+    serializedVersion: 2
+    m_Bits: 8320
+  spawnInterval: 0.3
+  maxDecalsPerRagdoll: 10
+  showDebugInfo: 0
+--- !u!4 &5393163103460524580 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8304229866045164878, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
+  m_PrefabInstance: {fileID: 5051120870852014230}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &5993890222239080745 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1528898191054688703, guid: 60bc2eebd8b65b848b21131c02876d17, type: 3}
