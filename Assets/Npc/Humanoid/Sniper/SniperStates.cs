@@ -120,9 +120,10 @@ namespace SniperStates
         {
             npc.RotateTowardTarget();
 
-            // Spieler dasht → Target verloren, Aiming abbrechen
-            if (npc.IsPlayerDashing)
-                return new Idle();
+            // KEIN Dash-Check hier — der AimController blendet AimIK
+            // automatisch smooth aus wenn der Spieler dasht.
+            // (Vorher: IsPlayerDashing → Idle, was ein Aiming↔Idle
+            //  Ping-Pong pro Frame verursacht hat = Zucken)
 
             if (!npc.HasLineOfSight())
                 return new Idle();

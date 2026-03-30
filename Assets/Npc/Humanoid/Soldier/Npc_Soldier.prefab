@@ -320,12 +320,6 @@ MonoBehaviour:
   - label: diagonal
     upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
     lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
-  - label: horizontal
-    upperHalfPrefab: {fileID: 3691713655005323378, guid: 2016fb47dd853174992292bb75eded38, type: 3}
-    lowerHalfPrefab: {fileID: 3567419384030797237, guid: fff7bd9f8f3a78c43a79d5be404f61b7, type: 3}
-  - label: vertical
-    upperHalfPrefab: {fileID: 2802668125561326815, guid: 1df9a8203e456c74997ab3c546514387, type: 3}
-    lowerHalfPrefab: {fileID: 5096942947395018427, guid: 4e5a597ab5a414d4c9e2372bbe6136b5, type: 3}
   droppableEquipment:
   - label: AM16
     equipmentObject: {fileID: 531835101737661252}
