@@ -47,7 +47,7 @@ public enum NpcType
     GenTwo,
     AntiDashDrone,
     ProxyMine,
-    Scientist,
+    Civilian,
     Grenadier,
     Sniper
 }
