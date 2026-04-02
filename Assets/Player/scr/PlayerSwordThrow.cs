@@ -229,6 +229,9 @@ public class PlayerSwordThrow : MonoBehaviour
         if (core.CurrentState == PlayerCore.PlayerState.Dashing) return false;
         if (core.CurrentState == PlayerCore.PlayerState.DashingToSword) return false;
 
+        // Can't throw during sprint burst (time is slowed for movement, not combat)
+        if (core.Movement != null && core.Movement.IsSprintBurstActive) return false;
+
         // Can't throw while exhausted (BlockHP depleted)
         if (combat != null && combat.IsExhausted) return false;
 

@@ -25,8 +25,8 @@ using UnityEngine.AI;
 // SETUP:
 //   1. Prefab erstellen mit NavMeshAgent + CivilianNpc + CivilianAnimationManager
 //   2. NavMeshAgent konfigurieren:
-//      - Speed: 5-6 (schneller als Walk, langsamer als Player)
 //      - Obstacle Avoidance: High Quality
+//      - Speed wird per moveSpeed im Inspector gesteuert
 //   3. CivilianAnimationManager auf das Model-Kind legen
 //   4. Im Inspector: CivilianBehavior wählen + Clips zuweisen
 //
@@ -71,9 +71,6 @@ public class CivilianNpc : NpcBase
     [SerializeField] private float fleeDistance = 10f;
 
     [Header("Civilian — Fluchtverhalten")]
-    [Tooltip("Geschwindigkeit beim panischen Rennen.")]
-    [SerializeField] private float panicRunSpeed = 6f;
-
     [Tooltip("Suchradius für Fluchtpunkte auf dem NavMesh.")]
     [SerializeField] private float fleeSearchRadius = 15f;
 
@@ -111,7 +108,6 @@ public class CivilianNpc : NpcBase
     public CivilianBehavior Behavior => civilianBehavior;
     public float DetectionDistance => detectionDistance;
     public float FleeDistance => fleeDistance;
-    public float PanicRunSpeed => panicRunSpeed;
     public float FleeSearchRadius => fleeSearchRadius;
     public int FleeSearchAttempts => fleeSearchAttempts;
     public float MinDirectionChangeInterval => minDirectionChangeInterval;
@@ -182,7 +178,7 @@ public class CivilianNpc : NpcBase
             // Rotation wird NICHT vom NavAgent gesteuert (updateRotation bleibt false von NpcBase).
             // Stattdessen rufen die States manuell RotateTowardMovementDirection() auf.
             if (navAgent != null)
-                navAgent.speed = panicRunSpeed;
+                navAgent.speed = moveSpeed;
 
             ChangeState(new CivilianStates.Idle());
         }
@@ -499,11 +495,8 @@ public class CivilianNpc : NpcBase
     public new bool UpdateStateTimer() => base.UpdateStateTimer();
 
     /// <summary>
-    /// Eigene MoveToward-Methode für den Civilian.
-    /// Nutzt panicRunSpeed statt NpcBase.moveSpeed.
-    /// 
-    /// WICHTIG: Ruft NICHT base.MoveToward() auf, weil die Basisklasse
-    /// navAgent.speed = moveSpeed setzt und damit unsere panicRunSpeed überschreibt.
+    /// Bewegt den Civilian zu einem Fluchtpunkt.
+    /// Nutzt moveSpeed aus NpcBase für die Geschwindigkeit.
     /// </summary>
     public void MoveToFleePoint(Vector3 position)
     {
@@ -511,7 +504,7 @@ public class CivilianNpc : NpcBase
 
         navAgent.SetDestination(position);
         navAgent.isStopped = false;
-        navAgent.speed = panicRunSpeed;
+        navAgent.speed = moveSpeed;
     }
 
     /// <summary>
@@ -552,7 +545,7 @@ public class CivilianNpc : NpcBase
         if (direction.sqrMagnitude < 0.01f) return;
 
         Quaternion targetRotation = Quaternion.LookRotation(direction.normalized);
-        float maxAngle = maxRotationSpeed * Time.deltaTime;
+        float maxAngle = maxRotationSpeed * 4 * Time.deltaTime;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, maxAngle);
     }
 

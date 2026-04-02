@@ -211,6 +211,9 @@ public class PlayerDash : MonoBehaviour
     /// Use this instead of CameraTransform.forward to get the actual flight path.
     /// </summary>
     public Vector3 DashDirection => dashDirection;
+    
+    /// <summary>The timeScale used during dash slow-mo. Read by PlayerMovement for sprint burst.</summary>
+    public float DashTimeScale => dashTimeScale;
 
     #endregion
 

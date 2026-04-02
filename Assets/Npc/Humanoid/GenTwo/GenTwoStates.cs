@@ -27,6 +27,7 @@ namespace GenTwoStates
         public override void Enter(GenTwoNpc npc)
         {
             npc.ClearInterceptData();
+            npc.IsLaserActive = false;
             npc.AnimManager?.PlayIdle();
         }
 
@@ -54,6 +55,7 @@ namespace GenTwoStates
             npc.SetUnscaledTimer(npc.ChargeDuration);
             npc.PlayChargeSound();
             npc.AnimManager?.PlayCharge();
+            npc.IsLaserActive = true;
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
@@ -75,7 +77,7 @@ namespace GenTwoStates
 
         public override void Exit(GenTwoNpc npc)
         {
-            // Charge-Animation wird vom nächsten State überschrieben
+            npc.IsLaserActive = false;
         }
     }
 
@@ -107,7 +109,8 @@ namespace GenTwoStates
 
             // DashStart one-shot → transitions to Dash loop automatically
             npc.AnimManager?.PlayDashStart();
-
+            npc.IsLaserActive = true;
+            
             Debug.Log($"[GenTwo] {npc.name}: Dash started! Direction: {interceptDir}");
         }
 
@@ -133,6 +136,7 @@ namespace GenTwoStates
             // Landing-Animation — DetermineWallOrGround() hat bereits
             // SetOnWall() aufgerufen, also wählt PlayLanding() die richtige Variante.
             npc.AnimManager?.PlayLanding();
+            npc.IsLaserActive = false;
         }
     }
 
@@ -155,7 +159,7 @@ namespace GenTwoStates
         {
             if (npc.UpdateUnscaledTimer())
             {
-                npc.AnimManager?.PlayRecoveryDone();
+                // Idle.Enter() kümmert sich um PlayIdle()
                 return new Idle();
             }
 
@@ -173,7 +177,8 @@ namespace GenTwoStates
 
         public override void Enter(GenTwoNpc npc)
         {
-            npc.AnimManager?.PlayStunned();
+            // PlayStunStart() wird bereits von NpcBase.ApplyStun() aufgerufen.
+            // Der AnimManager spielt die Stunned-Animation über das Interface.
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc) => null;

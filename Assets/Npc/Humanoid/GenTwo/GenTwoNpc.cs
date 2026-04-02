@@ -20,11 +20,12 @@ using UnityEngine;
 /// Uses segmented raycasting during dash to prevent tunneling at high speeds.
 /// Uses TimeManager.Instance.GameDeltaTime for dash movement.
 /// 
-/// ANIMANCER MIGRATION:
-/// - NpcAnimator Property entfernt → AnimManager (GenTwoAnimationManager) stattdessen.
-/// - DetermineWallOrGround() nutzt AnimManager.SetOnWall() statt SetBool.
-/// - ProcessDashMovement() nutzt AnimManager.PlayDashAttack() statt SetTrigger.
+/// ANIMANCER:
+/// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayCharge()).
+/// - DetermineWallOrGround() nutzt AnimManager.SetOnWall().
+/// - ProcessDashMovement() nutzt AnimManager.PlayDashAttack().
 /// - UpdateAnimator() überschrieben: GenTwo braucht kein Movement-Update.
+/// - playerCore wird aus NpcBase genutzt (nicht mehr lokal deklariert).
 /// </summary>
 public class GenTwoNpc : NpcBase
 {
@@ -90,8 +91,7 @@ public class GenTwoNpc : NpcBase
 
     private INpcState<GenTwoNpc> currentState;
 
-    // Player references (cached for fast access)
-    private PlayerCore playerCore;
+    // Player reference (cached for GenTwo-specific intercept calculations)
     private PlayerDash playerDash;
 
     // Dash state
@@ -124,12 +124,10 @@ public class GenTwoNpc : NpcBase
     public int RaycastSegments => raycastSegments;
     public float RecoveryDuration => recoveryDuration;
 
-    public PlayerCore PlayerCore => playerCore;
     public PlayerDash PlayerDash => playerDash;
 
     /// <summary>
     /// Typed animation manager reference for GenTwoStates.
-    /// Use this instead of the old NpcAnimator property.
     /// </summary>
     public GenTwoAnimationManager AnimManager { get; private set; }
 
@@ -141,10 +139,6 @@ public class GenTwoNpc : NpcBase
 
     /// <summary>True while GenTwo is in the Dashing state.</summary>
     public bool IsDashing => currentState is GenTwoStates.Dashing;
-
-    /// <summary>True if the player is currently in a dash state.</summary>
-    public bool IsPlayerDashing => playerCore != null &&
-                                    playerCore.CurrentState == PlayerCore.PlayerState.Dashing;
 
     /// <summary>True if player is within detection range.</summary>
     public bool IsPlayerInRange => DistanceToTarget <= detectionRange;
@@ -185,10 +179,10 @@ public class GenTwoNpc : NpcBase
     {
         base.Start();
 
-        // Cache player components for direct access
+        // Cache player components for GenTwo-specific intercept calculations
+        // (playerCore is already cached by NpcBase.Start())
         if (playerTransform != null)
         {
-            playerCore = playerTransform.GetComponent<PlayerCore>();
             playerDash = playerTransform.GetComponent<PlayerDash>();
         }
 
@@ -219,7 +213,7 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnStunEnd()
     {
-        AnimManager?.PlayRecoveryDone();
+        // PlayIdle() wird von Idle.Enter() aufgerufen — kein extra Aufruf nötig.
         ChangeState(new GenTwoStates.Idle());
     }
 

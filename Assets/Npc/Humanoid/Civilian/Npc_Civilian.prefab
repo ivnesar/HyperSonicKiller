@@ -103,7 +103,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CivilianNpc
   behaviorMode: 1
   maxHealth: 10
-  moveSpeed: 4
+  moveSpeed: 2
   stoppingDistance: 0.5
   maxRotationSpeed: 180
   hitSound: {fileID: 0}

@@ -273,10 +273,14 @@ public class PlayerCore : MonoBehaviour
                 
             case PlayerState.Dashing:
                 // Normal attack dash - NOT invulnerable
+                // Cancel sprint burst (it would conflict with dash SlowMo)
+                Movement?.CancelSprintBurst();
                 break;
                 
             case PlayerState.DashingToSword:
                 // Sword dash - INVULNERABLE
+                // Cancel sprint burst (it would conflict with dash SlowMo)
+                Movement?.CancelSprintBurst();
                 break;
 
             case PlayerState.Dead:

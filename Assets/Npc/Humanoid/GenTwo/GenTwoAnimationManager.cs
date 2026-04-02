@@ -61,12 +61,6 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     [SerializeField] private ClipTransition stunnedGround;
     [SerializeField] private ClipTransition stunnedWall;
 
-    // ── Hit / Death (Shared) ─────────────────────────────────────────────
-
-    [Header("Hit / Death (Shared)")]
-    [SerializeField] private ClipTransition hit;
-    [SerializeField] private ClipTransition die;
-
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -111,11 +105,6 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     #region INpcAnimationHandler (called by NpcBase)
     // ════════════════════════════════════════════════════════════════════════
 
-    public void PlayHitReaction()
-    {
-        PlayOneShotInstant(hit);
-    }
-
     public void PlayStunStart()
     {
         PlayStunned();
@@ -124,14 +113,6 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     public void PlayStunEnd()
     {
         PlayIdle();
-    }
-
-    public void PlayDeath()
-    {
-        if (die == null || die.Clip == null) return;
-
-        isPlayingOneShot = false;
-        animancer.Play(die, 0f);
     }
 
     public void UpdateMovement(float normalizedSpeed)
@@ -227,7 +208,7 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
         isPlayingOneShot = false;
         animancer.Play(landClip, 0f);
 
-        // Don't set OnEnd — landing holds until PlayRecoveryDone or PlayIdle is called.
+        // Don't set OnEnd — landing holds until PlayIdle is called.
     }
 
     /// <summary>Play stunned loop (ground or wall variant).</summary>
@@ -235,15 +216,6 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     {
         isPlayingOneShot = false;
         SetBaseClip(isOnWall ? stunnedWall : stunnedGround);
-    }
-
-    /// <summary>
-    /// Transition from landing/stunned back to idle.
-    /// Called by Recovery.Update() when timer expires, and by GenTwoNpc.OnStunEnd().
-    /// </summary>
-    public void PlayRecoveryDone()
-    {
-        PlayIdle();
     }
 
     #endregion
