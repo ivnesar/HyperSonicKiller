@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-2375503399659755266
+--- !u!114 &-5995835446450060829
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: matDef05Checker_unsolid
+  m_Name: matCivilian
   m_Shader: {fileID: 4800000, guid: 71a090e9b5b488349913abe716bb7bc6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -28,7 +28,7 @@ Material:
   - _DITHERMODE_SCREEN
   - _FILTERMODE_POINT
   - _LIGHTMODE_LIT
-  - _RECEIVESHADOWSMODE_ON
+  - _RECEIVESHADOWSMODE_OFF
   - _SNAPMODE_VIEW
   m_InvalidKeywords:
   - _USE_VERTEX_COLORS_OFF
@@ -44,8 +44,8 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 10309, guid: 0000000000000000f000000000000000, type: 0}
-        m_Scale: {x: 8, y: 8}
+        m_Texture: {fileID: 2800000, guid: 263f51ede819abd43ac7ef72b67d3191, type: 3}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 0}
@@ -108,13 +108,13 @@ Material:
     - _DitherMode: 0
     - _FilterMode: 1
     - _LightMode: 0
-    - _ReceiveShadowsMode: 0
+    - _ReceiveShadowsMode: 1
     - _ResolutionLimit: 64
     - _SnapMode: 2
-    - _SnapsPerUnit: 64
+    - _SnapsPerUnit: 128
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _AffineTextureStrength: 0.01
+    - _AffineTextureStrength: 1
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _AmbientLight: 0.02
@@ -155,7 +155,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.1981132, g: 0.1981132, b: 0.1981132, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _CubemapColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}

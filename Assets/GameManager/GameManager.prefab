@@ -47,4 +47,7 @@ MonoBehaviour:
   restartKey: 98
   allowRestartAnytime: 1
   restartDelay: 0.1
+  mainMenuSceneName: MainMenue
+  returnToMenuKey: 109
+  pauseAction: {fileID: 0}
   showDebugUI: 1

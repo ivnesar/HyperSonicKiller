@@ -9,6 +9,7 @@ using System;
 /// UPDATED: Two removal modes:
 ///   - Normal recall (RMB): Uses OnSwordRemoved() - damage after stun
 ///   - Sword dash: Uses OnSwordDashRemoval() - damage IMMEDIATELY
+/// UPDATED: Sword passes through breakable objects (BreakableGlass) instead of sticking.
 /// </summary>
 public class ThrownSword : MonoBehaviour
 {
@@ -290,7 +291,7 @@ public class ThrownSword : MonoBehaviour
         {
             if (CheckCollisionSegment(segmentLength))
             {
-                return; // Hit something, stop processing
+                return; // Hit something solid, stop processing
             }
 
             // Move forward one segment
@@ -309,6 +310,28 @@ public class ThrownSword : MonoBehaviour
             hitMask,
             QueryTriggerInteraction.Collide))
         {
+            // ── NEW: Durchfliegbare Objekte (Glas etc.) ──
+            // Prüfe ob das getroffene Objekt zerstörbar ist und das Schwert
+            // nicht stecken bleiben soll.
+            IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
+            IEnemy enemy = hit.collider.GetComponentInParent<IEnemy>();
+            IStunnable stunnable = hit.collider.GetComponentInParent<IStunnable>();
+
+            // Wenn es IDamageable ist, aber KEIN Enemy und KEIN Stunnable,
+            // dann ist es ein passives zerstörbares Objekt (z.B. Glas).
+            // → Schaden auslösen, aber NICHT stecken bleiben, weiterfliegen.
+            if (damageable != null && enemy == null && stunnable == null)
+            {
+                damageable.TakeDamage(0, hit.point, flyDirection);
+                Debug.Log($"[ThrownSword] Durchflogen: '{hit.collider.name}' (IDamageable, kein Enemy/Stunnable)");
+                
+                // Schwert hinter das getroffene Objekt teleportieren,
+                // damit es im nächsten Segment nicht erneut trifft
+                transform.position = hit.point + flyDirection * (swordRadius * 2f);
+                return false; // Weiterfliegen!
+            }
+
+            // ── Normales Verhalten: Stecken bleiben ──
             // Position at hit point
             transform.position = hit.point + hit.normal * swordRadius;
             transform.rotation = Quaternion.LookRotation(-hit.normal);

@@ -29,6 +29,17 @@ public class PlayerCore : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Inspector Fields
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Header("Laser Target")]
+    [Tooltip("Transform auf das NPC-Laser zeigen sollen (z.B. Brusthöhe). " +
+             "Wenn leer, wird transform.position als Fallback genutzt.")]
+    [SerializeField] private Transform laserTarget;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Events (External systems subscribe to these)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -74,6 +85,13 @@ public class PlayerCore : MonoBehaviour
     /// Only sword dash grants invulnerability - normal attack dash does NOT.
     /// </summary>
     public bool IsInvulnerable => CurrentState == PlayerState.DashingToSword;
+
+    /// <summary>
+    /// Zielpunkt auf den NPC-Laser zeigen sollen.
+    /// Gibt das zugewiesene Transform zurück, oder null wenn keins gesetzt ist.
+    /// NpcLaserPointer nutzt dies als automatisches Target.
+    /// </summary>
+    public Transform LaserTarget => laserTarget;
 
     #endregion
 

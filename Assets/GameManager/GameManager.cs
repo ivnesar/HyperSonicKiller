@@ -80,6 +80,13 @@ public class GameManager : MonoBehaviour
     [Tooltip("Small delay before reload to let UI update")]
     [SerializeField] private float restartDelay = 0.1f;
 
+    [Header("Main Menu")]
+    [Tooltip("Name of the Main Menu scene (must be in Build Settings)")]
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+
+    [Tooltip("Key to return to Main Menu")]
+    [SerializeField] private KeyCode returnToMenuKey = KeyCode.M;
+
     [Header("Pause Settings")]
     [Tooltip("Input Action for toggling pause (from InputSystem_Actions)")]
     [SerializeField] private InputActionReference pauseAction;
@@ -115,6 +122,13 @@ public class GameManager : MonoBehaviour
         // Don't process other input while paused
         if (IsPaused) return;
 
+        // Check for return to menu input (skip if already in menu)
+        bool isInMenu = SceneManager.GetActiveScene().name == mainMenuSceneName;
+        if (Input.GetKeyDown(returnToMenuKey) && !isRestarting && !isInMenu)
+        {
+            ReturnToMainMenu();
+        }
+
         // Check for restart input
         if (Input.GetKeyDown(restartKey) && !isRestarting)
         {
@@ -137,6 +151,10 @@ public class GameManager : MonoBehaviour
     private void OnGUI()
     {
         if (!showDebugUI) return;
+
+        // Don't show gameplay hints in the main menu
+        bool isInMenu = SceneManager.GetActiveScene().name == mainMenuSceneName;
+        if (isInMenu) return;
 
         // Show restart hint when dead
         if (IsPlayerDead && !isRestarting)
@@ -166,6 +184,23 @@ public class GameManager : MonoBehaviour
             GUI.color = Color.white;
             GUI.Label(rect, $"Press [{restartKey}] to Restart", style);
         }
+
+        // Show menu hint (bottom-left corner)
+        {
+            GUIStyle menuHintStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 16,
+                alignment = TextAnchor.LowerLeft,
+                normal = { textColor = new Color(0.7f, 0.7f, 0.7f) }
+            };
+
+            GUI.color = Color.white;
+            GUI.Label(
+                new Rect(10, Screen.height - 30, 300, 25),
+                $"[{returnToMenuKey}] Main Menu", menuHintStyle
+            );
+        }
+    
 
         // Show pause overlay
         if (IsPaused)
@@ -303,6 +338,24 @@ public class GameManager : MonoBehaviour
 
         Debug.Log("[GameManager] Restarting level...");
         StartCoroutine(RestartLevelCoroutine());
+    }
+
+    /// <summary>
+    /// Return to the Main Menu scene.
+    /// Can be called from anywhere (pause menu, death screen, etc.)
+    /// </summary>
+    public void ReturnToMainMenu()
+    {
+        if (isRestarting) return;
+
+        if (string.IsNullOrEmpty(mainMenuSceneName))
+        {
+            Debug.LogError("[GameManager] Main Menu scene name is not set!");
+            return;
+        }
+
+        Debug.Log("[GameManager] Returning to Main Menu...");
+        LoadScene(mainMenuSceneName);
     }
 
     /// <summary>

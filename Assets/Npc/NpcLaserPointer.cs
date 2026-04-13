@@ -3,40 +3,6 @@ using UnityEngine;
 // ════════════════════════════════════════════════════════════════════════════
 // NPC LASER POINTER - Visueller Warnstrahl für bevorstehende Angriffe
 // ════════════════════════════════════════════════════════════════════════════
-//
-// Zwei Modi:
-//
-//   TRACKING: Spieler ist im FOV des laserOrigin (Waffenrichtung) UND freie Sichtlinie
-//             → Laser zeigt von Origin Richtung Spieler (+ Verlängerung)
-//
-//   FORWARD:  Spieler nicht im FOV oder Sicht blockiert
-//             → Laser zeigt geradeaus (laserOrigin.forward)
-//               bis zum nächsten Collider oder bis laserLength
-//
-// VISUELLE WARNUNG (gesteuert durch AimProgress 0→1):
-//
-//   WIGGLE:   Laser wandert um den Zielpunkt via Perlin Noise.
-//             Radius schrumpft mit steigendem AimProgress bis eingelockt.
-//
-//   BREITE:   Laser wird über die Aim-Phase breiter.
-//             earlyWidth (Progress=0) → lockedWidth (Progress=1).
-//
-//   FARBE:    Laser wechselt die Farbe über die Aim-Phase.
-//             earlyColor (Progress=0) → lockedColor (Progress=1).
-//
-// Wird von NpcBase über IsLaserActive gesteuert.
-// Jede Subklasse entscheidet selbst, wann der Laser aktiv ist.
-//
-// Setup im Inspector:
-//   1. Auf NPC-Prefab legen (neben NpcBase-Subklasse)
-//   2. laserOrigin zuweisen (z.B. Waffe, Hand, Muzzle-Transform)
-//   3. laserTarget zuweisen (z.B. Brust-Bone am Spieler) — optional
-//   4. collisionMask setzen (Layer für Forward-Raycast, z.B. Solid/Wände)
-//   5. losCheckMask setzen (Layer für Sichtlinien-Check, z.B. Solid + Player)
-//   6. Material zuweisen (wird zur Laufzeit instanziert, Original bleibt unverändert)
-//   7. Optional: FOV, Wiggle, Breite, Farbe, Länge anpassen
-//
-// ════════════════════════════════════════════════════════════════════════════
 
 [RequireComponent(typeof(NpcBase))]
 public class NpcLaserPointer : MonoBehaviour
@@ -48,9 +14,6 @@ public class NpcLaserPointer : MonoBehaviour
     [Header("Transforms")]
     [Tooltip("Startpunkt des Lasers (z.B. Waffe, Hand, Muzzle). Wenn leer wird der Laser nicht angezeigt.")]
     [SerializeField] private Transform laserOrigin;
-
-    [Tooltip("Zielpunkt am Spieler (z.B. Brust-Bone, Kopf-Bone). Wenn leer wird playerTransform.position als Fallback genutzt.")]
-    [SerializeField] private Transform laserTarget;
 
     [Header("FOV & Line of Sight")]
     [Tooltip("Sichtfeld-Winkel (voll, nicht halb). Spieler muss innerhalb dieses Winkels ab laserOrigin.forward sein, damit der Laser auf ihn zeigt.")]
@@ -69,8 +32,6 @@ public class NpcLaserPointer : MonoBehaviour
     [Tooltip("Dauer in Sekunden für die Richtungsüberblendung zwischen Forward- und Tracking-Modus")]
     [SerializeField] private float transitionDuration = 0.3f;
 
-    // ── Zeitbasierte Breite ──────────────────────────────────────────────
-
     [Header("Laser Width (zeitbasiert)")]
     [Tooltip("Breite des Lasers am Anfang der Aim-Phase (AimProgress = 0).")]
     [SerializeField] private float earlyWidth = 0.01f;
@@ -78,16 +39,12 @@ public class NpcLaserPointer : MonoBehaviour
     [Tooltip("Breite des Lasers wenn eingelockt (AimProgress = 1).")]
     [SerializeField] private float lockedWidth = 0.06f;
 
-    // ── Zeitbasierte Farbe ───────────────────────────────────────────────
-
     [Header("Laser Color (zeitbasiert)")]
     [Tooltip("Farbe des Lasers am Anfang der Aim-Phase (AimProgress = 0).")]
-    [SerializeField] private Color earlyColor = new Color(1f, 1f, 0f, 0.5f); // Gelb, halbtransparent
+    [SerializeField] private Color earlyColor = new Color(1f, 1f, 0f, 0.5f); 
 
     [Tooltip("Farbe des Lasers wenn eingelockt (AimProgress = 1).")]
-    [SerializeField] private Color lockedColor = new Color(1f, 0f, 0f, 1f); // Rot, voll sichtbar
-
-    // ── Wiggle ───────────────────────────────────────────────────────────
+    [SerializeField] private Color lockedColor = new Color(1f, 0f, 0f, 1f); 
 
     [Header("Wiggle Settings")]
     [Tooltip("Maximaler Wiggle-Radius in Grad bei AimProgress = 0 (Beginn des Zielens).")]
@@ -98,8 +55,6 @@ public class NpcLaserPointer : MonoBehaviour
 
     [Tooltip("Aktiviert den Wiggle-Effekt. Wenn false, zeigt der Laser direkt auf den Spieler.")]
     [SerializeField] private bool enableWiggle = true;
-
-    // ── Material & Debug ─────────────────────────────────────────────────
 
     [Header("Visuals")]
     [Tooltip("Material für den Laser. Wird zur Laufzeit instanziert — das Original bleibt unverändert.")]
@@ -118,25 +73,22 @@ public class NpcLaserPointer : MonoBehaviour
     private NpcBase npc;
     private LineRenderer lineRenderer;
     private Transform playerTransform;
+    private Transform laserTarget;
 
-    // Aktuelle Richtung des Lasers — wird smooth interpoliert
     private Vector3 currentDirection;
 
-    // Wiggle: Perlin Noise Seed (pro Instanz zufällig, damit nicht alle NPCs synchron wigglen)
     private float noiseSeedX;
     private float noiseSeedY;
 
-    // Debug: letzte Werte für Gizmos-Zeichnung
+    private bool isInterceptMode;
+    private Vector3 interceptPoint;
+
     private bool debugInFOV;
     private bool debugHasLOS;
     private float debugAngle;
     private Vector3 debugTargetPoint;
     private float debugWiggleRadius;
 
-    /// <summary>
-    /// True wenn der Laser aktuell im Tracking-Modus ist (Spieler im FOV + LOS frei).
-    /// Kann von außen gelesen werden, z.B. für UI oder Gameplay-Logik.
-    /// </summary>
     public bool IsTracking { get; private set; }
 
     #endregion
@@ -150,7 +102,6 @@ public class NpcLaserPointer : MonoBehaviour
         npc = GetComponent<NpcBase>();
         SetupLineRenderer();
 
-        // Zufällige Seeds damit jeder NPC ein anderes Wiggle-Pattern hat
         noiseSeedX = Random.Range(0f, 1000f);
         noiseSeedY = Random.Range(0f, 1000f);
     }
@@ -159,13 +110,18 @@ public class NpcLaserPointer : MonoBehaviour
     {
         var player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
+        {
             playerTransform = player.transform;
+            var playerCore = player.GetComponent<PlayerCore>();
+            if (playerCore != null && playerCore.LaserTarget != null)
+            {
+                laserTarget = playerCore.LaserTarget;
+            }
+        }
     }
 
     private void LateUpdate()
     {
-        // LateUpdate damit der Laser NACH Animationen und Bone-Rotation aktualisiert wird
-
         if (npc == null || npc.IsDead || laserOrigin == null || playerTransform == null)
         {
             lineRenderer.enabled = false;
@@ -206,16 +162,10 @@ public class NpcLaserPointer : MonoBehaviour
         lineRenderer.receiveShadows = false;
 
         if (laserMaterial != null)
-        {
-            // Instanziertes Material damit das Original im Projekt nicht verändert wird
             lineRenderer.material = new Material(laserMaterial);
-        }
         else
-        {
             lineRenderer.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        }
 
-        // Initiale Farbe setzen
         ApplyColor(earlyColor);
     }
 
@@ -229,51 +179,77 @@ public class NpcLaserPointer : MonoBehaviour
     {
         Vector3 origin = laserOrigin.position;
         float progress = npc.AimProgress;
-
-        // Zielpunkt: laserTarget wenn zugewiesen, sonst Spieler-Position
-        Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-
-        // Zielrichtung bestimmen (Tracking oder Forward)
-        bool inFOV = IsPlayerInFOV(origin, targetPoint);
-        bool hasLOS = inFOV && HasLineOfSight(origin, targetPoint);
         Vector3 targetDirection;
 
-        if (inFOV && hasLOS)
+        if (isInterceptMode)
         {
+            // ── INTERCEPT-MODUS (GenTwo Charge/Dash) ──
             IsTracking = true;
-            targetDirection = (targetPoint - origin).normalized;
 
-            // Wiggle nur im Tracking-Modus anwenden
-            if (enableWiggle)
+            if (progress < 1f)
             {
-                targetDirection = ApplyWiggle(targetDirection, progress);
+                // CHARGE: Sofort auf Player Aim Target richten
+                Vector3 playerPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
+                targetDirection = (playerPoint - origin).normalized;
+
+                if (enableWiggle)
+                {
+                    targetDirection = ApplyWiggle(targetDirection, progress);
+                }
+
+                // Smooth Überblendung bei Charge (unscaled, weil Slow-Mo aktiv)
+                currentDirection = SmoothDirection(currentDirection, targetDirection, true);
+            }
+            else
+            {
+                // DASH: Laser entspricht exakt der Flugbahn des NPCs
+                targetDirection = (interceptPoint - npc.transform.position).normalized;
+                
+                if (targetDirection.sqrMagnitude < 0.01f)
+                    targetDirection = npc.transform.forward;
+
+                // Smoothing überspringen: Laser snappt sofort auf Flugbahn!
+                currentDirection = targetDirection;
             }
         }
         else
         {
-            IsTracking = false;
-            targetDirection = laserOrigin.forward;
+            // ── STANDARD-MODUS (FOV-basiert) ──
+            Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
+
+            bool inFOV = IsPlayerInFOV(origin, targetPoint);
+            bool hasLOS = inFOV && HasLineOfSight(origin, targetPoint);
+
+            if (inFOV && hasLOS)
+            {
+                IsTracking = true;
+                targetDirection = (targetPoint - origin).normalized;
+
+                if (enableWiggle)
+                {
+                    targetDirection = ApplyWiggle(targetDirection, progress);
+                }
+            }
+            else
+            {
+                IsTracking = false;
+                targetDirection = laserOrigin.forward;
+            }
+
+            // Smooth Überblendung bei Standard-Tracking
+            currentDirection = SmoothDirection(currentDirection, targetDirection);
         }
 
-        // Breite und Farbe basierend auf AimProgress aktualisieren
         UpdateWidthAndColor(progress);
 
-        // Debug-Log (alle 0.5 Sekunden, damit Konsole nicht geflutet wird)
         if (showDebug && Time.frameCount % 30 == 0)
         {
             Debug.Log($"[LaserPointer] {gameObject.name} | " +
-                      $"HorizontalAngle: {debugAngle:F1}° / {fieldOfView * 0.5f:F1}° (inFOV={inFOV}) | " +
-                      $"LOS={hasLOS} | Tracking={IsTracking} | " +
-                      $"AimProgress={progress:F2} | WiggleRadius={debugWiggleRadius:F1}° | " +
-                      $"NPC.forward={npc.transform.forward}");
+                      $"Intercept={isInterceptMode} | Tracking={IsTracking} | " +
+                      $"AimProgress={progress:F2} | WiggleRadius={debugWiggleRadius:F1}°");
         }
 
-        // Smooth Überblendung zur Zielrichtung
-        currentDirection = SmoothDirection(currentDirection, targetDirection);
-
-        // Endpunkt berechnen: Raycast für Collider-Stopp, sonst volle Länge
         Vector3 endPoint;
-
         if (Physics.Raycast(origin, currentDirection, out RaycastHit hit, laserLength, collisionMask))
         {
             endPoint = hit.point;
@@ -293,38 +269,23 @@ public class NpcLaserPointer : MonoBehaviour
     #region Width & Color
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Aktualisiert Breite und Farbe des Lasers basierend auf AimProgress.
-    /// Progress 0 → earlyWidth/earlyColor, Progress 1 → lockedWidth/lockedColor.
-    /// Nutzt das gleiche EaseIn wie der Wiggle, damit alles synchron eskaliert.
-    /// </summary>
     private void UpdateWidthAndColor(float progress)
     {
-        // Gleiche Easing-Kurve wie beim Wiggle (EaseInQuad):
-        // Am Anfang passiert wenig, am Ende eskaliert alles schnell
         float easedProgress = progress * progress;
 
-        // ── Breite ──
         float currentWidth = Mathf.Lerp(earlyWidth, lockedWidth, easedProgress);
         lineRenderer.startWidth = currentWidth;
         lineRenderer.endWidth = currentWidth;
 
-        // ── Farbe ──
         Color currentColor = Color.Lerp(earlyColor, lockedColor, easedProgress);
         ApplyColor(currentColor);
     }
 
-    /// <summary>
-    /// Setzt die Farbe auf dem LineRenderer und dem Material.
-    /// Nutzt sowohl LineRenderer-Farbe als auch Material._BaseColor,
-    /// damit es unabhängig vom Shader-Setup funktioniert.
-    /// </summary>
     private void ApplyColor(Color color)
     {
         lineRenderer.startColor = color;
         lineRenderer.endColor = color;
 
-        // Auch das Material aktualisieren (für URP Unlit/Lit Shader)
         if (lineRenderer.material != null)
         {
             lineRenderer.material.color = color;
@@ -334,68 +295,41 @@ public class NpcLaserPointer : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Wiggle
+    #region Wiggle & Smoothing
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Wendet einen Wiggle-Offset auf die Zielrichtung an.
-    /// Der Offset wird kleiner je höher der AimProgress ist (0→max, 1→0).
-    /// Nutzt Perlin Noise für organische, nicht-springende Bewegung.
-    /// </summary>
     private Vector3 ApplyWiggle(Vector3 direction, float progress)
     {
-        // Aktueller Wiggle-Radius: bei Progress 0 → maxAngle, bei 1 → 0
-        // EaseInQuad: Radius schrumpft am Anfang langsam, am Ende schnell
         float easedProgress = progress * progress;
         float currentAngle = wiggleMaxAngle * (1f - easedProgress);
 
         debugWiggleRadius = currentAngle;
 
-        // Wenn Wiggle-Radius praktisch 0 → keine Berechnung nötig
         if (currentAngle < 0.01f)
             return direction;
 
-        // Perlin Noise für X und Y Offset (-0.5 bis +0.5, dann auf -1 bis +1 normiert)
         float time = Time.time * wiggleFrequency;
         float noiseX = (Mathf.PerlinNoise(time, noiseSeedX) - 0.5f) * 2f;
         float noiseY = (Mathf.PerlinNoise(noiseSeedY, time) - 0.5f) * 2f;
 
-        // Offset als Rotation um die Zielrichtung
-        // Right-Achse = horizontal, Up-Achse = vertikal relativ zur Blickrichtung
         Quaternion baseRotation = Quaternion.LookRotation(direction);
         Vector3 right = baseRotation * Vector3.right;
         Vector3 up = baseRotation * Vector3.up;
 
-        // Rotation um beide Achsen anwenden
         Quaternion wiggleRotation = Quaternion.AngleAxis(noiseX * currentAngle, up)
                                   * Quaternion.AngleAxis(noiseY * currentAngle, right);
 
         return (wiggleRotation * direction).normalized;
     }
 
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Direction Smoothing
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Interpoliert die aktuelle Richtung smooth zur Zielrichtung.
-    /// Nutzt eine maximale Winkelgeschwindigkeit basierend auf transitionDuration.
-    /// </summary>
-    private Vector3 SmoothDirection(Vector3 current, Vector3 target)
+    private Vector3 SmoothDirection(Vector3 current, Vector3 target, bool useUnscaledTime = false)
     {
-        // Beim ersten Frame oder wenn currentDirection noch leer ist → sofort setzen
-        if (current == Vector3.zero)
-            return target;
+        if (current == Vector3.zero) return target;
+        if (transitionDuration <= 0f) return target;
 
-        // Kein Überblendung nötig wenn transitionDuration 0 oder negativ
-        if (transitionDuration <= 0f)
-            return target;
-
-        // 180° in transitionDuration Sekunden → maximale Grad pro Sekunde
         float maxDegreesPerSecond = 180f / transitionDuration;
-        float maxStep = maxDegreesPerSecond * Time.deltaTime;
+        float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+        float maxStep = maxDegreesPerSecond * dt;
 
         return Vector3.RotateTowards(current, target, maxStep * Mathf.Deg2Rad, 0f);
     }
@@ -406,50 +340,22 @@ public class NpcLaserPointer : MonoBehaviour
     #region FOV & Line of Sight
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Prüft ob der Zielpunkt innerhalb des FOV-Winkels liegt.
-    /// 
-    /// Nutzt den HORIZONTALEN Winkel zwischen NPC-Body-Forward und Spielerrichtung.
-    /// Grund: laserOrigin.forward hängt von der Aim-Bone-Rotation ab, die erst
-    /// in SoldierNpc.LateUpdate() angewendet wird. Wenn NpcLaserPointer.LateUpdate()
-    /// zuerst läuft, zeigt laserOrigin.forward noch horizontal → der vertikale
-    /// Winkel zum Spieler übersteigt das FOV → tracking = false.
-    /// 
-    /// Durch die horizontale Prüfung ist der Check unabhängig von der LateUpdate-
-    /// Reihenfolge und der vertikalen Bone-Rotation.
-    /// </summary>
     private bool IsPlayerInFOV(Vector3 origin, Vector3 targetPoint)
     {
-        // Horizontale Richtung zum Spieler (Y ignoriert)
         Vector3 directionToTarget = targetPoint - origin;
         Vector3 flatDirectionToTarget = new Vector3(directionToTarget.x, 0f, directionToTarget.z).normalized;
-
-        // Horizontale NPC-Blickrichtung (Body-Forward, wird in Update() gesetzt)
         Vector3 flatForward = new Vector3(npc.transform.forward.x, 0f, npc.transform.forward.z).normalized;
 
         float angle = Vector3.Angle(flatForward, flatDirectionToTarget);
         bool inFOV = angle <= fieldOfView * 0.5f;
 
-        // Debug-Daten cachen
         debugAngle = angle;
         debugTargetPoint = targetPoint;
         debugInFOV = inFOV;
 
-        if (showDebug)
-        {
-            // NPC-Body-Forward als cyan Ray (horizontal)
-            Debug.DrawRay(origin, flatForward * 5f, Color.cyan);
-            // Richtung zum Spieler als grün (im FOV) oder rot (außerhalb)
-            Debug.DrawRay(origin, directionToTarget.normalized * 5f, inFOV ? Color.green : Color.red);
-        }
-
         return inFOV;
     }
 
-    /// <summary>
-    /// Prüft ob eine freie Sichtlinie zwischen Origin und Zielpunkt besteht.
-    /// Freie Sicht = nichts getroffen, oder erstes getroffenes Objekt ist der Spieler.
-    /// </summary>
     private bool HasLineOfSight(Vector3 origin, Vector3 targetPoint)
     {
         Vector3 direction = targetPoint - origin;
@@ -458,13 +364,6 @@ public class NpcLaserPointer : MonoBehaviour
         if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, losCheckMask))
         {
             debugHasLOS = hit.collider.CompareTag("Player");
-
-            if (showDebug && !debugHasLOS)
-            {
-                Debug.DrawLine(origin, hit.point, Color.yellow);
-                Debug.Log($"[LaserPointer] LOS blockiert von: {hit.collider.name} (Layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)})");
-            }
-
             return debugHasLOS;
         }
 
@@ -478,20 +377,34 @@ public class NpcLaserPointer : MonoBehaviour
     #region Public API
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Erlaubt das Ändern des Startpunkts zur Laufzeit.
-    /// </summary>
     public void SetOrigin(Transform newOrigin)
     {
         laserOrigin = newOrigin;
     }
 
-    /// <summary>
-    /// Erlaubt das Ändern des Zielpunkts zur Laufzeit.
-    /// </summary>
-    public void SetTarget(Transform newTarget)
+    public void SetInterceptMode(Vector3 worldInterceptPoint)
     {
-        laserTarget = newTarget;
+        isInterceptMode = true;
+        interceptPoint = worldInterceptPoint;
+
+        // Sofort auf Spieler-Richtung snappen, damit der Laser nicht
+        // erst langsam von der alten forward-Richtung überschwenkt.
+        if (laserOrigin != null)
+        {
+            Vector3 playerPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
+            currentDirection = (playerPoint - laserOrigin.position).normalized;
+        }
+    }
+
+    public void UpdateInterceptPoint(Vector3 worldInterceptPoint)
+    {
+        interceptPoint = worldInterceptPoint;
+    }
+
+    public void ClearInterceptMode()
+    {
+        isInterceptMode = false;
+        interceptPoint = Vector3.zero;
     }
 
     #endregion
@@ -506,51 +419,38 @@ public class NpcLaserPointer : MonoBehaviour
         if (laserOrigin == null || npc == null) return;
 
         Vector3 origin = laserOrigin.position;
-        // FOV-Cone basiert auf dem horizontalen Body-Forward (wie IsPlayerInFOV)
         Vector3 forward = new Vector3(npc.transform.forward.x, 0f, npc.transform.forward.z).normalized;
         float halfAngle = fieldOfView * 0.5f;
         float coneLength = 5f;
 
-        // ── FOV Cone Ränder zeichnen ──
-
-        // Horizontale Ränder (links/rechts)
         Vector3 leftDir = Quaternion.AngleAxis(-halfAngle, Vector3.up) * forward;
         Vector3 rightDir = Quaternion.AngleAxis(halfAngle, Vector3.up) * forward;
 
-        // Cone Farbe: grün wenn Spieler im FOV, rot wenn nicht
         Gizmos.color = debugInFOV ? new Color(0f, 1f, 0f, 0.5f) : new Color(1f, 0f, 0f, 0.5f);
-
         Gizmos.DrawRay(origin, leftDir * coneLength);
         Gizmos.DrawRay(origin, rightDir * coneLength);
 
-        // Forward-Richtung (cyan)
         Gizmos.color = Color.cyan;
         Gizmos.DrawRay(origin, forward * coneLength);
 
-        // Richtung zum Spieler-Target
         if (playerTransform != null)
         {
             Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-
             Gizmos.color = (debugInFOV && debugHasLOS) ? Color.green : Color.red;
             Gizmos.DrawLine(origin, targetPoint);
             Gizmos.DrawWireSphere(targetPoint, 0.2f);
         }
 
-        // Winkel-Info als kleiner Sphere am Origin
         Gizmos.color = debugInFOV ? Color.green : Color.red;
         Gizmos.DrawWireSphere(origin, 0.1f);
 
-        // Wiggle-Radius als WireSphere am Target (wenn Tracking aktiv)
         if (IsTracking && enableWiggle && playerTransform != null)
         {
             Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
             float distToTarget = Vector3.Distance(origin, targetPoint);
-
-            // Wiggle-Radius in Welteinheiten umrechnen (Winkel → Abstand auf Target-Distanz)
             float wiggleWorldRadius = distToTarget * Mathf.Tan(debugWiggleRadius * Mathf.Deg2Rad);
 
-            Gizmos.color = new Color(1f, 0.5f, 0f, 0.4f); // Orange, halbtransparent
+            Gizmos.color = new Color(1f, 0.5f, 0f, 0.4f); 
             Gizmos.DrawWireSphere(targetPoint, wiggleWorldRadius);
         }
     }
@@ -566,26 +466,18 @@ public class NpcLaserPointer : MonoBehaviour
         float coneLength = 5f;
 
         Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
-
-        // Horizontaler FOV-Bogen (16 Segmente)
-        int segments = 16;
         Vector3 previousPoint = Vector3.zero;
 
-        for (int i = 0; i <= segments; i++)
+        for (int i = 0; i <= 16; i++)
         {
-            // Interpoliere von -halfAngle bis +halfAngle um Vector3.up
-            float t = (float)i / segments;
+            float t = (float)i / 16;
             float currentAngle = Mathf.Lerp(-halfAngle, halfAngle, t);
             Vector3 edgeDir = Quaternion.AngleAxis(currentAngle, Vector3.up) * forward;
-
             Vector3 point = origin + edgeDir.normalized * coneLength;
 
-            if (i > 0)
-                Gizmos.DrawLine(previousPoint, point);
-
+            if (i > 0) Gizmos.DrawLine(previousPoint, point);
             previousPoint = point;
         }
     }
-
     #endregion
 }

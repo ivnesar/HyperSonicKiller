@@ -948,6 +948,9 @@ MonoBehaviour:
   renderPassEvent:
     m_OverrideState: 1
     m_Value: 1
+  useBarrelDistortion:
+    m_OverrideState: 1
+    m_Value: 0
   distortionStrength:
     m_OverrideState: 1
     m_Value: 0
@@ -961,6 +964,18 @@ MonoBehaviour:
     m_OverrideState: 1
     m_Value: {fileID: 0}
     dimension: 1
+  redValues:
+    m_OverrideState: 1
+    m_Value: 256
+  greenValues:
+    m_OverrideState: 1
+    m_Value: 256
+  blueValues:
+    m_OverrideState: 1
+    m_Value: 256
+  useDithering:
+    m_OverrideState: 1
+    m_Value: 0
   tintColor:
     m_OverrideState: 1
     m_Value: {r: 1, g: 1, b: 1, a: 1}

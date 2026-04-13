@@ -131,6 +131,12 @@ public class GenTwoNpc : NpcBase
     /// </summary>
     public GenTwoAnimationManager AnimManager { get; private set; }
 
+    /// <summary>
+    /// Referenz auf den NpcLaserPointer für Intercept-Modus Steuerung.
+    /// Nutzt das in NpcBase.Awake() gecachte Feld.
+    /// </summary>
+    public NpcLaserPointer LaserPointer => laserPointer;
+
     /// <summary>Current dash direction (set once at dash start, never changes).</summary>
     public Vector3 DashDirection => dashDirection;
 
@@ -481,6 +487,48 @@ public class GenTwoNpc : NpcBase
 
     public void PlayChargeSound() => PlaySound(chargeSound);
     public void PlayDashSound() => PlaySound(dashSound);
+
+    /// <summary>
+    /// Berechnet den Intercept-Punkt vorab (ohne Dash zu starten).
+    /// Wird von Charging.Enter() aufgerufen, damit der Laser den Punkt kennt.
+    /// Gibt true zurück wenn ein gültiger Punkt gefunden wurde.
+    /// Der Punkt ist dann über LastInterceptPoint abrufbar.
+    /// </summary>
+    public bool PreCalculateIntercept()
+    {
+        Vector3 dir = CalculateInterceptDirection();
+        return dir != Vector3.zero;
+    }
+
+    /// <summary>
+    /// Public Wrapper für NpcBase.SetAimProgress (protected).
+    /// Erlaubt States den AimProgress manuell zu setzen.
+    /// GenTwo nutzt dies statt StartAimTracking(), weil der
+    /// unscaledTimer nicht mit dem stateTimer synchron ist.
+    /// </summary>
+    public void SetAimProgressPublic(float progress)
+    {
+        SetAimProgress(progress);
+    }
+
+    /// <summary>
+    /// Public Wrapper für NpcBase.ResetAimProgress (protected).
+    /// </summary>
+    public void ResetAimProgressPublic()
+    {
+        ResetAimProgress();
+    }
+
+    /// <summary>
+    /// Gibt den aktuellen Fortschritt des unscaledTimers zurück (0→1).
+    /// 0 = Timer gerade gestartet, 1 = Timer abgelaufen.
+    /// </summary>
+    public float GetUnscaledTimerProgress(float totalDuration)
+    {
+        if (totalDuration <= 0f) return 1f;
+        float elapsed = totalDuration - unscaledTimer;
+        return Mathf.Clamp01(elapsed / totalDuration);
+    }
 
     public void FaceDirection(Vector3 direction)
     {

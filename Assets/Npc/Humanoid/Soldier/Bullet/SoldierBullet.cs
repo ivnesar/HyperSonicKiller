@@ -9,6 +9,7 @@ using UnityEngine;
 /// Just instantiate and initialize, bullet handles everything itself.
 /// 
 /// UPDATED: Compatible with new PlayerCore system.
+/// UPDATED: Added IDamageable fallback for destructible objects (BreakableGlass etc.)
 /// </summary>
 public class SoldierBullet : MonoBehaviour
 {
@@ -178,6 +179,15 @@ public class SoldierBullet : MonoBehaviour
                 // Pass bullet travel direction so player camera nudges toward attacker
                 playerCore.TakeDamage(damage, direction);
                 //Debug.Log($"[SoldierBullet] Hit player for {damage} damage!");
+            }
+        }
+        else
+        {
+            // ── NEW: IDamageable fallback für zerstörbare Objekte (Glas etc.) ──
+            IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
+            if (damageable != null)
+            {
+                damageable.TakeDamage(damage, hit.point, direction);
             }
         }
 

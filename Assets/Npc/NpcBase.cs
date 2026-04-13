@@ -86,6 +86,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     [Header("Debug")]
     [SerializeField] protected bool showDebugInfo = true;
 
+    [Header("Overlay")]
+    [Tooltip("Anzeigename im UI-Overlay. Wenn leer, wird der NpcType verwendet.")]
+    [SerializeField] protected string displayName = "";
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -118,6 +122,13 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// Automatisch gefunden — null wenn kein AimController auf dem Prefab liegt.
     /// </summary>
     protected AimController aimController;
+
+    /// <summary>
+    /// Laser-Pointer für visuelle Warnstrahlen.
+    /// Automatisch gefunden — null wenn kein NpcLaserPointer auf dem Prefab liegt.
+    /// Wird in Die() und ApplyStun() aufgeräumt (Intercept-Modus beenden).
+    /// </summary>
+    protected NpcLaserPointer laserPointer;
 
     /// <summary>
     /// Cached PlayerCore-Referenz für Dash-Erkennung und andere Spieler-Queries.
@@ -161,6 +172,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     private const float SPEED_SMOOTH_TIME = 0.1f;
     private float smoothedSpeed;
 
+    // Overlay
+    private Renderer cachedRenderer;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -187,6 +201,28 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// Gibt das zugewiesene Transform zurück, oder null wenn keins gesetzt ist.
     /// </summary>
     public Transform SnapTarget => snapTarget;
+
+    /// <summary>
+    /// Name der im Overlay angezeigt wird.
+    /// Fallback auf NpcType wenn kein displayName gesetzt ist.
+    /// </summary>
+    public string DisplayName => string.IsNullOrEmpty(displayName) 
+        ? GetNpcType().ToString() 
+        : displayName;
+
+    /// <summary>
+    /// Renderer für Bounding-Box-Berechnung.
+    /// Wird beim ersten Zugriff gecacht.
+    /// </summary>
+    public Renderer BoundsRenderer
+    {
+        get
+        {
+            if (cachedRenderer == null)
+                cachedRenderer = GetComponentInChildren<Renderer>();
+            return cachedRenderer;
+        }
+    }
 
     /// <summary>
     /// Steuert den Warnlaser (NpcLaserPointer).
@@ -267,6 +303,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
 
         // AimController finden (optional — nicht alle NPCs haben einen)
         aimController = GetComponent<AimController>();
+
+        // LaserPointer finden (optional — nicht alle NPCs haben einen)
+        laserPointer = GetComponent<NpcLaserPointer>();
 
         currentHealth = maxHealth;
 
@@ -639,6 +678,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         StopMovement();
 
         aimController?.DisableImmediate();
+        laserPointer?.ClearInterceptMode();
         
         animHandler?.PlayStunStart();
         
@@ -689,6 +729,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         StopMovement();
 
         aimController?.DisableImmediate();
+        laserPointer?.ClearInterceptMode();
         
         animHandler?.PlayStunStart();
         
@@ -770,6 +811,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         ResetAimProgress();
 
         aimController?.DisableImmediate();
+        laserPointer?.ClearInterceptMode();
 
         if (navAgent != null)
         {
@@ -815,10 +857,12 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         isDead = true;
         isStunned = false;
         currentHealth = 0;
+        IsLaserActive = false;
         IsAimActive = false;
         ResetAimProgress();
 
         aimController?.DisableImmediate();
+        laserPointer?.ClearInterceptMode();
 
         if (navAgent != null)
         {

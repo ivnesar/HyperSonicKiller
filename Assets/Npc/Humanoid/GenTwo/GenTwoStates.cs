@@ -1,19 +1,5 @@
 using UnityEngine;
 
-// ════════════════════════════════════════════════════════════════════════════
-// GENTWO STATES (Animancer Version)
-// ════════════════════════════════════════════════════════════════════════════
-//
-// Alle animator.SetTrigger/SetBool Aufrufe sind durch typsichere
-// AnimManager-Methoden ersetzt. Kein String-basierter Zugriff mehr.
-//
-// Ground/Wall-Varianten werden automatisch vom GenTwoAnimationManager
-// anhand des isOnWall-Flags ausgewählt.
-//
-// Idle → Charging → Dashing → Recovery → Idle
-//
-// ════════════════════════════════════════════════════════════════════════════
-
 namespace GenTwoStates
 {
     // ─────────────────────────────────────────────────────────────────────
@@ -28,6 +14,8 @@ namespace GenTwoStates
         {
             npc.ClearInterceptData();
             npc.IsLaserActive = false;
+            npc.ResetAimProgressPublic();
+            npc.LaserPointer?.ClearInterceptMode();
             npc.AnimManager?.PlayIdle();
         }
 
@@ -55,7 +43,18 @@ namespace GenTwoStates
             npc.SetUnscaledTimer(npc.ChargeDuration);
             npc.PlayChargeSound();
             npc.AnimManager?.PlayCharge();
+
+            npc.PreCalculateIntercept();
+
             npc.IsLaserActive = true;
+            npc.SetAimProgressPublic(0f);
+
+            // IMMER in Intercept Mode setzen, unabhängig vom Vorhandensein eines gültigen Intercept-Punktes,
+            // damit der Laser das Player Aim Target sofort zentriert und wigglet!
+            if (npc.LaserPointer != null)
+            {
+                npc.LaserPointer.SetInterceptMode(npc.LastInterceptPoint);
+            }
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
@@ -67,17 +66,22 @@ namespace GenTwoStates
                 return new Idle();
             }
 
+            npc.PreCalculateIntercept();
+            
+            if (npc.LaserPointer != null)
+            {
+                npc.LaserPointer.UpdateInterceptPoint(npc.LastInterceptPoint);
+            }
+
+            float progress = npc.GetUnscaledTimerProgress(npc.ChargeDuration);
+            npc.SetAimProgressPublic(progress);
+
             if (npc.UpdateUnscaledTimer())
             {
                 return new Dashing();
             }
 
             return null;
-        }
-
-        public override void Exit(GenTwoNpc npc)
-        {
-            npc.IsLaserActive = false;
         }
     }
 
@@ -107,10 +111,17 @@ namespace GenTwoStates
             npc.FaceDirection(interceptDir);
             npc.PlayDashSound();
 
-            // DashStart one-shot → transitions to Dash loop automatically
             npc.AnimManager?.PlayDashStart();
+
+            // Progress = 1 triggert die Dash-Phase im Laser (exakte Flugbahn, kein Smoothing)
             npc.IsLaserActive = true;
-            
+            npc.SetAimProgressPublic(1f);
+
+            if (npc.LaserPointer != null)
+            {
+                npc.LaserPointer.UpdateInterceptPoint(npc.LastInterceptPoint);
+            }
+
             Debug.Log($"[GenTwo] {npc.name}: Dash started! Direction: {interceptDir}");
         }
 
@@ -133,10 +144,10 @@ namespace GenTwoStates
 
         public override void Exit(GenTwoNpc npc)
         {
-            // Landing-Animation — DetermineWallOrGround() hat bereits
-            // SetOnWall() aufgerufen, also wählt PlayLanding() die richtige Variante.
             npc.AnimManager?.PlayLanding();
             npc.IsLaserActive = false;
+            npc.ResetAimProgressPublic();
+            npc.LaserPointer?.ClearInterceptMode();
         }
     }
 
@@ -151,18 +162,12 @@ namespace GenTwoStates
         public override void Enter(GenTwoNpc npc)
         {
             npc.SetUnscaledTimer(npc.RecoveryDuration);
-
             Debug.Log($"[GenTwo] {npc.name}: Recovering for {npc.RecoveryDuration}s (OnWall: {npc.IsOnWall})");
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
         {
-            if (npc.UpdateUnscaledTimer())
-            {
-                // Idle.Enter() kümmert sich um PlayIdle()
-                return new Idle();
-            }
-
+            if (npc.UpdateUnscaledTimer()) return new Idle();
             return null;
         }
     }
@@ -177,8 +182,9 @@ namespace GenTwoStates
 
         public override void Enter(GenTwoNpc npc)
         {
-            // PlayStunStart() wird bereits von NpcBase.ApplyStun() aufgerufen.
-            // Der AnimManager spielt die Stunned-Animation über das Interface.
+            npc.IsLaserActive = false;
+            npc.ResetAimProgressPublic();
+            npc.LaserPointer?.ClearInterceptMode();
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc) => null;
