@@ -464,8 +464,8 @@ public class PlayerDash : MonoBehaviour
     /// </summary>
     private void CheckAndDamageEnemiesInRadius()
     {
-        // Skip damage dealing if player is exhausted (dash still works, just no damage)
-        if (combat != null && combat.IsExhausted)
+        // Skip damage dealing if player can't attack (exhausted or disarmed/sword thrown)
+        if (combat != null && !combat.CanDealDashDamage)
         {
             return;
         }
@@ -479,6 +479,10 @@ public class PlayerDash : MonoBehaviour
                 // Only hit each enemy once per dash
                 if (!enemiesHitThisDash.Contains(enemy))
                 {
+                    // Skip enemies that can't be auto-attacked (e.g. ProxyMine)
+                    if (!enemy.CanBeAutoAttacked)
+                        continue;
+
                     // Check if enemy is within the generous hit angle
                     Vector3 toEnemy = (col.transform.position - transform.position).normalized;
                     float angle = Vector3.Angle(dashDirection, toEnemy);

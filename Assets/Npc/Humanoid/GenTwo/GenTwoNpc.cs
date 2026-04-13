@@ -434,7 +434,7 @@ public class GenTwoNpc : NpcBase
 
                     if (IsPlayerDashing)
                     {
-                        playerCore.TakeDirectDamage(collisionDamage);
+                        playerCore.TakeDirectDamage(collisionDamage, gameObject.name);
                         Debug.Log($"[GenTwo] {name}: INTERCEPTED player during dash! Dealt {collisionDamage} damage!");
                     }
                     else

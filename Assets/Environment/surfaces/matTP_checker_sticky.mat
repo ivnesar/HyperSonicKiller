@@ -31,6 +31,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Blend: 1
+    - _QueueControl: 0
     - _Tile: 1
     m_Colors: []
   m_BuildTextureStacks: []

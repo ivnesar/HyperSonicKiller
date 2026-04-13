@@ -154,7 +154,8 @@ public class SniperBullet : MonoBehaviour
             {
                 // Angriffsrichtung: vom Schützen zum Spieler
                 Vector3 attackDir = direction.normalized;
-                playerCore.TakeDamage(damage, attackDir);
+                string sourceName = shooter != null ? shooter.gameObject.name : "Sniper";
+                playerCore.TakeDamage(damage, attackDir, sourceName);
                 Debug.Log($"[SniperBullet] Player getroffen! Damage: {damage}");
             }
             else

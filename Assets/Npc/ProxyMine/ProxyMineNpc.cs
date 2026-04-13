@@ -30,7 +30,14 @@ public class ProxyMineNpc : NpcBase
         "stoppingDistance",  // Mine bewegt sich nicht
         "maxRotationSpeed",  // Mine rotiert nicht
         "useRagdollOnDeath", // Mine explodiert, kein Ragdoll
+        "snapTarget",        // Mine braucht keinen Kamera-Snap
     };
+
+    /// <summary>
+    /// Mine kann nicht vom Dash-Auto-Attack getroffen werden.
+    /// Sword-Throw und Explosions-Schaden funktionieren weiterhin.
+    /// </summary>
+    public override bool CanBeAutoAttacked => false;
 
     #endregion
 

@@ -197,6 +197,13 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     public Transform Transform => transform;
 
     /// <summary>
+    /// Whether this NPC can be hit by the player's dash auto-attack.
+    /// Override and return false for NPCs that should be dashed through.
+    /// Does NOT affect sword throw, bullet, or explosion damage.
+    /// </summary>
+    public virtual bool CanBeAutoAttacked => true;
+
+    /// <summary>
     /// Snap-Ziel für die Kamera bei Treffer.
     /// Gibt das zugewiesene Transform zurück, oder null wenn keins gesetzt ist.
     /// </summary>

@@ -140,7 +140,7 @@ public class ExplosionSphere : MonoBehaviour
         if (player != null)
         {
             damagedTargets.Add(rootObject);
-            player.TakeDirectDamage(playerDamage);
+            player.TakeDirectDamage(playerDamage, "Explosion");
             return;
         }
 

@@ -32,6 +32,16 @@ public class PlayerHealthUI : MonoBehaviour
     [Header("Dash Blocked")]
     [SerializeField] private RawImage dashBlockedIcon;
 
+    [Header("Game Over Panel")]
+    [Tooltip("Eltern-GameObject des Game-Over-Panels (wird bei Tod aktiviert)")]
+    [SerializeField] private GameObject gameOverPanel;
+
+    [Tooltip("Text für 'Killed by [NPC Name]'")]
+    [SerializeField] private TextMeshProUGUI killedByText;
+
+    [Tooltip("Text für die tödliche Schadensmenge")]
+    [SerializeField] private TextMeshProUGUI deathDamageText;
+
     [Header("Colors")]
     [SerializeField] private Color healthyColor = new Color(0.2f, 0.8f, 0.2f);
     [SerializeField] private Color damagedColor = new Color(0.9f, 0.7f, 0.1f);
@@ -156,6 +166,10 @@ public class PlayerHealthUI : MonoBehaviour
         if (dashBlockedIcon != null)
             dashBlockedIcon.gameObject.SetActive(false);
 
+        // Game Over Panel zu Beginn verstecken
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+
         UpdateStatus("");
     }
 
@@ -250,11 +264,13 @@ public class PlayerHealthUI : MonoBehaviour
     private void HandleDeath()
     {
         UpdateStatus("<color=red>DEAD</color>");
+        ShowGameOverPanel();
     }
 
     private void HandleRevive()
     {
         UpdateStatus("");
+        HideGameOverPanel();
         InitializeUI();
     }
 
@@ -280,6 +296,42 @@ public class PlayerHealthUI : MonoBehaviour
                 UpdateStatus("");
             }
         }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Game Over Panel
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void ShowGameOverPanel()
+    {
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
+
+        // Killer-Info aus PlayerCore lesen
+        string killerName = player.LastDamageSourceName;
+        float killerDamage = player.LastDamageAmount;
+
+        if (killedByText != null)
+        {
+            killedByText.text = !string.IsNullOrEmpty(killerName)
+                ? $"Killed by {killerName}"
+                : "Killed";
+        }
+
+        if (deathDamageText != null)
+        {
+            deathDamageText.text = killerDamage > 0
+                ? $"{Mathf.CeilToInt(killerDamage)} damage"
+                : "";
+        }
+    }
+
+    private void HideGameOverPanel()
+    {
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
     }
 
     #endregion

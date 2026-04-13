@@ -93,6 +93,16 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public Transform LaserTarget => laserTarget;
 
+    // ── Last Damage Source (für Game Over Screen) ──
+    private string lastDamageSourceName = "";
+    private float lastDamageAmount;
+
+    /// <summary>Name der letzten Schadensquelle (z.B. "Soldier", "Proxy Mine").</summary>
+    public string LastDamageSourceName => lastDamageSourceName;
+
+    /// <summary>Schadensmenge des letzten Treffers.</summary>
+    public float LastDamageAmount => lastDamageAmount;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -167,7 +177,7 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage)
     {
-        return TakeDamage(damage, Vector3.zero);
+        return TakeDamage(damage, Vector3.zero, "");
     }
 
     /// <summary>
@@ -177,10 +187,21 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage, Vector3 attackDirection)
     {
+        return TakeDamage(damage, attackDirection, "");
+    }
+
+    /// <summary>
+    /// Damage with attack direction and source name for kill tracking.
+    /// </summary>
+    public bool TakeDamage(float damage, Vector3 attackDirection, string sourceName)
+    {
         if (IsDead || damage <= 0) return false;
         
         // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
+
+        // Track damage source (even if blocked — the last hit that connects matters)
+        TrackDamageSource(sourceName, damage);
 
         // Combat handles block logic, Health handles actual HP
         if (Combat != null && Combat.IsBlocking)
@@ -213,10 +234,20 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDirectDamage(float damage)
     {
+        return TakeDirectDamage(damage, "");
+    }
+
+    /// <summary>
+    /// Direct damage with source name for kill tracking.
+    /// </summary>
+    public bool TakeDirectDamage(float damage, string sourceName)
+    {
         if (IsDead || damage <= 0) return false;
         
         // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
+
+        TrackDamageSource(sourceName, damage);
         
         Health?.TakeDamage(damage);
         return true;
@@ -239,6 +270,7 @@ public class PlayerCore : MonoBehaviour
 
         Health?.ResetHealth();
         Combat?.ResetCombat();
+        ClearDamageSource();
         SetState(PlayerState.Normal);
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -246,6 +278,40 @@ public class PlayerCore : MonoBehaviour
 
         OnPlayerRevive?.Invoke();
     }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Damage Source Tracking
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Merkt sich die letzte Schadensquelle. Wird bei jedem Treffer aufgerufen.
+    /// Leerer Name wird ignoriert (alte Aufrufe ohne sourceName behalten den vorherigen Wert).
+    /// </summary>
+    private void TrackDamageSource(string sourceName, float damage)
+    {
+        if (!string.IsNullOrEmpty(sourceName))
+        {
+            lastDamageSourceName = sourceName;
+        }
+        lastDamageAmount = damage;
+    }
+
+    /// <summary>
+    /// Setzt die Schadensquelle zurück (z.B. bei Revive).
+    /// </summary>
+    private void ClearDamageSource()
+    {
+        lastDamageSourceName = "";
+        lastDamageAmount = 0f;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Public API - Misc
+    // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Force the player into a specific state (use sparingly).

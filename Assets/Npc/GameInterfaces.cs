@@ -71,6 +71,13 @@ public interface IEnemy : IDamageable, IStunnable
     bool IsDead { get; }
 
     /// <summary>
+    /// Whether this enemy can be hit by the player's dash auto-attack.
+    /// Return false for enemies that should be dashed through (e.g. ProxyMine).
+    /// Sword throw, bullet, and explosion damage are NOT affected by this.
+    /// </summary>
+    bool CanBeAutoAttacked { get; }
+
+    /// <summary>
     /// Transform of the enemy (for positioning, distance checks).
     /// </summary>
     Transform Transform { get; }
