@@ -73,6 +73,11 @@ public class NpcLaserPointer : MonoBehaviour
     [Tooltip("Material für den Laser. Wird zur Laufzeit instanziert — das Original bleibt unverändert.")]
     [SerializeField] private Material laserMaterial;
 
+    [Header("Time Mode")]
+    [Tooltip("Wenn true, nutzt der Laser unscaled Time für Wiggle und Smoothing. " +
+             "Aktivieren für NPCs die während SlowMo normal agieren sollen (z.B. Turret).")]
+    [SerializeField] private bool useUnscaledTime = false;
+
     [Header("Debug")]
     [Tooltip("Aktiviert Debug-Visualisierung: FOV-Cone, LOS-Ray und Konsolen-Logs")]
     [SerializeField] private bool showDebug = false;
@@ -92,6 +97,14 @@ public class NpcLaserPointer : MonoBehaviour
 
     private float noiseSeedX;
     private float noiseSeedY;
+
+    /// <summary>
+    /// Akkumulierte unscaled Time für Wiggle-Noise.
+    /// Wird nur genutzt wenn useUnscaledTime = true.
+    /// Time.unscaledTime direkt zu nutzen wäre auch möglich, aber ein
+    /// Akkumulator erlaubt identisches Verhalten zu Time.time.
+    /// </summary>
+    private float unscaledWiggleTime;
 
     private bool debugInFOV;
     private bool debugHasLOS;
@@ -212,7 +225,7 @@ public class NpcLaserPointer : MonoBehaviour
             targetDirection = laserOrigin.forward;
         }
 
-        currentDirection = SmoothDirection(currentDirection, targetDirection);
+        currentDirection = SmoothDirection(currentDirection, targetDirection, useUnscaledTime);
 
         UpdateWidthAndColor(progress);
 
@@ -282,7 +295,18 @@ public class NpcLaserPointer : MonoBehaviour
         if (currentAngle < 0.01f)
             return direction;
 
-        float time = Time.time * wiggleFrequency;
+        // Unscaled: eigenen Akkumulator nutzen, damit Wiggle während SlowMo normal läuft
+        float time;
+        if (useUnscaledTime)
+        {
+            unscaledWiggleTime += Time.unscaledDeltaTime * wiggleFrequency;
+            time = unscaledWiggleTime;
+        }
+        else
+        {
+            time = Time.time * wiggleFrequency;
+        }
+
         float noiseX = (Mathf.PerlinNoise(time, noiseSeedX) - 0.5f) * 2f;
         float noiseY = (Mathf.PerlinNoise(noiseSeedY, time) - 0.5f) * 2f;
 

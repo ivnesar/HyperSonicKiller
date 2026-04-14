@@ -15,6 +15,13 @@ using UnityEngine;
 //
 // Idle → MovingToRange → Aiming → Firing → Reloading → zurück
 //
+// ONLY-SHOOT-DASHING-PLAYER:
+// - Wenn npc.OnlyShootDashingPlayer aktiv ist, bleibt der Sniper im Idle
+//   solange der Spieler NICHT dasht.
+// - Idle → Aiming nur wenn IsPlayerDashing == true.
+// - Aiming bricht ab (→ Idle) sobald der Spieler aufhört zu dashen.
+// - Firing/Reloading laufen normal durch (Schuss wurde bereits ausgelöst).
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 namespace SniperStates
@@ -41,6 +48,10 @@ namespace SniperStates
         public override INpcState<SniperNpc> Update(SniperNpc npc)
         {
             npc.RotateTowardTarget();
+
+            // Wenn onlyShootDashingPlayer aktiv ist, nur angreifen wenn Spieler dasht
+            if (npc.OnlyShootDashingPlayer && !npc.IsPlayerDashing)
+                return null;
 
             if (npc.CanShoot())
                 return new Aiming();
@@ -120,10 +131,9 @@ namespace SniperStates
         {
             npc.RotateTowardTarget();
 
-            // KEIN Dash-Check hier — der AimController blendet AimIK
-            // automatisch smooth aus wenn der Spieler dasht.
-            // (Vorher: IsPlayerDashing → Idle, was ein Aiming↔Idle
-            //  Ping-Pong pro Frame verursacht hat = Zucken)
+            // Wenn onlyShootDashingPlayer aktiv und Spieler nicht mehr dasht → abbrechen
+            if (npc.OnlyShootDashingPlayer && !npc.IsPlayerDashing)
+                return new Idle();
 
             if (!npc.HasLineOfSight())
                 return new Idle();

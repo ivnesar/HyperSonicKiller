@@ -32,6 +32,11 @@ public class SniperNpc : NpcBase
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 
+    [Header("Combat - Behavior")]
+    [Tooltip("Wenn aktiv, schießt der Sniper NUR auf den Spieler während dieser dasht. " +
+             "Ansonsten bleibt er im Idle.")]
+    [SerializeField] private bool onlyShootDashingPlayer;
+
     [Header("Combat - Ranges")]
     [SerializeField] private float maxShootingRange = 50f;
     [SerializeField] private float preferredRange = 35f;
@@ -72,6 +77,7 @@ public class SniperNpc : NpcBase
     public float PreferredRange => preferredRange;
     public float AimDuration => aimDuration;
     public float ReloadDuration => reloadDuration;
+    public bool OnlyShootDashingPlayer => onlyShootDashingPlayer;
 
     /// <summary>
     /// Typed animation manager reference for SniperStates.

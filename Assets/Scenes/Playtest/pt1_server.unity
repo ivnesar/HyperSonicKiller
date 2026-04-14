@@ -2053,7 +2053,7 @@ GameObject:
   - component: {fileID: 637199916}
   - component: {fileID: 637199915}
   - component: {fileID: 637199914}
-  m_Layer: 13
+  m_Layer: 7
   m_Name: cable
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4853,7 +4853,7 @@ GameObject:
   - component: {fileID: 1637642944}
   - component: {fileID: 1637642943}
   - component: {fileID: 1637642942}
-  m_Layer: 13
+  m_Layer: 7
   m_Name: cable
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -50,7 +50,8 @@ public enum NpcType
     ProxyMine,
     Civilian,
     Grenadier,
-    Sniper
+    Sniper,
+    Turret
 }
 
 public abstract class NpcBase : MonoBehaviour, IEnemy
