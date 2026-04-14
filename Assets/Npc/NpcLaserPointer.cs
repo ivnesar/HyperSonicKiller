@@ -13,6 +13,14 @@ using UnityEngine;
 //   - Wiggle-Radius nimmt ab je weiter AimProgress fortschreitet (0→1).
 //   - Farbverlauf und Breite ändern sich über AimProgress.
 //
+// ANIMATION CURVES:
+//   - colorWidthCurve: Steuert den Verlauf von Farbe UND Breite über AimProgress.
+//     X-Achse = AimProgress (0→1), Y-Achse = Interpolationswert (0→1).
+//     Default: Quadratische Kurve (wie vorher progress * progress).
+//   - wiggleFalloffCurve: Steuert wie schnell der Wiggle-Radius abnimmt.
+//     X-Achse = AimProgress (0→1), Y-Achse = verbleibender Wiggle-Anteil (1→0).
+//     Default: Umgekehrte quadratische Kurve (wie vorher 1 - progress²).
+//
 // Für Dash-basierte NPCs (GenTwo etc.) siehe LaserPointer_Dash.
 //
 // ════════════════════════════════════════════════════════════════════════════
@@ -58,6 +66,23 @@ public class NpcLaserPointer : MonoBehaviour
 
     [Tooltip("Farbe des Lasers wenn eingelockt (AimProgress = 1).")]
     [SerializeField] private Color lockedColor = new Color(1f, 0f, 0f, 1f); 
+
+    [Header("Animation Curves")]
+    [Tooltip("Steuert den Verlauf von Farbe und Breite über AimProgress (0→1). " +
+             "X = AimProgress, Y = Interpolationswert. " +
+             "Default: Quadratische Kurve (langsamer Start, schnelleres Ende).")]
+    [SerializeField] private AnimationCurve colorWidthCurve = new AnimationCurve(
+        new Keyframe(0f, 0f, 0f, 0f),      // Start: flach
+        new Keyframe(1f, 1f, 2f, 0f)        // Ende: steil (≈ progress²)
+    );
+
+    [Tooltip("Steuert wie viel Wiggle bei gegebenem AimProgress übrig bleibt (0→1). " +
+             "X = AimProgress, Y = verbleibender Wiggle-Anteil (1 = voller Wiggle, 0 = kein Wiggle). " +
+             "Default: Umgekehrte quadratische Kurve (schnelle Abnahme am Ende).")]
+    [SerializeField] private AnimationCurve wiggleFalloffCurve = new AnimationCurve(
+        new Keyframe(0f, 1f, 0f, 0f),       // Start: voller Wiggle
+        new Keyframe(1f, 0f, -2f, 0f)       // Ende: kein Wiggle (≈ 1 - progress²)
+    );
 
     [Header("Wiggle Settings")]
     [Tooltip("Maximaler Wiggle-Radius in Grad bei AimProgress = 0 (Beginn des Zielens).")]
@@ -258,7 +283,8 @@ public class NpcLaserPointer : MonoBehaviour
 
     private void UpdateWidthAndColor(float progress)
     {
-        float easedProgress = progress * progress;
+        // AnimationCurve statt hartkodiertem progress * progress
+        float easedProgress = colorWidthCurve.Evaluate(progress);
 
         float currentWidth = Mathf.Lerp(earlyWidth, lockedWidth, easedProgress);
         lineRenderer.startWidth = currentWidth;
@@ -287,8 +313,9 @@ public class NpcLaserPointer : MonoBehaviour
 
     private Vector3 ApplyWiggle(Vector3 direction, float progress)
     {
-        float easedProgress = progress * progress;
-        float currentAngle = wiggleMaxAngle * (1f - easedProgress);
+        // AnimationCurve statt hartkodiertem 1 - progress²
+        float wiggleFactor = wiggleFalloffCurve.Evaluate(progress);
+        float currentAngle = wiggleMaxAngle * wiggleFactor;
 
         debugWiggleRadius = currentAngle;
 

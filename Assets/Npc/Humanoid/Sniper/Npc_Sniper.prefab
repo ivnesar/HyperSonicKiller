@@ -29,7 +29,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &614902531416003641
 Transform:
   m_ObjectHideFlags: 0
@@ -114,6 +114,7 @@ MonoBehaviour:
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 1
   displayName: 
+  onlyShootDashingPlayer: 0
   maxShootingRange: 50
   preferredRange: 15
   aimDuration: 2
@@ -271,12 +272,61 @@ MonoBehaviour:
   transitionDuration: 0.3
   earlyWidth: 0.02
   lockedWidth: 0.1
-  earlyColor: {r: 0.4403944, g: 0, b: 1, a: 1}
-  lockedColor: {r: 1, g: 0, b: 0.91280556, a: 1}
-  wiggleMaxAngle: 8
-  wiggleFrequency: 3
+  earlyColor: {r: 1, g: 0.6319656, b: 0.5882353, a: 0.23529412}
+  lockedColor: {r: 1, g: 0, b: 0, a: 1}
+  colorWidthCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.8
+      value: 0
+      inSlope: -2
+      outSlope: -2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wiggleMaxAngle: 12
+  wiggleFrequency: 2
   enableWiggle: 1
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
+  useUnscaledTime: 0
   showDebug: 0
 --- !u!114 &6267239683382934993
 MonoBehaviour:

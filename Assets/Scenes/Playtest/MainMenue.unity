@@ -1832,23 +1832,23 @@ MonoBehaviour:
   - displayName: tut
     sceneName: pt1_tutorial
     button: {fileID: 1231539410}
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: 8207410592886b34fafdc678aab92a74, type: 3}
   - displayName: storage
     sceneName: pt1_storage
     button: {fileID: 30552250}
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: ff76b874ea57df649a698c89bd6d0a1e, type: 3}
   - displayName: server
     sceneName: pt1_server
     button: {fileID: 673499592}
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: ecf14e46705d9c84aafda92aaaf9a954, type: 3}
   - displayName: entrance
     sceneName: pt1_entrance
     button: {fileID: 1658005267}
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: bdcc9915bcc7b7d419a74150496877b8, type: 3}
   - displayName: industrial
     sceneName: pt1_industrial
     button: {fileID: 1418150820}
-    previewSprite: {fileID: 0}
+    previewSprite: {fileID: 21300000, guid: fa43c14781ce59641a2ed83adb563f97, type: 3}
   previewImage: {fileID: 0}
 --- !u!4 &1268685662
 Transform:

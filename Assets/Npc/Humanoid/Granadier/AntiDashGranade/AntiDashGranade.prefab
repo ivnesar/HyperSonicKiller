@@ -48,7 +48,7 @@ MonoBehaviour:
   flightDuration: 1.2
   gravity: 20
   zonePrefab: {fileID: 6305089387292487818, guid: 1158c7cde2478464cb3aee8aa7408989, type: 3}
-  zoneRadius: 2
+  zoneRadius: 1
   zoneDuration: 1
   impactEffectPrefab: {fileID: 0}
   launchSound: {fileID: 0}

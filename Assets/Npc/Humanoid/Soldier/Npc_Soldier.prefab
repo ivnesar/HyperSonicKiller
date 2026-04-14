@@ -276,14 +276,63 @@ MonoBehaviour:
     m_Bits: 8328
   laserLength: 50
   transitionDuration: 0.3
-  earlyWidth: 0.003
-  lockedWidth: 0.01
-  earlyColor: {r: 0.5853553, g: 1, b: 0, a: 1}
-  lockedColor: {r: 1, g: 0.48571634, b: 0, a: 1}
-  wiggleMaxAngle: 8
-  wiggleFrequency: 3
+  earlyWidth: 0.01
+  lockedWidth: 0.03
+  earlyColor: {r: 1, g: 0.50980395, b: 0, a: 0.15686275}
+  lockedColor: {r: 1, g: 1, b: 0, a: 1}
+  colorWidthCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.8
+      value: 0
+      inSlope: -2
+      outSlope: -2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wiggleMaxAngle: 12
+  wiggleFrequency: 2
   enableWiggle: 1
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
+  useUnscaledTime: 0
   showDebug: 0
 --- !u!114 &6267239683382934993
 MonoBehaviour:

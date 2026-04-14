@@ -3217,6 +3217,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: 'NpcOverlayManager '
       objectReference: {fileID: 0}
+    - target: {fileID: 198000839169369850, guid: 51d4e7fff807c654db3d43ef869f82cc, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1314429826659154669, guid: 51d4e7fff807c654db3d43ef869f82cc, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

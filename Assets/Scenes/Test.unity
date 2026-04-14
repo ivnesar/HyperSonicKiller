@@ -518,7 +518,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 614902531416003641, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -4.5
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
       propertyPath: m_LocalPosition.y
@@ -526,7 +526,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -556,17 +556,9 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2453643018770953778, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
-      propertyPath: onlyShootDashingPlayer
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
       propertyPath: m_Name
       value: Npc_Sniper
-      objectReference: {fileID: 0}
-    - target: {fileID: 2472838132611520362, guid: 3b77f345dee93624091bb66706e070e7, type: 3}
-      propertyPath: m_IsActive
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1770,7 +1762,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 614902531416003641, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -7.5
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_LocalPosition.y
@@ -1778,7 +1770,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -3
       objectReference: {fileID: 0}
     - target: {fileID: 614902531416003641, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1811,10 +1803,6 @@ PrefabInstance:
     - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_Name
       value: Npc_Soldier
-      objectReference: {fileID: 0}
-    - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
-      propertyPath: m_IsActive
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2439,6 +2427,63 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6386316311934283463, guid: 43c4abf52c3eee740bee940e39ba8231, type: 3}
   m_PrefabInstance: {fileID: 858102311}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &1309060867
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 614902531416003641, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2472838132611520362, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
+      propertyPath: m_Name
+      value: Npc_Granadier
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
 --- !u!4 &1333144196 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6386316311934283463, guid: 43c4abf52c3eee740bee940e39ba8231, type: 3}
@@ -9506,10 +9551,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 4677948153725549190, guid: abae123b4a7087d40a8e8d438df290e2, type: 3}
-      propertyPath: fireBeamMaterial
-      value: 
-      objectReference: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
     - target: {fileID: 8742668367218396410, guid: abae123b4a7087d40a8e8d438df290e2, type: 3}
       propertyPath: m_Name
       value: Npc_AntiDashTurret
@@ -9773,3 +9814,4 @@ SceneRoots:
   - {fileID: 925228519}
   - {fileID: 270913985}
   - {fileID: 5055531875502154228}
+  - {fileID: 1309060867}

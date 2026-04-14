@@ -11,6 +11,11 @@ using UnityEngine;
 //   - Farbverlauf und Breite ändern sich über AimProgress (0→1).
 //   - Optionale Impact Sphere zur visuellen Darstellung des Einschlagpunkts.
 //
+// ANIMATION CURVES:
+//   - colorWidthCurve: Steuert den Verlauf von Farbe UND Breite über AimProgress.
+//     X-Achse = AimProgress (0→1), Y-Achse = Interpolationswert (0→1).
+//     Default: Quadratische Kurve (wie vorher progress * progress).
+//
 // ABLAUF:
 //   1. State ruft SetInterceptMode(point) auf → Laser + Sphere snappen sofort auf den Punkt.
 //   2. State ruft jeden Frame UpdateInterceptPoint(point) auf → Punkt wird aktualisiert.
@@ -62,6 +67,15 @@ public class LaserPointer_Dash : MonoBehaviour
 
     [Tooltip("Farbe des Lasers wenn eingelockt (AimProgress = 1).")]
     [SerializeField] private Color lockedColor = new Color(1f, 0f, 0f, 1f);
+
+    [Header("Animation Curves")]
+    [Tooltip("Steuert den Verlauf von Farbe und Breite über AimProgress (0→1). " +
+             "X = AimProgress, Y = Interpolationswert. " +
+             "Default: Quadratische Kurve (langsamer Start, schnelleres Ende).")]
+    [SerializeField] private AnimationCurve colorWidthCurve = new AnimationCurve(
+        new Keyframe(0f, 0f, 0f, 0f),      // Start: flach
+        new Keyframe(1f, 1f, 2f, 0f)        // Ende: steil (≈ progress²)
+    );
 
     [Header("Impact Sphere")]
     [Tooltip("Optionale Sphere zur visuellen Darstellung des Einschlagpunkts. " +
@@ -221,7 +235,8 @@ public class LaserPointer_Dash : MonoBehaviour
 
     private void UpdateWidthAndColor(float progress)
     {
-        float easedProgress = progress * progress;
+        // AnimationCurve statt hartkodiertem progress * progress
+        float easedProgress = colorWidthCurve.Evaluate(progress);
 
         float currentWidth = Mathf.Lerp(earlyWidth, lockedWidth, easedProgress);
         lineRenderer.startWidth = currentWidth;

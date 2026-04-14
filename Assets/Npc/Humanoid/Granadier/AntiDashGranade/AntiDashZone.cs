@@ -315,7 +315,7 @@ public class AntiDashZone : MonoBehaviour
         if (billboardTransform == null) return;
 
         float diameter = effectRadius * 2f;
-        billboardTransform.localScale = new Vector3(diameter, diameter, 1f);
+        billboardTransform.localScale = new Vector3(diameter, diameter, diameter);
     }
 
     private void UpdateBillboard()
