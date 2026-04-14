@@ -44,14 +44,15 @@ namespace GenTwoStates
             npc.PlayChargeSound();
             npc.AnimManager?.PlayCharge();
 
-            npc.PreCalculateIntercept();
+            // Intercept-Punkt EINMALIG berechnen — bleibt für den ganzen Angriff fix.
+            // Auch bei ungültigem Punkt wird weiter geladen (Abbruch erst bei Dash-Start).
+            bool hasPoint = npc.PreCalculateIntercept();
 
             npc.IsLaserActive = true;
             npc.SetAimProgressPublic(0f);
 
-            // IMMER in Intercept Mode setzen, unabhängig vom Vorhandensein eines gültigen Intercept-Punktes,
-            // damit der Laser das Player Aim Target sofort zentriert und wigglet!
-            if (npc.LaserPointer != null)
+            // Laser und Impact Sphere nur aktivieren wenn ein gültiger Punkt existiert
+            if (hasPoint && npc.LaserPointer != null)
             {
                 npc.LaserPointer.SetInterceptMode(npc.LastInterceptPoint);
             }
@@ -61,16 +62,10 @@ namespace GenTwoStates
         {
             npc.RotateTowardTargetUnscaled();
 
+            // Nur abbrechen wenn der Spieler aufhört zu dashen, out of range oder LOS verloren
             if (!npc.IsPlayerDashing || !npc.IsPlayerInRange || !npc.HasLineOfSightToPlayer())
             {
                 return new Idle();
-            }
-
-            npc.PreCalculateIntercept();
-            
-            if (npc.LaserPointer != null)
-            {
-                npc.LaserPointer.UpdateInterceptPoint(npc.LastInterceptPoint);
             }
 
             float progress = npc.GetUnscaledTimerProgress(npc.ChargeDuration);
@@ -97,6 +92,7 @@ namespace GenTwoStates
 
         public override void Enter(GenTwoNpc npc)
         {
+            // Richtung zum fixen Intercept-Punkt berechnen (+ Wall-Check)
             Vector3 interceptDir = npc.CalculateInterceptDirection();
 
             if (interceptDir == Vector3.zero)
@@ -113,14 +109,9 @@ namespace GenTwoStates
 
             npc.AnimManager?.PlayDashStart();
 
-            // Progress = 1 triggert die Dash-Phase im Laser (exakte Flugbahn, kein Smoothing)
+            // Progress = 1 triggert die Dash-Phase im Laser (exakte Flugbahn)
             npc.IsLaserActive = true;
             npc.SetAimProgressPublic(1f);
-
-            if (npc.LaserPointer != null)
-            {
-                npc.LaserPointer.UpdateInterceptPoint(npc.LastInterceptPoint);
-            }
 
             Debug.Log($"[GenTwo] {npc.name}: Dash started! Direction: {interceptDir}");
         }

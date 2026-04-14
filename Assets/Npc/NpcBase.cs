@@ -22,6 +22,7 @@ using UnityEngine.AI;
 // - Generisches System für Laser-Wiggle und andere Aim-Indikatoren.
 // - Subklassen rufen SetAimProgress() oder StartAimTracking() auf.
 // - NpcLaserPointer liest AimProgress um den Wiggle-Radius zu steuern.
+// - LaserPointer_Dash liest AimProgress für Farbverlauf und Breite.
 // - 0 = Aim gerade gestartet (max Wiggle), 1 = eingelockt (kein Wiggle).
 //
 // AIM-IK STEUERUNG (zentral für alle NPCs):
@@ -124,9 +125,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     protected AimController aimController;
 
     /// <summary>
-    /// Laser-Pointer für visuelle Warnstrahlen.
+    /// Laser-Pointer für visuelle Warnstrahlen (Standard-Modus, FOV-basiert).
     /// Automatisch gefunden — null wenn kein NpcLaserPointer auf dem Prefab liegt.
-    /// Wird in Die() und ApplyStun() aufgeräumt (Intercept-Modus beenden).
+    /// NPCs die LaserPointer_Dash nutzen (z.B. GenTwo) finden und verwalten
+    /// ihre eigene Referenz in der Subklasse.
     /// </summary>
     protected NpcLaserPointer laserPointer;
 
@@ -232,9 +234,9 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     }
 
     /// <summary>
-    /// Steuert den Warnlaser (NpcLaserPointer).
+    /// Steuert den Warnlaser (NpcLaserPointer oder LaserPointer_Dash).
     /// Subklassen setzen dies auf true, wenn der NPC sich auf einen Angriff vorbereitet.
-    /// Die NpcLaserPointer-Komponente liest diesen Wert in LateUpdate.
+    /// Die Laser-Komponente liest diesen Wert in LateUpdate.
     /// </summary>
     public bool IsLaserActive { get; set; }
 
@@ -685,7 +687,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         StopMovement();
 
         aimController?.DisableImmediate();
-        laserPointer?.ClearInterceptMode();
         
         animHandler?.PlayStunStart();
         
@@ -736,7 +737,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         StopMovement();
 
         aimController?.DisableImmediate();
-        laserPointer?.ClearInterceptMode();
         
         animHandler?.PlayStunStart();
         
@@ -818,7 +818,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         ResetAimProgress();
 
         aimController?.DisableImmediate();
-        laserPointer?.ClearInterceptMode();
 
         if (navAgent != null)
         {
@@ -869,7 +868,6 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         ResetAimProgress();
 
         aimController?.DisableImmediate();
-        laserPointer?.ClearInterceptMode();
 
         if (navAgent != null)
         {

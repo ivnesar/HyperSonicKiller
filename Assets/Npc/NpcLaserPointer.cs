@@ -3,6 +3,19 @@ using UnityEngine;
 // ════════════════════════════════════════════════════════════════════════════
 // NPC LASER POINTER - Visueller Warnstrahl für bevorstehende Angriffe
 // ════════════════════════════════════════════════════════════════════════════
+//
+// Standard-Laser für NPCs die FOV-basiert auf den Spieler zielen
+// (Soldier, Sniper, Defender, etc.).
+//
+// Funktionsweise:
+//   - Prüft ob der Spieler im FOV und in Sichtlinie ist.
+//   - Wenn ja: Laser trackt den Spieler mit optionalem Wiggle.
+//   - Wiggle-Radius nimmt ab je weiter AimProgress fortschreitet (0→1).
+//   - Farbverlauf und Breite ändern sich über AimProgress.
+//
+// Für Dash-basierte NPCs (GenTwo etc.) siehe LaserPointer_Dash.
+//
+// ════════════════════════════════════════════════════════════════════════════
 
 [RequireComponent(typeof(NpcBase))]
 public class NpcLaserPointer : MonoBehaviour
@@ -79,9 +92,6 @@ public class NpcLaserPointer : MonoBehaviour
 
     private float noiseSeedX;
     private float noiseSeedY;
-
-    private bool isInterceptMode;
-    private Vector3 interceptPoint;
 
     private bool debugInFOV;
     private bool debugHasLOS;
@@ -181,71 +191,35 @@ public class NpcLaserPointer : MonoBehaviour
         float progress = npc.AimProgress;
         Vector3 targetDirection;
 
-        if (isInterceptMode)
+        Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
+
+        bool inFOV = IsPlayerInFOV(origin, targetPoint);
+        bool hasLOS = inFOV && HasLineOfSight(origin, targetPoint);
+
+        if (inFOV && hasLOS)
         {
-            // ── INTERCEPT-MODUS (GenTwo Charge/Dash) ──
             IsTracking = true;
+            targetDirection = (targetPoint - origin).normalized;
 
-            if (progress < 1f)
+            if (enableWiggle)
             {
-                // CHARGE: Sofort auf Player Aim Target richten
-                Vector3 playerPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-                targetDirection = (playerPoint - origin).normalized;
-
-                if (enableWiggle)
-                {
-                    targetDirection = ApplyWiggle(targetDirection, progress);
-                }
-
-                // Smooth Überblendung bei Charge (unscaled, weil Slow-Mo aktiv)
-                currentDirection = SmoothDirection(currentDirection, targetDirection, true);
-            }
-            else
-            {
-                // DASH: Laser entspricht exakt der Flugbahn des NPCs
-                targetDirection = (interceptPoint - npc.transform.position).normalized;
-                
-                if (targetDirection.sqrMagnitude < 0.01f)
-                    targetDirection = npc.transform.forward;
-
-                // Smoothing überspringen: Laser snappt sofort auf Flugbahn!
-                currentDirection = targetDirection;
+                targetDirection = ApplyWiggle(targetDirection, progress);
             }
         }
         else
         {
-            // ── STANDARD-MODUS (FOV-basiert) ──
-            Vector3 targetPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-
-            bool inFOV = IsPlayerInFOV(origin, targetPoint);
-            bool hasLOS = inFOV && HasLineOfSight(origin, targetPoint);
-
-            if (inFOV && hasLOS)
-            {
-                IsTracking = true;
-                targetDirection = (targetPoint - origin).normalized;
-
-                if (enableWiggle)
-                {
-                    targetDirection = ApplyWiggle(targetDirection, progress);
-                }
-            }
-            else
-            {
-                IsTracking = false;
-                targetDirection = laserOrigin.forward;
-            }
-
-            // Smooth Überblendung bei Standard-Tracking
-            currentDirection = SmoothDirection(currentDirection, targetDirection);
+            IsTracking = false;
+            targetDirection = laserOrigin.forward;
         }
+
+        currentDirection = SmoothDirection(currentDirection, targetDirection);
 
         UpdateWidthAndColor(progress);
 
         if (showDebug && Time.frameCount % 30 == 0)
         {
             Debug.Log($"[LaserPointer] {gameObject.name} | " +
-                      $"Intercept={isInterceptMode} | Tracking={IsTracking} | " +
+                      $"Tracking={IsTracking} | " +
                       $"AimProgress={progress:F2} | WiggleRadius={debugWiggleRadius:F1}°");
         }
 
@@ -382,31 +356,6 @@ public class NpcLaserPointer : MonoBehaviour
         laserOrigin = newOrigin;
     }
 
-    public void SetInterceptMode(Vector3 worldInterceptPoint)
-    {
-        isInterceptMode = true;
-        interceptPoint = worldInterceptPoint;
-
-        // Sofort auf Spieler-Richtung snappen, damit der Laser nicht
-        // erst langsam von der alten forward-Richtung überschwenkt.
-        if (laserOrigin != null)
-        {
-            Vector3 playerPoint = laserTarget != null ? laserTarget.position : playerTransform.position;
-            currentDirection = (playerPoint - laserOrigin.position).normalized;
-        }
-    }
-
-    public void UpdateInterceptPoint(Vector3 worldInterceptPoint)
-    {
-        interceptPoint = worldInterceptPoint;
-    }
-
-    public void ClearInterceptMode()
-    {
-        isInterceptMode = false;
-        interceptPoint = Vector3.zero;
-    }
-
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -479,5 +428,6 @@ public class NpcLaserPointer : MonoBehaviour
             previousPoint = point;
         }
     }
+
     #endregion
 }

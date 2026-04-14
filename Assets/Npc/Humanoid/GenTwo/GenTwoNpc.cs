@@ -55,6 +55,10 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Time to charge before dashing (gives player a visual warning)")]
     [SerializeField] private float chargeDuration = 1f;
 
+    [Tooltip("How far ahead (in unscaled seconds) along the player's dash path the intercept point is placed. " +
+             "Higher = more reaction time for the player.")]
+    [SerializeField] private float interceptLeadTime = 0.7f;
+
     [Header("Dash")]
     [Tooltip("Base dash speed (before multiplier)")]
     [SerializeField] private float dashSpeed = 25f;
@@ -116,6 +120,7 @@ public class GenTwoNpc : NpcBase
 
     public float DetectionRange => detectionRange;
     public float ChargeDuration => chargeDuration;
+    public float InterceptLeadTime => interceptLeadTime;
     public float DashSpeed => dashSpeed;
     public float DashSpeedMultiplier => dashSpeedMultiplier;
     public float PlayerHitRadius => playerHitRadius;
@@ -132,10 +137,10 @@ public class GenTwoNpc : NpcBase
     public GenTwoAnimationManager AnimManager { get; private set; }
 
     /// <summary>
-    /// Referenz auf den NpcLaserPointer für Intercept-Modus Steuerung.
-    /// Nutzt das in NpcBase.Awake() gecachte Feld.
+    /// Referenz auf den LaserPointer_Dash für Intercept-Modus Steuerung.
+    /// Wird in Awake() gecached.
     /// </summary>
-    public NpcLaserPointer LaserPointer => laserPointer;
+    public LaserPointer_Dash LaserPointer { get; private set; }
 
     /// <summary>Current dash direction (set once at dash start, never changes).</summary>
     public Vector3 DashDirection => dashDirection;
@@ -179,6 +184,9 @@ public class GenTwoNpc : NpcBase
             Debug.LogWarning($"[GenTwoNpc] No GenTwoAnimationManager found on {gameObject.name}! " +
                              "Animations will not work.");
         }
+
+        // LaserPointer_Dash finden (GenTwo nutzt den Dash-Laser, nicht den Standard-Laser)
+        LaserPointer = GetComponent<LaserPointer_Dash>();
     }
 
     protected override void Start()
@@ -290,88 +298,125 @@ public class GenTwoNpc : NpcBase
     #region Intercept Calculation
     // ════════════════════════════════════════════════════════════════════════
 
-    public Vector3 CalculateInterceptDirection()
+    /// <summary>
+    /// Berechnet den Intercept-Punkt einmalig beim Charge-Start.
+    /// 
+    /// Ziel: einen Punkt finden, an dem sich Spieler und GenTwo nach der Charge-Phase treffen.
+    /// Der Spieler soll interceptLeadTime Sekunden haben um zu reagieren, nachdem
+    /// der GenTwo seinen Dash startet.
+    /// 
+    /// Alle Zeiten und Geschwindigkeiten sind in Echtzeit (unscaled), da GameDeltaTime
+    /// = Time.unscaledDeltaTime während SlowMo.
+    /// 
+    /// Berechnung:
+    ///   - Der Spieler erreicht den Punkt in (chargeDuration + t) Sekunden ab jetzt.
+    ///   - Der GenTwo startet seinen Dash nach chargeDuration und fliegt t Sekunden.
+    ///   - Wir suchen t so, dass GenTwo den Punkt in t Sekunden erreicht:
+    ///       playerSpeed * (chargeDuration + t) = GenTwo-Distanz-zum-Punkt
+    ///       GenTwo-Distanz / genTwoSpeed = t
+    ///   - t = interceptLeadTime ist die gewünschte Reaktionszeit für den Spieler.
+    ///     Aber GenTwo muss auch in t Sekunden ankommen können.
+    ///     Deshalb: Punkt = playerPos + playerDir * playerSpeed * (chargeDuration + t)
+    ///     und GenTwo-Flugzeit = Distanz(GenTwo, Punkt) / genTwoSpeed.
+    ///     Wir wählen t so, dass beide gleichzeitig ankommen.
+    /// 
+    /// Vereinfachte Lösung:
+    ///   Spieler-Position zum Dash-Start (nach Charge): playerPos + playerDir * playerSpeed * chargeDuration
+    ///   Von dort braucht der Spieler t Sekunden für die restliche Strecke.
+    ///   GenTwo muss den gleichen Punkt in t Sekunden erreichen.
+    ///   → Löse: playerSpeed * t = |Punkt - playerFuturePos| und genTwoSpeed * t = |Punkt - genTwoPos|
+    ///   Das ist ein klassisches Intercept-Problem das wir per Iteration lösen.
+    ///   
+    ///   Einfacherer Ansatz: Punkt = playerFuturePos + playerDir * playerSpeed * interceptLeadTime
+    ///   Dann prüfen ob GenTwo den Punkt schnell genug erreichen kann.
+    /// </summary>
+    public bool PreCalculateIntercept()
     {
         if (playerDash == null || playerCore == null)
-            return GetDirectionToTarget();
+        {
+            hasValidIntercept = false;
+            return false;
+        }
 
         Vector3 playerPos = playerTransform.position;
         Vector3 playerDir = playerDash.DashDirection.normalized;
-        Vector3 genTwoPos = transform.position;
+        float playerSpeed = playerDash.DashSpeed;
+        float maxDist = playerDash.DashMaxDistance;
+        float genTwoSpeed = dashSpeed * dashSpeedMultiplier;
 
-        float pSpeed = playerDash != null ? playerDash.DashSpeed : 20f;
-        float gSpeed = dashSpeed * dashSpeedMultiplier;
+        // Wo ist der Spieler wenn der GenTwo seinen Dash startet (nach chargeDuration)?
+        Vector3 playerPosAtDashStart = playerPos + playerDir * playerSpeed * chargeDuration;
 
-        float maxDist = playerDash != null ? playerDash.DashMaxDistance : 15f;
-        float maxPlayerDashTime = maxDist / pSpeed;
+        // Der Intercept-Punkt liegt interceptLeadTime Sekunden weiter
+        // (das ist die Reaktionszeit die der Spieler bekommt)
+        Vector3 interceptTarget = playerPosAtDashStart + playerDir * playerSpeed * interceptLeadTime;
 
-        Vector3 relPos = playerPos - genTwoPos;
-
-        float a = (pSpeed * pSpeed) - (gSpeed * gSpeed);
-        float b = 2f * Vector3.Dot(relPos, playerDir) * pSpeed;
-        float c = relPos.sqrMagnitude;
-
-        float discriminant = b * b - 4f * a * c;
-        Vector3 interceptPoint;
-
-        if (discriminant >= 0f && Mathf.Abs(a) > 0.001f)
+        // Prüfen ob der Punkt innerhalb der Spieler-Dash-Distanz liegt
+        float totalPlayerDistance = playerSpeed * (chargeDuration + interceptLeadTime);
+        if (totalPlayerDistance > maxDist)
         {
-            float sqrtDisc = Mathf.Sqrt(discriminant);
-            float t1 = (-b - sqrtDisc) / (2f * a);
-            float t2 = (-b + sqrtDisc) / (2f * a);
-
-            float t = -1f;
-            if (t1 > 0.01f && t2 > 0.01f) t = Mathf.Min(t1, t2);
-            else if (t1 > 0.01f) t = t1;
-            else if (t2 > 0.01f) t = t2;
-
-            if (t > 0f)
-            {
-                t = Mathf.Min(t, maxPlayerDashTime);
-                interceptPoint = playerPos + playerDir * pSpeed * t;
-            }
-            else
-            {
-                interceptPoint = FallbackClosestPoint(genTwoPos, playerPos, playerDir);
-            }
-        }
-        else
-        {
-            interceptPoint = FallbackClosestPoint(genTwoPos, playerPos, playerDir);
+            hasValidIntercept = false;
+            Debug.Log($"[GenTwo] {name}: Intercept point beyond player dash range " +
+                      $"({totalPlayerDistance:F1}m > {maxDist:F1}m) — no valid intercept");
+            return false;
         }
 
-        float interceptDistAlongPath = Vector3.Dot(interceptPoint - playerPos, playerDir);
-        if (interceptDistAlongPath > maxDist)
+        // Prüfen ob GenTwo den Punkt in interceptLeadTime erreichen kann
+        float genTwoDistToTarget = Vector3.Distance(transform.position, interceptTarget);
+        float genTwoFlightTime = genTwoDistToTarget / genTwoSpeed;
+
+        if (genTwoFlightTime > interceptLeadTime + chargeDuration)
         {
-            interceptPoint = playerPos + playerDir * maxDist;
+            // GenTwo ist zu weit weg — kann den Punkt nicht rechtzeitig erreichen
+            hasValidIntercept = false;
+            Debug.Log($"[GenTwo] {name}: Too far from intercept point — " +
+                      $"needs {genTwoFlightTime:F2}s but only {interceptLeadTime + chargeDuration:F2}s available");
+            return false;
         }
 
-        if (!HasClearPathTo(interceptPoint))
+        lastInterceptPoint = interceptTarget;
+        hasValidIntercept = true;
+
+        Debug.Log($"[GenTwo] {name}: Intercept calculated — " +
+                  $"point {totalPlayerDistance:F1}m ahead of player, " +
+                  $"GenTwo flight time: {genTwoFlightTime:F2}s, " +
+                  $"player reaction time: {interceptLeadTime:F2}s");
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gibt die Richtung zum bereits berechneten Intercept-Punkt zurück.
+    /// Wird von Dashing.Enter() aufgerufen.
+    /// 
+    /// Prüft zusätzlich ob GenTwo den Punkt erreichen kann (Wall-Check).
+    /// Gibt Vector3.zero zurück wenn der Pfad blockiert ist.
+    /// </summary>
+    public Vector3 CalculateInterceptDirection()
+    {
+        if (!hasValidIntercept)
+        {
+            Debug.Log($"[GenTwo] {name}: No valid intercept point — cannot dash");
+            return Vector3.zero;
+        }
+
+        // Wall-Check erst hier (bei Dash-Start) für mehr Spannung
+        if (!HasClearPathTo(lastInterceptPoint))
         {
             hasValidIntercept = false;
             Debug.Log($"[GenTwo] {name}: Intercept point blocked by wall — aborting dash");
             return Vector3.zero;
         }
 
-        lastInterceptPoint = interceptPoint;
-        hasValidIntercept = true;
+        Vector3 direction = (lastInterceptPoint - transform.position).normalized;
 
-        Vector3 direction = (interceptPoint - genTwoPos).normalized;
-
-        float genTwoTravelDist = Vector3.Distance(genTwoPos, interceptPoint);
-        float genTwoTravelTime = genTwoTravelDist / gSpeed;
-        float playerTravelTime = interceptDistAlongPath / pSpeed;
-        Debug.Log($"[GenTwo] {name}: Intercept calculated — GenTwo arrives in {genTwoTravelTime:F2}s, Player in {playerTravelTime:F2}s");
+        float travelDist = Vector3.Distance(transform.position, lastInterceptPoint);
+        float gSpeed = dashSpeed * dashSpeedMultiplier;
+        float travelTime = travelDist / gSpeed;
+        Debug.Log($"[GenTwo] {name}: Dash direction locked — " +
+                  $"distance: {travelDist:F1}m, arrival in {travelTime:F2}s");
 
         return direction;
-    }
-
-    private Vector3 FallbackClosestPoint(Vector3 genTwoPos, Vector3 playerPos, Vector3 playerDir)
-    {
-        Vector3 toGenTwo = genTwoPos - playerPos;
-        float t = Vector3.Dot(toGenTwo, playerDir);
-        t = Mathf.Max(t, 2f);
-        return playerPos + playerDir * t;
     }
 
     public void SetDashDirection(Vector3 direction)
@@ -487,18 +532,6 @@ public class GenTwoNpc : NpcBase
 
     public void PlayChargeSound() => PlaySound(chargeSound);
     public void PlayDashSound() => PlaySound(dashSound);
-
-    /// <summary>
-    /// Berechnet den Intercept-Punkt vorab (ohne Dash zu starten).
-    /// Wird von Charging.Enter() aufgerufen, damit der Laser den Punkt kennt.
-    /// Gibt true zurück wenn ein gültiger Punkt gefunden wurde.
-    /// Der Punkt ist dann über LastInterceptPoint abrufbar.
-    /// </summary>
-    public bool PreCalculateIntercept()
-    {
-        Vector3 dir = CalculateInterceptDirection();
-        return dir != Vector3.zero;
-    }
 
     /// <summary>
     /// Public Wrapper für NpcBase.SetAimProgress (protected).
@@ -640,6 +673,9 @@ public class GenTwoNpc : NpcBase
         isStunned = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
+
+        // Dash-Laser aufräumen
+        LaserPointer?.ClearInterceptMode();
 
         // Alles Weitere (Swapper, Impact, Destroy) erledigt NpcBase
         base.Die();
