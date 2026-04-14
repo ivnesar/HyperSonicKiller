@@ -431,16 +431,6 @@ public class ThrownSword : MonoBehaviour
 
         if (enemy != null)
         {
-            // ── Shield Parry Check ──────────────────────────────────
-            // If this enemy has a DefenderShield and the sword came from
-            // inside its FOV cone, the sword is parried.
-            DefenderShield shield = enemy.Transform.GetComponent<DefenderShield>();
-            if (shield != null && shield.IsBlockingAttackFrom(transform.position))
-            {
-                shield.ParryThrownSword(this);
-                return; // Don't embed, don't stun — sword returns, player exhausted
-            }
-
             // No shield or attack from behind — embed normally
             enemy.OnSwordEmbedded();
             embeddedEnemy = enemy;

@@ -484,7 +484,7 @@ MonoBehaviour:
   snapTarget: {fileID: 0}
   showDebugInfo: 1
   displayName: 
-  effectRadius: 8
+  effectRadius: 5
   dashCancelDelay: 0.3
   billboardTransform: {fileID: 0}
   zoneSphereTransform: {fileID: 1344255643146877446}

@@ -15,6 +15,13 @@ using UnityEngine;
 //   - Stun pausiert den Fuse-Timer
 //   - Kein NavMeshAgent / Animator nötig auf dem GameObject
 //
+// Warn-Sphere:
+//   - Child-Objekt mit MeshRenderer (transparentes Unlit-Material)
+//   - Wird bei Fuse-Start sichtbar, zeigt den Explosionsradius
+//   - Farbe wechselt über AnimationCurve von startColor → endColor
+//   - Bei Stun unsichtbar, nach Stun-Ende wieder sichtbar
+//   - Radius wird automatisch vom ExplosionSphere-Prefab gelesen
+//
 // ════════════════════════════════════════════════════════════════════════════
 
 public class ProxyMineNpc : NpcBase
@@ -69,6 +76,19 @@ public class ProxyMineNpc : NpcBase
     [Tooltip("Partikel-Prefab (wird parallel gespawnt, zerstört sich selbst)")]
     [SerializeField] private GameObject particlePrefab;
 
+    [Header("Mine - Warn-Sphere")]
+    [Tooltip("Child-Objekt mit MeshRenderer für die Warn-Anzeige")]
+    [SerializeField] private MeshRenderer warnSphereRenderer;
+
+    [Tooltip("Startfarbe der Warn-Sphere (Fuse-Beginn)")]
+    [SerializeField] private Color warnColorStart = new Color(1f, 0.9f, 0f, 0.15f);
+
+    [Tooltip("Endfarbe der Warn-Sphere (kurz vor Explosion)")]
+    [SerializeField] private Color warnColorEnd = new Color(1f, 0f, 0f, 0.4f);
+
+    [Tooltip("Farbverlauf über die Fuse-Zeit (X: 0=Start, 1=Explosion / Y: 0=StartColor, 1=EndColor)")]
+    [SerializeField] private AnimationCurve warnColorCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -89,6 +109,12 @@ public class ProxyMineNpc : NpcBase
     // Nach Stun-Ende wird dann der Fuse gestartet.
     private bool damagePendingFuse;
 
+    // Material-Instanz für die Warn-Sphere (damit andere Minen nicht beeinflusst werden)
+    private Material warnSphereMaterial;
+
+    // Shader-Property-ID für die Hauptfarbe (gecacht für Performance)
+    private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -98,6 +124,7 @@ public class ProxyMineNpc : NpcBase
     protected override void OnStart()
     {
         behaviorMode = BehaviorMode.Stationary;
+        SetupWarnSphere();
     }
 
     protected override void UpdateBehavior()
@@ -110,6 +137,7 @@ public class ProxyMineNpc : NpcBase
 
             case MineState.Triggered:
                 UpdateFuseTimer();
+                UpdateWarnSphereColor();
                 break;
         }
     }
@@ -142,6 +170,76 @@ public class ProxyMineNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Warn-Sphere
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void SetupWarnSphere()
+    {
+        if (warnSphereRenderer == null)
+        {
+            Debug.LogWarning($"[ProxyMineNpc] '{name}': Kein WarnSphere-Renderer zugewiesen!", this);
+            return;
+        }
+
+        // Material-Instanz erstellen (verhindert, dass alle Minen dasselbe Material teilen)
+        warnSphereMaterial = warnSphereRenderer.material;
+
+        // Größe an Explosionsradius anpassen (vom Prefab auslesen)
+        float explosionRadius = GetExplosionRadius();
+        float diameter = explosionRadius * 2f;
+        warnSphereRenderer.transform.localScale = Vector3.one * diameter;
+
+        // Zu Beginn unsichtbar
+        warnSphereRenderer.enabled = false;
+    }
+
+    /// <summary>
+    /// Liest den maxRadius vom ExplosionSphere-Prefab.
+    /// Fallback: 5f wenn kein Prefab oder Script vorhanden.
+    /// </summary>
+    private float GetExplosionRadius()
+    {
+        if (explosionPrefab == null) return 5f;
+
+        ExplosionSphere explosionSphere = explosionPrefab.GetComponent<ExplosionSphere>();
+        if (explosionSphere == null) return 5f;
+
+        return explosionSphere.MaxRadius;
+    }
+
+    private void ShowWarnSphere()
+    {
+        if (warnSphereRenderer == null) return;
+        warnSphereRenderer.enabled = true;
+    }
+
+    private void HideWarnSphere()
+    {
+        if (warnSphereRenderer == null) return;
+        warnSphereRenderer.enabled = false;
+    }
+
+    /// <summary>
+    /// Aktualisiert die Farbe der Warn-Sphere basierend auf dem Fuse-Fortschritt.
+    /// </summary>
+    private void UpdateWarnSphereColor()
+    {
+        if (warnSphereMaterial == null) return;
+
+        // Fuse-Fortschritt: 0 = gerade gestartet, 1 = kurz vor Explosion
+        float fuseProgress = 1f - (fuseTimer / fuseTime);
+        fuseProgress = Mathf.Clamp01(fuseProgress);
+
+        // AnimationCurve auswerten → steuert den Blend zwischen den Farben
+        float curveValue = warnColorCurve.Evaluate(fuseProgress);
+
+        Color currentColor = Color.Lerp(warnColorStart, warnColorEnd, curveValue);
+        warnSphereMaterial.SetColor(BaseColorID, currentColor);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Fuse Timer
     // ════════════════════════════════════════════════════════════════════════
 
@@ -152,6 +250,7 @@ public class ProxyMineNpc : NpcBase
         mineState = MineState.Triggered;
         fuseTimer = fuseTime;
         PlaySound(fuseSound);
+        ShowWarnSphere();
     }
 
     private void UpdateFuseTimer()
@@ -176,6 +275,8 @@ public class ProxyMineNpc : NpcBase
     {
         mineState = MineState.Exploded;
 
+        HideWarnSphere();
+
         Vector3 spawnPos = transform.position;
 
         if (explosionPrefab != null)
@@ -199,8 +300,8 @@ public class ProxyMineNpc : NpcBase
 
     protected override void OnStunStart()
     {
-        // Fuse-Timer wird automatisch pausiert, da NpcBase bei Stun
-        // UpdateBehavior() nicht aufruft.
+        // Warn-Sphere verstecken während die Mine gestunnt ist
+        HideWarnSphere();
     }
 
     protected override void OnStunEnd()
@@ -210,6 +311,12 @@ public class ProxyMineNpc : NpcBase
         {
             damagePendingFuse = false;
             StartFuse();
+        }
+
+        // Warn-Sphere wieder anzeigen wenn der Fuse bereits läuft
+        if (mineState == MineState.Triggered)
+        {
+            ShowWarnSphere();
         }
     }
 
@@ -318,6 +425,21 @@ public class ProxyMineNpc : NpcBase
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Cleanup
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void OnDestroy()
+    {
+        // Material-Instanz aufräumen (verhindert Memory Leak)
+        if (warnSphereMaterial != null)
+        {
+            Destroy(warnSphereMaterial);
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Abstract Implementations
     // ════════════════════════════════════════════════════════════════════════
 
@@ -338,6 +460,10 @@ public class ProxyMineNpc : NpcBase
             ? new Color(1f, 0f, 0f, 0.3f)
             : new Color(1f, 1f, 0f, 0.2f);
         Gizmos.DrawWireSphere(transform.position, detectionRadius);
+
+        // Explosionsradius (zeigt synchronisierten Wert)
+        Gizmos.color = new Color(1f, 0.5f, 0f, 0.15f);
+        Gizmos.DrawWireSphere(transform.position, GetExplosionRadius());
 
         // Raycast Origin
         Gizmos.color = Color.cyan;

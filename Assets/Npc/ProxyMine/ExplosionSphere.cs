@@ -52,6 +52,18 @@ public class ExplosionSphere : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Public Accessors
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Maximaler Explosionsradius. Wird von ProxyMineNpc gelesen,
+    /// damit die Warn-Sphere synchron bleibt.
+    /// </summary>
+    public float MaxRadius => maxRadius;
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Runtime State
     // ════════════════════════════════════════════════════════════════════════
 
