@@ -105,6 +105,7 @@ GameObject:
   - component: {fileID: 9190051213164589030}
   - component: {fileID: 6255646037874087239}
   - component: {fileID: 6872239883917322336}
+  - component: {fileID: 7071042562543658868}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -584,6 +585,21 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
+--- !u!114 &7071042562543658868
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2c96385bc0e88046987e5193cdf71e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDashTrail
+  planePrefab: {fileID: 7217619135873028787, guid: 37168de599557c34f9fbe0cbcb198e57, type: 3}
+  spawnInterval: 5
+  maxPlanes: 10
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
