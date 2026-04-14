@@ -276,9 +276,9 @@ MonoBehaviour:
     m_Bits: 8328
   laserLength: 50
   transitionDuration: 0.3
-  earlyWidth: 0.005
-  lockedWidth: 0.03
-  earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
+  earlyWidth: 0.003
+  lockedWidth: 0.01
+  earlyColor: {r: 0.5853553, g: 1, b: 0, a: 1}
   lockedColor: {r: 1, g: 0.48571634, b: 0, a: 1}
   wiggleMaxAngle: 8
   wiggleFrequency: 3

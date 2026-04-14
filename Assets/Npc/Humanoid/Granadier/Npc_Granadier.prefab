@@ -274,7 +274,7 @@ MonoBehaviour:
   transitionDuration: 0.3
   earlyWidth: 0.01
   lockedWidth: 0.06
-  earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
+  earlyColor: {r: 1, g: 0.30254513, b: 0, a: 1}
   lockedColor: {r: 1, g: 0, b: 0, a: 1}
   wiggleMaxAngle: 8
   wiggleFrequency: 3

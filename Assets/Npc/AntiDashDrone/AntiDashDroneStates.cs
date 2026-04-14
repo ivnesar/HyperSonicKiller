@@ -28,6 +28,8 @@ namespace AntiDashDroneStates
         public override void Enter(AntiDashDroneNpc npc)
         {
             npc.SetBillboardVisible(true);
+            npc.SetZoneSphereVisible(true);
+            npc.SetPulseSphereVisible(true);
         }
 
         public override INpcState<AntiDashDroneNpc> Update(AntiDashDroneNpc npc)
@@ -46,6 +48,8 @@ namespace AntiDashDroneStates
             // Disable zone when leaving Idle (entering Stunned or Dead)
             npc.DisableZone();
             npc.SetBillboardVisible(false);
+            npc.SetZoneSphereVisible(false);
+            npc.SetPulseSphereVisible(false);
         }
     }
 

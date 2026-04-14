@@ -49,6 +49,17 @@ public class AntiDashDroneNpc : NpcBase
     [Tooltip("The billboard Transform (child quad/sprite that shows the effect area)")]
     [SerializeField] private Transform billboardTransform;
 
+    [Header("Zone Sphere")]
+    [Tooltip("The sphere Transform (child sphere that visualizes the effect area in 3D)")]
+    [SerializeField] private Transform zoneSphereTransform;
+
+    [Header("Pulse Sphere")]
+    [Tooltip("The sphere Transform (child sphere that pulses outward to show the drone is active)")]
+    [SerializeField] private Transform pulseSphereTransform;
+
+    [Tooltip("Duration of one pulse cycle in seconds")]
+    [SerializeField] private float pulseDuration = 2f;
+
     [Header("Death Effect")]
     [Tooltip("Optional particle effect prefab spawned on death")]
     [SerializeField] private GameObject explosionEffectPrefab;
@@ -74,8 +85,7 @@ public class AntiDashDroneNpc : NpcBase
 
     private INpcState<AntiDashDroneNpc> currentState;
 
-    // Player references
-    private PlayerCore playerCore;
+    // Player references (playerCore is inherited from NpcBase)
     private PlayerDash playerDash;
 
     // Zone tracking
@@ -86,6 +96,9 @@ public class AntiDashDroneNpc : NpcBase
 
     // Camera reference for billboard
     private Transform cameraTransform;
+
+    // Pulse sphere
+    private float pulseTimer;
 
     #endregion
 
@@ -106,12 +119,20 @@ public class AntiDashDroneNpc : NpcBase
 
     protected override void Start()
     {
+        // Cache camera
+        cameraTransform = Camera.main != null ? Camera.main.transform : null;
+
+        // Setup billboard and sphere BEFORE base.Start(),
+        // because base.Start() → OnStart() → Idle.Enter() activates them
+        SetupBillboard();
+        SetupZoneSphere();
+        SetupPulseSphere();
+
         base.Start();
 
-        // Cache player components
+        // Cache PlayerDash (playerCore is already cached by NpcBase.Start())
         if (playerTransform != null)
         {
-            playerCore = playerTransform.GetComponent<PlayerCore>();
             playerDash = playerTransform.GetComponent<PlayerDash>();
         }
 
@@ -119,12 +140,6 @@ public class AntiDashDroneNpc : NpcBase
         {
             Debug.LogError($"[AntiDashDrone] {name}: PlayerCore not found! Drone will not function.");
         }
-
-        // Cache camera
-        cameraTransform = Camera.main != null ? Camera.main.transform : null;
-
-        // Setup billboard scale to match effect radius
-        SetupBillboard();
     }
 
     protected override void OnStart()
@@ -155,6 +170,9 @@ public class AntiDashDroneNpc : NpcBase
 
         // Billboard always faces camera (only in Idle)
         UpdateBillboard();
+
+        // Pulse sphere animation
+        UpdatePulseSphere();
     }
 
     protected override void UpdateBehavior()
@@ -201,8 +219,10 @@ public class AntiDashDroneNpc : NpcBase
             Instantiate(explosionEffectPrefab, transform.position, Quaternion.identity);
         }
 
-        // Hide billboard
+        // Hide billboard and zone spheres
         SetBillboardVisible(false);
+        SetZoneSphereVisible(false);
+        SetPulseSphereVisible(false);
 
         // Change to dead state
         ChangeState(new AntiDashDroneStates.Dead());
@@ -357,6 +377,24 @@ public class AntiDashDroneNpc : NpcBase
         billboardTransform.localScale = new Vector3(diameter, diameter, 1f);
     }
 
+    private void SetupZoneSphere()
+    {
+        if (zoneSphereTransform == null) return;
+
+        // Ensure sphere stays centered on the drone
+        zoneSphereTransform.localPosition = Vector3.zero;
+
+        // Scale sphere to match effect radius diameter
+        // Unity's default sphere has a radius of 0.5, so diameter = correct scale
+        float diameter = effectRadius * 2f;
+        zoneSphereTransform.localScale = new Vector3(diameter, diameter, diameter);
+
+        // Disable the collider — sphere is visual only
+        var collider = zoneSphereTransform.GetComponent<Collider>();
+        if (collider != null)
+            collider.enabled = false;
+    }
+
     /// <summary>
     /// Rotates the billboard to always face the camera.
     /// </summary>
@@ -365,16 +403,74 @@ public class AntiDashDroneNpc : NpcBase
         if (billboardTransform == null || cameraTransform == null) return;
         if (!billboardTransform.gameObject.activeSelf) return;
 
-        // Look at camera (billboard faces toward camera)
-        billboardTransform.LookAt(
-            billboardTransform.position + cameraTransform.forward
-        );
+        // Billboard faces toward camera position
+        billboardTransform.LookAt(cameraTransform.position);
     }
 
     public void SetBillboardVisible(bool visible)
     {
         if (billboardTransform != null)
             billboardTransform.gameObject.SetActive(visible);
+    }
+
+    public void SetZoneSphereVisible(bool visible)
+    {
+        if (zoneSphereTransform != null)
+            zoneSphereTransform.gameObject.SetActive(visible);
+    }
+
+    private void SetupPulseSphere()
+    {
+        if (pulseSphereTransform == null) return;
+
+        // Ensure sphere stays centered on the drone
+        pulseSphereTransform.localPosition = Vector3.zero;
+
+        // Start at scale 0
+        pulseSphereTransform.localScale = Vector3.zero;
+
+        // Disable the collider — sphere is visual only
+        var collider = pulseSphereTransform.GetComponent<Collider>();
+        if (collider != null)
+            collider.enabled = false;
+    }
+
+    private void UpdatePulseSphere()
+    {
+        if (pulseSphereTransform == null) return;
+        if (!pulseSphereTransform.gameObject.activeSelf) return;
+
+        // Advance timer
+        pulseTimer += Time.deltaTime;
+
+        // Loop: hard reset when cycle ends
+        if (pulseTimer >= pulseDuration)
+            pulseTimer -= pulseDuration;
+
+        // Normalized progress 0→1
+        float t = pulseTimer / pulseDuration;
+
+        // Ease-out: starts fast, slows down (1 - (1-t)^2)
+        float eased = 1f - (1f - t) * (1f - t);
+
+        // Scale from 0 to effect radius diameter
+        float diameter = effectRadius * 2f;
+        float scale = eased * diameter;
+        pulseSphereTransform.localScale = new Vector3(scale, scale, scale);
+    }
+
+    public void SetPulseSphereVisible(bool visible)
+    {
+        if (pulseSphereTransform == null) return;
+
+        pulseSphereTransform.gameObject.SetActive(visible);
+
+        // Reset pulse on activation so it always starts from 0
+        if (visible)
+        {
+            pulseTimer = 0f;
+            pulseSphereTransform.localScale = Vector3.zero;
+        }
     }
 
     #endregion
