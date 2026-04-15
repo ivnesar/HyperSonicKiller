@@ -7,6 +7,7 @@ using System;
 /// Manages player state machine and routes events between subsystems.
 /// 
 /// UPDATED: Adjusted for new dash-attack system where LMB = Dash with auto-attack.
+/// UPDATED: Added SprintDashing state and PlayerSprint subsystem.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(PlayerInputHandler))]
@@ -19,6 +20,7 @@ public class PlayerCore : MonoBehaviour
     public enum PlayerState
     {
         Normal,
+        SprintDashing,      // Sprint-dash (short dodge, NOT cancellable)
         Dashing,            // Attack dash (NOT invulnerable)
         DashingToSword,     // Invulnerable dash to retrieve thrown sword
         StuckToSurface,
@@ -66,6 +68,7 @@ public class PlayerCore : MonoBehaviour
 
     [HideInInspector] public PlayerMovement Movement { get; private set; }
     [HideInInspector] public PlayerDash Dash { get; private set; }
+    [HideInInspector] public PlayerSprint Sprint { get; private set; }
     [HideInInspector] public PlayerLook Look { get; private set; }
     [HideInInspector] public PlayerCombat Combat { get; private set; }
     [HideInInspector] public PlayerHealth Health { get; private set; }
@@ -120,6 +123,7 @@ public class PlayerCore : MonoBehaviour
         // Subsystems (all on same GameObject)
         Movement = GetComponent<PlayerMovement>();
         Dash = GetComponent<PlayerDash>();
+        Sprint = GetComponent<PlayerSprint>();
         Look = GetComponent<PlayerLook>();
         Combat = GetComponent<PlayerCombat>();
         Health = GetComponent<PlayerHealth>();
@@ -355,21 +359,24 @@ public class PlayerCore : MonoBehaviour
                 // Charges reset is handled by PlayerDash.CompleteDash → HandleDashCompleted
                 break;
                 
+            case PlayerState.SprintDashing:
+                // Sprint-dash: stop normal sprint (will resume after dash if Shift held)
+                Sprint?.StopSprint();
+                break;
+                
             case PlayerState.Dashing:
                 // Normal attack dash - NOT invulnerable
-                // Cancel sprint burst (it would conflict with dash SlowMo)
-                Movement?.CancelSprintBurst();
                 break;
                 
             case PlayerState.DashingToSword:
                 // Sword dash - INVULNERABLE
-                // Cancel sprint burst (it would conflict with dash SlowMo)
-                Movement?.CancelSprintBurst();
                 break;
 
             case PlayerState.Dead:
                 // Cancel any active dash (this also resets Time.timeScale)
                 Dash?.ForceCancelDash();
+                Sprint?.ForceCancelDash();
+                Sprint?.StopSprint();
                 TimeManager.Instance.ClearAllLayers(); // Alles zurücksetzen bei Tod
                 
                 Cursor.lockState = CursorLockMode.None;
@@ -388,11 +395,12 @@ public class PlayerCore : MonoBehaviour
                 break;
                 
             case PlayerState.DashingToSword:
-
                 break;
                 
             case PlayerState.Dashing:
- 
+                break;
+                
+            case PlayerState.SprintDashing:
                 break;
         }
     }
@@ -469,10 +477,11 @@ public class PlayerCore : MonoBehaviour
     public bool CanMove => CurrentState != PlayerState.Dead && 
                            CurrentState != PlayerState.Dashing && 
                            CurrentState != PlayerState.DashingToSword &&
-                           CurrentState != PlayerState.StuckToSurface;
+                           CurrentState != PlayerState.StuckToSurface &&
+                           CurrentState != PlayerState.SprintDashing;
     
     /// <summary>
-    /// Returns true if player can initiate a dash (attack or sword).
+    /// Returns true if player can initiate an attack dash (LMB).
     /// </summary>
     public bool CanDash => CurrentState == PlayerState.Normal || 
                            CurrentState == PlayerState.Airborne || 
@@ -485,6 +494,7 @@ public class PlayerCore : MonoBehaviour
     public bool CanSwordDash => CurrentState != PlayerState.Dead && 
                                 CurrentState != PlayerState.Dashing &&
                                 CurrentState != PlayerState.DashingToSword &&
+                                CurrentState != PlayerState.SprintDashing &&
                                 SwordThrow != null && 
                                 SwordThrow.IsSwordStuck;
 

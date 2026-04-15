@@ -97,6 +97,7 @@ GameObject:
   - component: {fileID: 6552793720517183731}
   - component: {fileID: 6409869773086982550}
   - component: {fileID: 6516431572162398611}
+  - component: {fileID: 3323261471173554615}
   - component: {fileID: 4511031296643993828}
   - component: {fileID: 8462264894812746746}
   - component: {fileID: 6295242138573287136}
@@ -218,45 +219,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   walkSpeed: 5
-  runSpeed: 8
-  sprintInitialBoost: 64
-  sprintDecayCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: -0.0032297682
-      outSlope: -0.0032297682
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0.1890138
-    - serializedVersion: 3
-      time: 0.1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.1567164
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: -0.0054661953
-      outSlope: -0.0054661953
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.14492804
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  burstDuration: 0.3
-  burstCooldown: 1
   jumpForce: 8
   gravity: 20
+--- !u!114 &3323261471173554615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e5238c1fd5a008438ed25cb9ddcb52f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSprint
+  dashDuration: 0.15
+  dashSpeed: 35
+  dashCooldown: 1
+  sprintSpeed: 10
 --- !u!114 &4511031296643993828
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -274,7 +254,7 @@ MonoBehaviour:
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
-    m_Bits: 8320
+    m_Bits: 128
   maxFloorAngle: 45
   dashTimeScale: 0.01
   dashCancelUpwardForce: 10
@@ -405,6 +385,10 @@ MonoBehaviour:
   isDashing: 0
   isSwordDashing: 0
   isStuckToSurface: 0
+  isSprinting: 0
+  isSprintDashing: 0
+  sprintDashOnCooldown: 0
+  sprintDashCooldownRemaining: 0
   isGrounded: 0
   verticalVelocity: 0
   showDashRay: 1
@@ -460,6 +444,24 @@ MonoBehaviour:
       _Callbacks: []
       _Names: []
     _Clip: {fileID: -3419257869308726280, guid: f97e31264c14f594ab69ed711267cb20, type: 3}
+    _NormalizedStartTime: NaN
+  sprint:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 0}
+    _NormalizedStartTime: NaN
+  sprintDash:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: 0}
     _NormalizedStartTime: NaN
   dash:
     _FadeDuration: 0.25

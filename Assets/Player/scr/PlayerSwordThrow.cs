@@ -14,6 +14,7 @@ using System;
 ///   - Time slow expires after aimSlowMaxDuration (even if still holding).
 ///   - Time slow managed via TimeManager "AimSlowMo" layer (same priority as DashSlowMo).
 ///   - Release key: sword is thrown, zoom/time/sensitivity reset immediately.
+/// UPDATED: Removed IsSprintBurstActive check — old sprint system removed.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerSwordThrow : MonoBehaviour
@@ -228,9 +229,7 @@ public class PlayerSwordThrow : MonoBehaviour
         if (core.IsDead) return false;
         if (core.CurrentState == PlayerCore.PlayerState.Dashing) return false;
         if (core.CurrentState == PlayerCore.PlayerState.DashingToSword) return false;
-
-        // Can't throw during sprint burst (time is slowed for movement, not combat)
-        if (core.Movement != null && core.Movement.IsSprintBurstActive) return false;
+        if (core.CurrentState == PlayerCore.PlayerState.SprintDashing) return false;
 
         // Can't throw while exhausted (BlockHP depleted)
         if (combat != null && combat.IsExhausted) return false;
@@ -258,42 +257,39 @@ public class PlayerSwordThrow : MonoBehaviour
         aimSlowTimer = 0f;
         aimSlowExpired = false;
 
-        // Cache base sensitivity before we modify it
+        // Cache base sensitivity for restoration
         if (look != null)
         {
             baseSensitivity = look.GetSensitivity();
         }
 
-        // Start time slow via TimeManager (same priority as dash slow-mo)
+        // Start aim slow-mo
         TimeManager.Instance.SetLayer("AimSlowMo", aimTimeScale, TimeManager.PRIORITY_SLOW_MO, blocksGameTime: false);
     }
 
     private void UpdateAim()
     {
-        float dt = TimeManager.Instance.GameDeltaTime;
-        aimTimer += dt;
-        aimSlowTimer += dt;
+        aimTimer += Time.unscaledDeltaTime;
+        aimSlowTimer += Time.unscaledDeltaTime;
 
-        // ── Zoom: lerp zoom factor from 1x to aimZoomFactor over aimZoomInDuration ──
+        // ── Zoom: ramp up over aimZoomInDuration ──
         float zoomProgress = Mathf.Clamp01(aimTimer / aimZoomInDuration);
         float currentZoom = Mathf.Lerp(1f, aimZoomFactor, zoomProgress);
 
-        // Apply FOV override: normalFOV / currentZoom
-        float normalFOV = dashFOV != null ? dashFOV.NormalFOV : 70f;
-        float zoomedFOV = normalFOV / currentZoom;
-
+        // Apply FOV override
         if (dashFOV != null)
         {
+            float zoomedFOV = dashFOV.NormalFOV / currentZoom;
             dashFOV.SetFOVOverride(zoomedFOV);
         }
 
-        // ── Sensitivity: scale down proportionally to zoom ──
+        // Scale sensitivity down proportionally to zoom
         if (look != null)
         {
             look.SetSensitivity(baseSensitivity / currentZoom);
         }
 
-        // ── Time slow expiry: after aimSlowMaxDuration, remove slow-mo layer ──
+        // ── Time slow expiry ──
         if (!aimSlowExpired && aimSlowTimer >= aimSlowMaxDuration)
         {
             aimSlowExpired = true;

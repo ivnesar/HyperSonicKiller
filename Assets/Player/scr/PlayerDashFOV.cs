@@ -4,6 +4,7 @@ using UnityEngine;
 /// Smoothly adjusts camera FOV based on player dash state.
 /// Sits on the Player GameObject, reads state from PlayerCore.
 /// Three FOV values: normal, attack dash, sword dash.
+/// Sprint-dash uses normal FOV (no FOV change for short dodge).
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerDashFOV : MonoBehaviour
@@ -83,6 +84,7 @@ public class PlayerDashFOV : MonoBehaviour
         {
             PlayerCore.PlayerState.Dashing        => dashFOV,
             PlayerCore.PlayerState.DashingToSword  => swordDashFOV,
+            // SprintDashing uses normal FOV — it's a short ground dodge, no dramatic FOV shift
             _                                      => normalFOV
         };
     }

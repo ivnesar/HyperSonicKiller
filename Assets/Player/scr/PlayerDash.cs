@@ -939,7 +939,8 @@ public class PlayerDash : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         if (!Application.isPlaying) return;
-
+        if (core == null) return;  
+        
         if (IsDashing)
         {
             // Draw dash path

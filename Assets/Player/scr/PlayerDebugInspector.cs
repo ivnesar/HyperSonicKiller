@@ -4,6 +4,8 @@ using UnityEngine;
 /// Debug-Komponente für Spieler-Werte im Inspector.
 /// Zeigt Dash-Richtung, Zustände und Combat-Infos.
 /// Orientiert sich an NpcDebugInspector.
+/// 
+/// UPDATED: Added Sprint debug info (isSprinting, sprintDashing, cooldown).
 /// </summary>
 public class PlayerDebugInspector : MonoBehaviour
 {
@@ -13,6 +15,7 @@ public class PlayerDebugInspector : MonoBehaviour
 
     private PlayerCore core;
     private PlayerDash dash;
+    private PlayerSprint sprint;
     private PlayerMovement movement;
     private PlayerHealth health;
     private PlayerCombat combat;
@@ -44,6 +47,12 @@ public class PlayerDebugInspector : MonoBehaviour
     [SerializeField] private bool isDashing;
     [SerializeField] private bool isSwordDashing;
     [SerializeField] private bool isStuckToSurface;
+
+    [Header("Sprint")]
+    [SerializeField] private bool isSprinting;
+    [SerializeField] private bool isSprintDashing;
+    [SerializeField] private bool sprintDashOnCooldown;
+    [SerializeField] private float sprintDashCooldownRemaining;
 
     [Header("Movement")]
     [SerializeField] private bool isGrounded;
@@ -102,6 +111,7 @@ public class PlayerDebugInspector : MonoBehaviour
         }
 
         dash = GetComponent<PlayerDash>();
+        sprint = GetComponent<PlayerSprint>();
         movement = GetComponent<PlayerMovement>();
         health = GetComponent<PlayerHealth>();
         combat = GetComponent<PlayerCombat>();
@@ -116,6 +126,7 @@ public class PlayerDebugInspector : MonoBehaviour
         UpdateHealthInfo();
         UpdateCombatInfo();
         UpdateDashInfo();
+        UpdateSprintInfo();
         UpdateMovementInfo();
         UpdateDashVisualization();
     }
@@ -158,6 +169,15 @@ public class PlayerDebugInspector : MonoBehaviour
         isStuckToSurface = dash.IsStuck;
     }
 
+    private void UpdateSprintInfo()
+    {
+        if (sprint == null) return;
+        isSprinting = sprint.IsSprinting;
+        isSprintDashing = sprint.IsDashing;
+        sprintDashOnCooldown = sprint.IsDashOnCooldown;
+        sprintDashCooldownRemaining = sprint.CooldownRemaining;
+    }
+
     private void UpdateMovementInfo()
     {
         if (movement == null) return;
@@ -180,9 +200,6 @@ public class PlayerDebugInspector : MonoBehaviour
         if (dash != null && dash.IsDashing)
         {
             // Aktiver Dash: zeige Dash-Richtung
-            // Dash-Richtung aus Kamera-Forward zum Zeitpunkt des Dash-Starts
-            // Da wir keinen direkten Zugriff auf dashDirection haben,
-            // nutzen wir die aktuelle Bewegungsrichtung
             Vector3 dashDir = core.CameraTransform.forward;
             Debug.DrawRay(origin, dashDir * 30f, dashRayColor);
             hasDashData = true;
@@ -287,7 +304,7 @@ public class PlayerDebugInspector : MonoBehaviour
         if (!showScreenOverlay || core == null) return;
 
         // Oben links: kompaktes Status-Overlay
-        GUILayout.BeginArea(new Rect(10, 10, 220, 200));
+        GUILayout.BeginArea(new Rect(10, 10, 220, 250));
 
         GUIStyle style = new GUIStyle(GUI.skin.label);
         style.fontSize = 12;
@@ -295,6 +312,7 @@ public class PlayerDebugInspector : MonoBehaviour
 
         string stateColor = core.CurrentState switch
         {
+            PlayerCore.PlayerState.SprintDashing => "<color=orange>SPRINT DASH</color>",
             PlayerCore.PlayerState.Dashing => "<color=cyan>DASHING</color>",
             PlayerCore.PlayerState.DashingToSword => "<color=magenta>SWORD DASH</color>",
             PlayerCore.PlayerState.StuckToSurface => "<color=yellow>STUCK</color>",
@@ -316,6 +334,21 @@ public class PlayerDebugInspector : MonoBehaviour
         if (dash != null)
         {
             GUILayout.Label($"Dash: {dashCharges}/{dash.MaxCharges}", style);
+        }
+
+        if (sprint != null)
+        {
+            string sprintState = isSprintDashing
+                ? "<color=orange>DASH</color>"
+                : isSprinting
+                    ? "<color=green>ON</color>"
+                    : "OFF";
+            GUILayout.Label($"Sprint: {sprintState}", style);
+
+            if (sprintDashOnCooldown)
+            {
+                GUILayout.Label($"Sprint CD: {sprintDashCooldownRemaining:F1}s", style);
+            }
         }
 
         GUILayout.EndArea();

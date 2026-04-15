@@ -7,7 +7,7 @@ using UnityEngine;
 /// Sits on the Player GameObject, reads state from PlayerCore subsystems.
 /// 
 /// Subscribes to events for one-shot animations (Attack, Block, SwordThrow, SwordRecover)
-/// and polls state each frame for continuous clips (Idle, Walk, Dash, etc.).
+/// and polls state each frame for continuous clips (Idle, Walk, Dash, Sprint, etc.).
 /// 
 /// One-shots REPLACE the base animation for their duration, then return to
 /// the appropriate base clip via OnEnd callback.
@@ -29,6 +29,8 @@ using UnityEngine;
 ///   3. Adjust FadeDuration on each ClipTransition for smooth blending.
 ///   4. The Animator's UpdateMode will be set to UnscaledTime automatically.
 /// ─────────────────────────────────────────────────────────────────────
+/// 
+/// UPDATED: Added sprintDash and sprint base clip slots for new sprint system.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerArmAnimator : MonoBehaviour
@@ -46,6 +48,8 @@ public class PlayerArmAnimator : MonoBehaviour
     [Header("Base Clips (Looping)")]
     [SerializeField] private ClipTransition idle;
     [SerializeField] private ClipTransition walk;
+    [SerializeField] private ClipTransition sprint;
+    [SerializeField] private ClipTransition sprintDash;
     [SerializeField] private ClipTransition dash;
     [SerializeField] private ClipTransition swordDash;
     [SerializeField] private ClipTransition stuck;
@@ -262,6 +266,10 @@ public class PlayerArmAnimator : MonoBehaviour
         // ── State-specific overrides ──
         switch (core.CurrentState)
         {
+            case PlayerCore.PlayerState.SprintDashing:
+                // Use sprintDash clip if assigned, fall back to dash
+                return (sprintDash != null && sprintDash.Clip != null) ? sprintDash : dash;
+
             case PlayerCore.PlayerState.Dashing:
                 return dash;
 
@@ -282,9 +290,20 @@ public class PlayerArmAnimator : MonoBehaviour
                 return disarmedIdle;
         }
 
-        // ── Normal movement: Idle vs Walk ──
+        // ── Normal movement: Idle vs Walk vs Sprint ──
         float inputMagnitude = core.Input.GetMoveInput().magnitude;
-        return inputMagnitude > walkThreshold ? walk : idle;
+
+        if (inputMagnitude > walkThreshold)
+        {
+            // Check if sprinting (PlayerSprint sets IsSprinting)
+            bool isSprinting = core.Sprint != null && core.Sprint.IsSprinting;
+            if (isSprinting && sprint != null && sprint.Clip != null)
+                return sprint;
+
+            return walk;
+        }
+
+        return idle;
     }
 
     #endregion
