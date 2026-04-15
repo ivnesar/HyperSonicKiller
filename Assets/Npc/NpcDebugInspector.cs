@@ -175,7 +175,7 @@ public class NpcDebugInspector : MonoBehaviour
         if (genTwo.HasValidIntercept)
         {
             // Zeige Linie zum Abfangpunkt
-            Vector3 interceptTarget = genTwo.LastInterceptPoint + Vector3.up;
+            Vector3 interceptTarget = genTwo.InterceptPoint + Vector3.up;
             Debug.DrawLine(origin, interceptTarget, interceptRayColor);
         }
     }
@@ -203,7 +203,7 @@ public class NpcDebugInspector : MonoBehaviour
         // GenTwo: Abfangpunkt
         if (showInterceptDebug && genTwo != null && genTwo.HasValidIntercept)
         {
-            Vector3 interceptPos = genTwo.LastInterceptPoint;
+            Vector3 interceptPos = genTwo.InterceptPoint;
 
             // Solider Punkt am Abfangort
             Gizmos.color = interceptPointColor;

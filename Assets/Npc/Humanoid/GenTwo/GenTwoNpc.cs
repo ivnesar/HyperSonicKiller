@@ -4,28 +4,30 @@ using UnityEngine;
 /// GenTwo NPC - Melee Interceptor.
 /// 
 /// Behavior:
-/// 1. Idle: Waits and watches the player. Cannot move except by dashing.
-/// 2. When the player enters Dashing state AND is within detection range:
-///    - Charges up for ~1 second (visual warning for the player)
-///    - Calculates an intercept point on the player's dash trajectory
-///    - Dashes toward that point at slightly higher speed than the player
-/// 3. If GenTwo collides with the player WHILE the player is dashing → 999 damage (lethal)
-/// 4. If the player cancels their dash → GenTwo is harmless and flies past
-/// 5. GenTwo continues flying until hitting a wall or floor → sticks there
-/// 6. Recovery phase → repeat
-/// 
-/// Counter-play: Player cancels their dash so GenTwo flies past harmlessly.
+/// 1. Idle: Waits dormant. Reacts ONLY when the player is in Dashing state.
+/// 2. When the player dashes AND is within detection range AND line of sight:
+///    - Calculates an intercept point on the player's dash trajectory.
+///    - The intercept point is placed so the player reaches it in exactly
+///      playerArrivalTime seconds (unscaled) from the moment GenTwo activates.
+///    - GenTwo must be able to reach that point in (playerArrivalTime - chargeDuration) seconds.
+///    - If no valid point is found → stays in Idle.
+/// 3. Charging: Visual warning phase. NOT cancellable (except by stun/death).
+/// 4. Dashing: Flies toward the intercept point. INVULNERABLE during dash.
+///    Continues until hitting a surface (wall/floor). Does NOT self-cancel.
+///    If the player is still dashing and within hit radius → lethal damage.
+///    If the player cancelled their dash → GenTwo flies past harmlessly.
+/// 5. Recovery: Stuck to surface for a duration, then back to Idle.
 /// 
 /// IMPORTANT: GenTwo does NOT use NavMesh. Movement is purely dash-based.
-/// Uses segmented raycasting during dash to prevent tunneling at high speeds.
-/// Uses TimeManager.Instance.GameDeltaTime for dash movement.
+/// All timing uses unscaled time (TimeManager.Instance.GameDeltaTime) because
+/// both the player and GenTwo operate with time distortion.
 /// 
 /// ANIMANCER:
-/// - States rufen typsichere Methoden auf AnimManager auf (z.B. AnimManager.PlayCharge()).
-/// - DetermineWallOrGround() nutzt AnimManager.SetOnWall().
-/// - ProcessDashMovement() nutzt AnimManager.PlayDashAttack().
-/// - UpdateAnimator() überschrieben: GenTwo braucht kein Movement-Update.
-/// - playerCore wird aus NpcBase genutzt (nicht mehr lokal deklariert).
+/// - States call typed methods on AnimManager (e.g. AnimManager.PlayCharge()).
+/// - DetermineWallOrGround() uses AnimManager.SetOnWall().
+/// - ProcessDashMovement() uses AnimManager.PlayDashAttack().
+/// - UpdateAnimator() overridden: GenTwo has no NavMesh movement blending.
+/// - playerCore is inherited from NpcBase (not locally declared).
 /// </summary>
 public class GenTwoNpc : NpcBase
 {
@@ -51,20 +53,20 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Maximum distance at which GenTwo detects and reacts to player dashes")]
     [SerializeField] private float detectionRange = 30f;
 
-    [Header("Charge")]
-    [Tooltip("Time to charge before dashing (gives player a visual warning)")]
-    [SerializeField] private float chargeDuration = 1f;
+    [Header("Intercept Timing")]
+    [Tooltip("Time in unscaled seconds from GenTwo activation until the player " +
+             "reaches the intercept point. This is the player's total reaction window. " +
+             "Must be greater than chargeDuration.")]
+    [SerializeField] private float playerArrivalTime = 1f;
 
-    [Tooltip("How far ahead (in unscaled seconds) along the player's dash path the intercept point is placed. " +
-             "Higher = more reaction time for the player.")]
-    [SerializeField] private float interceptLeadTime = 0.7f;
+    [Header("Charge")]
+    [Tooltip("Time GenTwo spends charging before dashing (visual warning for the player). " +
+             "Must be less than playerArrivalTime.")]
+    [SerializeField] private float chargeDuration = 0.5f;
 
     [Header("Dash")]
-    [Tooltip("Base dash speed (before multiplier)")]
+    [Tooltip("GenTwo's dash speed")]
     [SerializeField] private float dashSpeed = 25f;
-
-    [Tooltip("Speed multiplier applied ONLY while the player is in Dashing state")]
-    [SerializeField] private float dashSpeedMultiplier = 1.3f;
 
     [Tooltip("Radius for detecting collision with the player during dash")]
     [SerializeField] private float playerHitRadius = 1.2f;
@@ -79,7 +81,7 @@ public class GenTwoNpc : NpcBase
     [SerializeField] private int raycastSegments = 4;
 
     [Header("Recovery")]
-    [Tooltip("Time GenTwo stays stuck after a dash before it can act again")]
+    [Tooltip("Time GenTwo stays stuck after a dash before returning to Idle")]
     [SerializeField] private float recoveryDuration = 1.5f;
 
     [Header("Audio")]
@@ -95,19 +97,19 @@ public class GenTwoNpc : NpcBase
 
     private INpcState<GenTwoNpc> currentState;
 
-    // Player reference (cached for GenTwo-specific intercept calculations)
+    // Player reference (cached for intercept calculations)
     private PlayerDash playerDash;
 
-    // Dash state
+    // Intercept data (calculated once at charge start, fixed for entire attack)
+    private Vector3 interceptPoint;
     private Vector3 dashDirection;
+    private bool hasValidIntercept;
+
+    // Dash runtime
     private bool hasHitPlayer;
 
-    // Surface state (wall vs ground)
+    // Surface state (wall vs ground after landing)
     private bool isOnWall;
-
-    // Debug: cached intercept point from last calculation
-    private Vector3 lastInterceptPoint;
-    private bool hasValidIntercept;
 
     // Unscaled timer — independent of Time.timeScale
     private float unscaledTimer;
@@ -119,10 +121,9 @@ public class GenTwoNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     public float DetectionRange => detectionRange;
+    public float PlayerArrivalTime => playerArrivalTime;
     public float ChargeDuration => chargeDuration;
-    public float InterceptLeadTime => interceptLeadTime;
     public float DashSpeed => dashSpeed;
-    public float DashSpeedMultiplier => dashSpeedMultiplier;
     public float PlayerHitRadius => playerHitRadius;
     public int CollisionDamage => collisionDamage;
     public LayerMask SurfaceLayerMask => surfaceLayerMask;
@@ -138,11 +139,10 @@ public class GenTwoNpc : NpcBase
 
     /// <summary>
     /// Referenz auf den LaserPointer_Dash für Intercept-Modus Steuerung.
-    /// Wird in Awake() gecached.
     /// </summary>
     public LaserPointer_Dash LaserPointer { get; private set; }
 
-    /// <summary>Current dash direction (set once at dash start, never changes).</summary>
+    /// <summary>Current dash direction (set once, never changes during dash).</summary>
     public Vector3 DashDirection => dashDirection;
 
     /// <summary>True wenn GenTwo an einer Wand hängt (statt am Boden).</summary>
@@ -154,8 +154,8 @@ public class GenTwoNpc : NpcBase
     /// <summary>True if player is within detection range.</summary>
     public bool IsPlayerInRange => DistanceToTarget <= detectionRange;
 
-    /// <summary>Last calculated intercept point (for debug visualization).</summary>
-    public Vector3 LastInterceptPoint => lastInterceptPoint;
+    /// <summary>Last calculated intercept point (for debug/laser visualization).</summary>
+    public Vector3 InterceptPoint => interceptPoint;
 
     /// <summary>True if the last intercept calculation found a valid point.</summary>
     public bool HasValidIntercept => hasValidIntercept;
@@ -170,13 +170,12 @@ public class GenTwoNpc : NpcBase
     {
         base.Awake();
 
-        // GenTwo does NOT use NavMesh - disable it if present
+        // GenTwo does NOT use NavMesh
         if (navAgent != null)
         {
             navAgent.enabled = false;
         }
 
-        // Typsichere Referenz auf den Animation Manager
         AnimManager = GetComponentInChildren<GenTwoAnimationManager>();
 
         if (AnimManager == null)
@@ -185,7 +184,7 @@ public class GenTwoNpc : NpcBase
                              "Animations will not work.");
         }
 
-        // LaserPointer_Dash finden (GenTwo nutzt den Dash-Laser, nicht den Standard-Laser)
+        // GenTwo uses LaserPointer_Dash, not the standard NpcLaserPointer
         LaserPointer = GetComponent<LaserPointer_Dash>();
     }
 
@@ -193,8 +192,6 @@ public class GenTwoNpc : NpcBase
     {
         base.Start();
 
-        // Cache player components for GenTwo-specific intercept calculations
-        // (playerCore is already cached by NpcBase.Start())
         if (playerTransform != null)
         {
             playerDash = playerTransform.GetComponent<PlayerDash>();
@@ -203,6 +200,13 @@ public class GenTwoNpc : NpcBase
         if (playerCore == null)
         {
             Debug.LogError($"[GenTwo] {name}: PlayerCore not found! GenTwo will not function.");
+        }
+
+        // Validate inspector settings
+        if (chargeDuration >= playerArrivalTime)
+        {
+            Debug.LogError($"[GenTwo] {name}: chargeDuration ({chargeDuration}s) must be less than " +
+                           $"playerArrivalTime ({playerArrivalTime}s)! GenTwo would have no flight time.");
         }
     }
 
@@ -227,13 +231,21 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnStunEnd()
     {
-        // PlayIdle() wird von Idle.Enter() aufgerufen — kein extra Aufruf nötig.
         ChangeState(new GenTwoStates.Idle());
     }
 
     public override string GetCurrentStateName() => currentState?.StateName ?? "None";
     public override NpcType GetNpcType() => NpcType.GenTwo;
     public override int GetStateID() => currentState?.StateID ?? 0;
+
+    /// <summary>
+    /// GenTwo has no NavMesh movement — UpdateAnimator does nothing.
+    /// Animation is fully controlled by states via AnimManager.
+    /// </summary>
+    protected override void UpdateAnimator()
+    {
+        // Intentionally empty
+    }
 
     #endregion
 
@@ -266,12 +278,7 @@ public class GenTwoNpc : NpcBase
         Vector3 direction = target - origin;
         float distance = direction.magnitude;
 
-        if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, surfaceLayerMask))
-        {
-            return false;
-        }
-
-        return true;
+        return !Physics.Raycast(origin, direction.normalized, distance, surfaceLayerMask);
     }
 
     /// <summary>
@@ -284,12 +291,7 @@ public class GenTwoNpc : NpcBase
         Vector3 direction = target - origin;
         float distance = direction.magnitude;
 
-        if (Physics.Raycast(origin, direction.normalized, out RaycastHit hit, distance, surfaceLayerMask))
-        {
-            return false;
-        }
-
-        return true;
+        return !Physics.Raycast(origin, direction.normalized, distance, surfaceLayerMask);
     }
 
     #endregion
@@ -299,135 +301,105 @@ public class GenTwoNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Berechnet den Intercept-Punkt einmalig beim Charge-Start.
+    /// Berechnet die Intercept-Position einmalig beim Charge-Start.
     /// 
-    /// Ziel: einen Punkt finden, an dem sich Spieler und GenTwo nach der Charge-Phase treffen.
-    /// Der Spieler soll interceptLeadTime Sekunden haben um zu reagieren, nachdem
-    /// der GenTwo seinen Dash startet.
+    /// LOGIK:
+    /// Der Spieler soll die Impact-Position in genau playerArrivalTime Sekunden
+    /// (unscaled) erreichen, ab JETZT (Moment des Charge-Starts).
     /// 
-    /// Alle Zeiten und Geschwindigkeiten sind in Echtzeit (unscaled), da GameDeltaTime
-    /// = Time.unscaledDeltaTime während SlowMo.
+    ///   interceptPoint = playerPos + playerDir × playerSpeed × playerArrivalTime
     /// 
-    /// Berechnung:
-    ///   - Der Spieler erreicht den Punkt in (chargeDuration + t) Sekunden ab jetzt.
-    ///   - Der GenTwo startet seinen Dash nach chargeDuration und fliegt t Sekunden.
-    ///   - Wir suchen t so, dass GenTwo den Punkt in t Sekunden erreicht:
-    ///       playerSpeed * (chargeDuration + t) = GenTwo-Distanz-zum-Punkt
-    ///       GenTwo-Distanz / genTwoSpeed = t
-    ///   - t = interceptLeadTime ist die gewünschte Reaktionszeit für den Spieler.
-    ///     Aber GenTwo muss auch in t Sekunden ankommen können.
-    ///     Deshalb: Punkt = playerPos + playerDir * playerSpeed * (chargeDuration + t)
-    ///     und GenTwo-Flugzeit = Distanz(GenTwo, Punkt) / genTwoSpeed.
-    ///     Wir wählen t so, dass beide gleichzeitig ankommen.
+    /// GenTwo hat chargeDuration Sekunden zum Laden. Danach fliegt er los.
+    /// Verfügbare Flugzeit für GenTwo:
     /// 
-    /// Vereinfachte Lösung:
-    ///   Spieler-Position zum Dash-Start (nach Charge): playerPos + playerDir * playerSpeed * chargeDuration
-    ///   Von dort braucht der Spieler t Sekunden für die restliche Strecke.
-    ///   GenTwo muss den gleichen Punkt in t Sekunden erreichen.
-    ///   → Löse: playerSpeed * t = |Punkt - playerFuturePos| und genTwoSpeed * t = |Punkt - genTwoPos|
-    ///   Das ist ein klassisches Intercept-Problem das wir per Iteration lösen.
-    ///   
-    ///   Einfacherer Ansatz: Punkt = playerFuturePos + playerDir * playerSpeed * interceptLeadTime
-    ///   Dann prüfen ob GenTwo den Punkt schnell genug erreichen kann.
+    ///   genTwoFlightTime = playerArrivalTime - chargeDuration
+    /// 
+    /// GenTwo muss die Distanz zum interceptPoint in genTwoFlightTime schaffen:
+    /// 
+    ///   benötigteZeit = distanz / dashSpeed
+    ///   → benötigteZeit <= genTwoFlightTime ? → valide
+    /// 
+    /// Zusätzliche Checks:
+    /// - Liegt der Punkt innerhalb der max Dash-Distanz des Spielers?
+    /// - Hat GenTwo freie Sicht zum Punkt?
+    /// 
+    /// Returns true wenn ein valider Intercept-Punkt gefunden wurde.
     /// </summary>
-    public bool PreCalculateIntercept()
+    public bool TryCalculateIntercept()
     {
-        if (playerDash == null || playerCore == null)
+        hasValidIntercept = false;
+
+        if (playerDash == null || playerCore == null || playerTransform == null)
         {
-            hasValidIntercept = false;
             return false;
         }
 
+        // ── Spieler-Daten zum Zeitpunkt der Berechnung ──
         Vector3 playerPos = playerTransform.position;
         Vector3 playerDir = playerDash.DashDirection.normalized;
         float playerSpeed = playerDash.DashSpeed;
-        float maxDist = playerDash.DashMaxDistance;
-        float genTwoSpeed = dashSpeed * dashSpeedMultiplier;
+        float playerMaxDist = playerDash.DashMaxDistance;
 
-        // Wo ist der Spieler wenn der GenTwo seinen Dash startet (nach chargeDuration)?
-        Vector3 playerPosAtDashStart = playerPos + playerDir * playerSpeed * chargeDuration;
+        // ── Impact-Position: Wo der Spieler in playerArrivalTime Sekunden sein wird ──
+        float playerTravelDist = playerSpeed * playerArrivalTime;
+        Vector3 candidatePoint = playerPos + playerDir * playerTravelDist;
 
-        // Der Intercept-Punkt liegt interceptLeadTime Sekunden weiter
-        // (das ist die Reaktionszeit die der Spieler bekommt)
-        Vector3 interceptTarget = playerPosAtDashStart + playerDir * playerSpeed * interceptLeadTime;
-
-        // Prüfen ob der Punkt innerhalb der Spieler-Dash-Distanz liegt
-        float totalPlayerDistance = playerSpeed * (chargeDuration + interceptLeadTime);
-        if (totalPlayerDistance > maxDist)
+        // ── Check 1: Liegt der Punkt innerhalb der Spieler-Dash-Reichweite? ──
+        if (playerTravelDist > playerMaxDist)
         {
-            hasValidIntercept = false;
-            Debug.Log($"[GenTwo] {name}: Intercept point beyond player dash range " +
-                      $"({totalPlayerDistance:F1}m > {maxDist:F1}m) — no valid intercept");
+            Debug.Log($"[GenTwo] {name}: Intercept beyond player dash range " +
+                      $"({playerTravelDist:F1}m > {playerMaxDist:F1}m)");
             return false;
         }
 
-        // Prüfen ob GenTwo den Punkt in interceptLeadTime erreichen kann
-        float genTwoDistToTarget = Vector3.Distance(transform.position, interceptTarget);
-        float genTwoFlightTime = genTwoDistToTarget / genTwoSpeed;
+        // ── Check 2: Hat GenTwo genug Flugzeit? ──
+        float genTwoFlightTime = playerArrivalTime - chargeDuration;
 
-        if (genTwoFlightTime > interceptLeadTime + chargeDuration)
+        if (genTwoFlightTime <= 0f)
         {
-            // GenTwo ist zu weit weg — kann den Punkt nicht rechtzeitig erreichen
-            hasValidIntercept = false;
-            Debug.Log($"[GenTwo] {name}: Too far from intercept point — " +
-                      $"needs {genTwoFlightTime:F2}s but only {interceptLeadTime + chargeDuration:F2}s available");
+            Debug.LogError($"[GenTwo] {name}: No flight time available! " +
+                           $"chargeDuration ({chargeDuration}s) >= playerArrivalTime ({playerArrivalTime}s)");
             return false;
         }
 
-        lastInterceptPoint = interceptTarget;
+        float distToPoint = Vector3.Distance(transform.position, candidatePoint);
+        float requiredTime = distToPoint / dashSpeed;
+
+        if (requiredTime > genTwoFlightTime)
+        {
+            Debug.Log($"[GenTwo] {name}: Too far — needs {requiredTime:F2}s " +
+                      $"but only {genTwoFlightTime:F2}s flight time available");
+            return false;
+        }
+
+        // ── Check 3: Freie Sicht zum Punkt? ──
+        if (!HasClearPathTo(candidatePoint))
+        {
+            Debug.Log($"[GenTwo] {name}: Path to intercept point blocked by wall");
+            return false;
+        }
+
+        // ── Alles valide — Intercept-Daten speichern ──
+        interceptPoint = candidatePoint;
+        dashDirection = (interceptPoint - transform.position).normalized;
         hasValidIntercept = true;
 
         Debug.Log($"[GenTwo] {name}: Intercept calculated — " +
-                  $"point {totalPlayerDistance:F1}m ahead of player, " +
-                  $"GenTwo flight time: {genTwoFlightTime:F2}s, " +
-                  $"player reaction time: {interceptLeadTime:F2}s");
+                  $"point {playerTravelDist:F1}m ahead of player, " +
+                  $"GenTwo flight time: {requiredTime:F2}s / {genTwoFlightTime:F2}s available, " +
+                  $"player arrival: {playerArrivalTime:F2}s");
 
         return true;
     }
 
     /// <summary>
-    /// Gibt die Richtung zum bereits berechneten Intercept-Punkt zurück.
-    /// Wird von Dashing.Enter() aufgerufen.
-    /// 
-    /// Prüft zusätzlich ob GenTwo den Punkt erreichen kann (Wall-Check).
-    /// Gibt Vector3.zero zurück wenn der Pfad blockiert ist.
+    /// Clears all intercept data. Called when returning to Idle.
     /// </summary>
-    public Vector3 CalculateInterceptDirection()
-    {
-        if (!hasValidIntercept)
-        {
-            Debug.Log($"[GenTwo] {name}: No valid intercept point — cannot dash");
-            return Vector3.zero;
-        }
-
-        // Wall-Check erst hier (bei Dash-Start) für mehr Spannung
-        if (!HasClearPathTo(lastInterceptPoint))
-        {
-            hasValidIntercept = false;
-            Debug.Log($"[GenTwo] {name}: Intercept point blocked by wall — aborting dash");
-            return Vector3.zero;
-        }
-
-        Vector3 direction = (lastInterceptPoint - transform.position).normalized;
-
-        float travelDist = Vector3.Distance(transform.position, lastInterceptPoint);
-        float gSpeed = dashSpeed * dashSpeedMultiplier;
-        float travelTime = travelDist / gSpeed;
-        Debug.Log($"[GenTwo] {name}: Dash direction locked — " +
-                  $"distance: {travelDist:F1}m, arrival in {travelTime:F2}s");
-
-        return direction;
-    }
-
-    public void SetDashDirection(Vector3 direction)
-    {
-        dashDirection = direction.normalized;
-        hasHitPlayer = false;
-    }
-
     public void ClearInterceptData()
     {
         hasValidIntercept = false;
+        interceptPoint = Vector3.zero;
+        dashDirection = Vector3.zero;
     }
 
     #endregion
@@ -437,25 +409,30 @@ public class GenTwoNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// Prepares the dash. Called by Dashing.Enter().
+    /// Resets hit tracking.
+    /// </summary>
+    public void StartDash()
+    {
+        hasHitPlayer = false;
+    }
+
+    /// <summary>
     /// Performs one frame of dash movement with segmented raycasting.
     /// Returns true if the dash should end (hit a surface).
+    /// 
+    /// Movement uses TimeManager.Instance.GameDeltaTime (= unscaled delta)
+    /// so GenTwo moves at real-world speed regardless of slow-mo.
     /// </summary>
     public bool ProcessDashMovement()
     {
-        float currentSpeed = dashSpeed;
-        if (IsPlayerDashing)
-        {
-            currentSpeed *= dashSpeedMultiplier;
-        }
-
-        float totalMoveDistance = currentSpeed * TimeManager.Instance.GameDeltaTime;
-
+        float totalMoveDistance = dashSpeed * TimeManager.Instance.GameDeltaTime;
         float segmentDistance = totalMoveDistance / raycastSegments;
         Vector3 currentPos = transform.position;
 
         for (int i = 0; i < raycastSegments; i++)
         {
-            // 1. Check for surface collision (wall/floor)
+            // 1. Surface collision check (wall/floor)
             if (Physics.Raycast(currentPos, dashDirection, out RaycastHit surfaceHit,
                 segmentDistance + 0.5f, surfaceLayerMask))
             {
@@ -465,7 +442,7 @@ public class GenTwoNpc : NpcBase
                 return true;
             }
 
-            // 2. Check for player collision
+            // 2. Player collision check
             if (!hasHitPlayer && playerTransform != null)
             {
                 float distToPlayer = Vector3.Distance(currentPos, playerTransform.position);
@@ -474,17 +451,16 @@ public class GenTwoNpc : NpcBase
                 {
                     hasHitPlayer = true;
 
-                    // DashAttack animation über den Manager
                     AnimManager?.PlayDashAttack();
 
                     if (IsPlayerDashing)
                     {
                         playerCore.TakeDirectDamage(collisionDamage, gameObject.name);
-                        Debug.Log($"[GenTwo] {name}: INTERCEPTED player during dash! Dealt {collisionDamage} damage!");
+                        Debug.Log($"[GenTwo] {name}: INTERCEPTED player! Dealt {collisionDamage} damage!");
                     }
                     else
                     {
-                        Debug.Log($"[GenTwo] {name}: Passed through player (player not dashing - no damage)");
+                        Debug.Log($"[GenTwo] {name}: Passed through player (not dashing — no damage)");
                     }
                 }
             }
@@ -503,58 +479,25 @@ public class GenTwoNpc : NpcBase
     #region Helper Methods (exposed for States)
     // ════════════════════════════════════════════════════════════════════════
 
-    public new void SetStateTimer(float t) => base.SetStateTimer(t);
-    public new bool UpdateStateTimer() => base.UpdateStateTimer();
-
     /// <summary>
-    /// Rotates toward target using unscaled time (works during slow-mo).
-    /// Blocked while GenTwo is on a wall to prevent clipping.
+    /// Sets the unscaled timer (counts down using GameDeltaTime).
     /// </summary>
-    public new void RotateTowardTargetUnscaled()
-    {
-        if (isOnWall) return;
-        base.RotateTowardTargetUnscaled();
-    }
-
-    public new void RotateTowardTarget() => base.RotateTowardTarget();
-    public new Vector3 GetDirectionToTarget() => base.GetDirectionToTarget();
-
     public void SetUnscaledTimer(float duration)
     {
         unscaledTimer = duration;
     }
 
+    /// <summary>
+    /// Updates the unscaled timer. Returns true when it reaches zero.
+    /// </summary>
     public bool UpdateUnscaledTimer()
     {
         unscaledTimer -= TimeManager.Instance.GameDeltaTime;
         return unscaledTimer <= 0f;
     }
 
-    public void PlayChargeSound() => PlaySound(chargeSound);
-    public void PlayDashSound() => PlaySound(dashSound);
-
     /// <summary>
-    /// Public Wrapper für NpcBase.SetAimProgress (protected).
-    /// Erlaubt States den AimProgress manuell zu setzen.
-    /// GenTwo nutzt dies statt StartAimTracking(), weil der
-    /// unscaledTimer nicht mit dem stateTimer synchron ist.
-    /// </summary>
-    public void SetAimProgressPublic(float progress)
-    {
-        SetAimProgress(progress);
-    }
-
-    /// <summary>
-    /// Public Wrapper für NpcBase.ResetAimProgress (protected).
-    /// </summary>
-    public void ResetAimProgressPublic()
-    {
-        ResetAimProgress();
-    }
-
-    /// <summary>
-    /// Gibt den aktuellen Fortschritt des unscaledTimers zurück (0→1).
-    /// 0 = Timer gerade gestartet, 1 = Timer abgelaufen.
+    /// Returns timer progress from 0 (just started) to 1 (finished).
     /// </summary>
     public float GetUnscaledTimerProgress(float totalDuration)
     {
@@ -563,6 +506,22 @@ public class GenTwoNpc : NpcBase
         return Mathf.Clamp01(elapsed / totalDuration);
     }
 
+    public void PlayChargeSound() => PlaySound(chargeSound);
+    public void PlayDashSound() => PlaySound(dashSound);
+
+    /// <summary>
+    /// Rotates toward target using unscaled time.
+    /// Blocked while GenTwo is on a wall to prevent clipping.
+    /// </summary>
+    public new void RotateTowardTargetUnscaled()
+    {
+        if (isOnWall) return;
+        base.RotateTowardTargetUnscaled();
+    }
+
+    /// <summary>
+    /// Instantly faces a direction (horizontal only).
+    /// </summary>
     public void FaceDirection(Vector3 direction)
     {
         Vector3 flatDir = new Vector3(direction.x, 0f, direction.z).normalized;
@@ -572,6 +531,24 @@ public class GenTwoNpc : NpcBase
         }
     }
 
+    /// <summary>
+    /// Public wrapper for NpcBase.SetAimProgress (protected).
+    /// GenTwo uses this instead of StartAimTracking() because the
+    /// unscaledTimer is not synchronized with the base stateTimer.
+    /// </summary>
+    public void SetAimProgressPublic(float progress)
+    {
+        SetAimProgress(progress);
+    }
+
+    /// <summary>
+    /// Public wrapper for NpcBase.ResetAimProgress (protected).
+    /// </summary>
+    public void ResetAimProgressPublic()
+    {
+        ResetAimProgress();
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -579,8 +556,8 @@ public class GenTwoNpc : NpcBase
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Bestimmt anhand der Aufprall-Normale ob GenTwo an einer Wand oder
-    /// am Boden gelandet ist. Alles über 45° zur Vertikalen = Wand.
+    /// Determines whether GenTwo landed on a wall or floor based on surface normal.
+    /// Anything > 45° from vertical = wall.
     /// </summary>
     public void DetermineWallOrGround(Vector3 surfaceNormal)
     {
@@ -596,25 +573,9 @@ public class GenTwoNpc : NpcBase
             }
         }
 
-        // Animation Manager über Wall-State informieren
         AnimManager?.SetOnWall(isOnWall);
 
         Debug.Log($"[GenTwo] {name}: Landed on {(isOnWall ? "WALL" : "GROUND")} (angle: {angle:F1}°)");
-    }
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Animator Override
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// GenTwo nutzt kein NavMesh-Movement — UpdateAnimator tut nichts.
-    /// Animation wird vollständig von den States über AnimManager gesteuert.
-    /// </summary>
-    protected override void UpdateAnimator()
-    {
-        // Intentionally empty — GenTwo has no movement blending.
     }
 
     #endregion
@@ -669,15 +630,12 @@ public class GenTwoNpc : NpcBase
     {
         if (isDead) return;
 
-        // GenTwo-spezifisches Cleanup vor dem Tod
         isStunned = false;
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 
-        // Dash-Laser aufräumen
         LaserPointer?.ClearInterceptMode();
 
-        // Alles Weitere (Swapper, Impact, Destroy) erledigt NpcBase
         base.Die();
     }
 
@@ -689,18 +647,30 @@ public class GenTwoNpc : NpcBase
 
     protected override void OnDrawGizmosSelected()
     {
+        // Detection range
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
+        // Player hit radius
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, playerHitRadius);
 
         if (!Application.isPlaying) return;
         if (playerTransform == null) return;
 
+        // Line to player (yellow if in range)
         Gizmos.color = IsPlayerInRange ? Color.yellow : Color.gray;
         Gizmos.DrawLine(transform.position + Vector3.up, playerTransform.position + Vector3.up);
 
+        // Intercept point
+        if (hasValidIntercept)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawWireSphere(interceptPoint, 0.5f);
+            Gizmos.DrawLine(transform.position, interceptPoint);
+        }
+
+        // Dash direction
         if (IsDashing)
         {
             Gizmos.color = Color.red;
