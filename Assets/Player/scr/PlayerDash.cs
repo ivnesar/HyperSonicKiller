@@ -114,6 +114,9 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Sword Dash")]
+    [Tooltip("Sword Dash komplett deaktivieren (LMB bei Schwert löst dann immer Attack Dash aus)")]
+    [SerializeField] private bool disableSwordDash = false;
+    
     [Tooltip("Speed when dashing to retrieve the thrown sword")]
     [SerializeField] private float swordDashSpeed = 40f;
     
@@ -297,7 +300,7 @@ public class PlayerDash : MonoBehaviour
         if (core.Input.GetActionDown("Dash"))
         {
             // Check if sword is thrown and stuck AND player is looking at it
-            if (swordThrow != null && swordThrow.IsSwordStuck && IsSwordInCrosshairFOV())
+            if (!disableSwordDash && swordThrow != null && swordThrow.IsSwordStuck && IsSwordInCrosshairFOV())
             {
                 TryStartSwordDash();
             }

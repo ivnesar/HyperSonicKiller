@@ -219,33 +219,42 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   walkSpeed: 5
   runSpeed: 8
-  sprintInitialBoost: 16
+  sprintInitialBoost: 64
   sprintDecayCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 1
-      inSlope: -8.195918
-      outSlope: -8.195918
+      value: 0
+      inSlope: -0.0032297682
+      outSlope: -0.0032297682
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
-      outWeight: 0.046480745
+      outWeight: 0.1890138
     - serializedVersion: 3
-      time: 0.3
-      value: 0
+      time: 0.1
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
       weightedMode: 0
-      inWeight: 0
+      inWeight: 0.33333334
+      outWeight: 0.1567164
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -0.0054661953
+      outSlope: -0.0054661953
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.14492804
       outWeight: 0
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  burstDuration: 1
-  burstCooldown: 2
+  burstDuration: 0.3
+  burstCooldown: 1
   jumpForce: 8
   gravity: 20
 --- !u!114 &4511031296643993828
@@ -261,7 +270,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
   maxDashCharges: 3
-  dashSpeed: 10
+  dashSpeed: 8
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
@@ -278,7 +287,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   enemyHitAngle: 50
-  hitStopDuration: 0.08
+  hitStopDuration: 0.1
+  disableSwordDash: 1
   swordDashSpeed: 40
   swordCatchDistance: 1.5
   swordDashDamage: 50
@@ -297,7 +307,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerLook
   rotationTarget: {fileID: 4254791061503729056}
-  sensitivity: 2
+  sensitivity: 1.5
   maxVerticalAngle: 80
   deathRotationSpeed: 30
   snapTransitionDuration: 0.05
@@ -325,7 +335,7 @@ MonoBehaviour:
   maxBlockHP: 300
   blockRegenDelay: 1
   blockRegenRate: 30
-  exhaustionDuration: 5
+  exhaustionDuration: 1.5
 --- !u!114 &4948156137820876829
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -739,7 +749,7 @@ GameObject:
   - component: {fileID: 8476516627239373863}
   - component: {fileID: 7933905155740974530}
   - component: {fileID: 8737292327484426415}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
@@ -794,7 +804,7 @@ Camera:
     height: 1
   near clip plane: 0.01
   far clip plane: 1000
-  field of view: 60
+  field of view: 90
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
