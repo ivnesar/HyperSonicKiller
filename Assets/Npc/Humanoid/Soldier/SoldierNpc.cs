@@ -47,15 +47,18 @@ public class SoldierNpc : NpcBase
     
     [Header("Aim Assist — Bone-Based FOV")]
     [Tooltip("Referenz-Bone für den FOV-Check (z.B. Chest). AimIK bewegt diesen Bone mit, " +
-             "daher ist seine Forward-Richtung zuverlässiger als die der Mündung.")]
+             "daher ist seine Forward-Richtung zuverlässiger als die des NPC-Wurzeltransforms. " +
+             "Wird verwendet um zu prüfen ob der Soldier korrekt auf den Spieler ausgerichtet ist " +
+             "(z.B. für Early-Fire wenn der Spieler während des Zielens dasht).")]
     [SerializeField] private Transform aimReferenceBone;
 
     [Tooltip("Lokale Forward-Achse des Referenz-Bones. Standard (0,0,1) = transform.forward. " +
              "Anpassen falls der Bone eine andere Achsenrotation hat.")]
     [SerializeField] private Vector3 aimReferenceForwardAxis = Vector3.forward;
 
-    [Tooltip("FOV-Winkel in Grad. Wenn der Spieler innerhalb dieses Winkels liegt, " +
-             "wird direkt auf ihn gezielt. Außerhalb → Kugel fliegt in Bone-Forward-Richtung.")]
+    [Tooltip("FOV-Winkel in Grad. Liegt der Spieler innerhalb dieses Winkels relativ zum Bone-Forward, " +
+             "gilt der Soldier als 'ausgerichtet'. Wird für Early-Fire-Entscheidung genutzt " +
+             "(Spieler dasht während Aiming → schießen wenn ausgerichtet, sonst Idle).")]
     [SerializeField] private float aimAssistFOV = 15f;
 
     [Header("Audio/VFX")]
@@ -212,6 +215,33 @@ public class SoldierNpc : NpcBase
         return IsInShootingRange() && HasLineOfSight();
     }
 
+    /// <summary>
+    /// Prüft ob der Soldier korrekt auf den Spieler ausgerichtet ist.
+    /// Nutzt den Referenz-Bone (z.B. Chest), der von AimIK mitbewegt wird.
+    ///
+    /// Liegt der Spieler innerhalb des aimAssistFOV-Winkels relativ zur Bone-Forward-Richtung,
+    /// gilt der Soldier als ausgerichtet und kann sofort feuern.
+    ///
+    /// Wird z.B. für Early-Fire genutzt: Wenn der Spieler während des Aiming-States
+    /// zu dashen beginnt, soll der Soldier sofort schießen — aber nur wenn er schon
+    /// richtig zielt. Andernfalls bricht er den Zielvorgang ab.
+    ///
+    /// Fallback: Wenn kein Referenz-Bone gesetzt ist, gilt der NPC immer als ausgerichtet.
+    /// </summary>
+    public bool IsAimedAtPlayer()
+    {
+        if (aimReferenceBone == null || playerTransform == null)
+            return true;
+
+        Vector3 boneForward = aimReferenceBone.TransformDirection(aimReferenceForwardAxis.normalized);
+        Vector3 boneToTarget = (TargetPosition + Vector3.up * 1f) - aimReferenceBone.position;
+
+        if (boneToTarget.sqrMagnitude < 0.01f) return true;
+
+        float angle = Vector3.Angle(boneForward, boneToTarget.normalized);
+        return angle <= aimAssistFOV;
+    }
+
     public void FireShot()
     {
         if (muzzlePoint == null || bulletPrefab == null) return;
@@ -232,44 +262,14 @@ public class SoldierNpc : NpcBase
     }
 
     /// <summary>
-    /// Berechnet die Schussrichtung basierend auf dem Referenz-Bone-FOV.
-    /// 
-    /// 1. Ermittelt die Forward-Richtung des Referenz-Bones (z.B. Chest).
-    ///    Der Bone wird von AimIK mitbewegt → zeigt zuverlässig Richtung Ziel.
-    /// 2. Prüft ob der Spieler innerhalb des FOV-Winkels liegt.
-    ///    - JA → Kugel fliegt direkt zum Spieler (aim-assisted).
-    ///    - NEIN → Kugel fliegt in Bone-Forward-Richtung (verfehlt, z.B. bei Dash).
-    /// 3. Fallback: Wenn kein Referenz-Bone gesetzt ist → immer Richtung Spieler.
+    /// Berechnet die Schussrichtung.
+    /// AimIK richtet den Muzzle entlang seiner lokalen Z-negativen Achse zum Ziel aus,
+    /// daher ist -muzzlePoint.forward exakt die gewünschte Schussrichtung.
     /// </summary>
     private Vector3 CalculateFireDirection()
     {
-        // Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;
-        // Vector3 directionToTarget = (targetPoint - muzzlePoint.position).normalized;
-        //
-        // if (aimReferenceBone == null)
-        //     return directionToTarget;
-        //
-        // Vector3 boneForward = aimReferenceBone.TransformDirection(aimReferenceForwardAxis.normalized);
-        //
-        // Vector3 boneToTarget = (targetPoint - aimReferenceBone.position).normalized;
-        //
-        // float angleToTarget = Vector3.Angle(boneForward, boneToTarget);
-        //
-        // if (angleToTarget <= aimAssistFOV)
-        // {
-        //     // Spieler im FOV → direkt zum Spieler zielen
-        //     return directionToTarget;
-        // }
-        //
-        // Vector3 farPoint = aimReferenceBone.position + boneForward * 100f;
-        // return (farPoint - muzzlePoint.position).normalized;
-        
-        // Da AimIK die Mündung (muzzlePoint) im Prefab entlang der lokalen
-        // Z-negativ Achse (0, 0, -1) ausrichtet, ist das exakt unsere Schussrichtung.
         if (muzzlePoint != null)
-        {
             return -muzzlePoint.forward;
-        }
 
         // Fallback, falls kein muzzlePoint existiert
         Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;

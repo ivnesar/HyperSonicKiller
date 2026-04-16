@@ -126,6 +126,24 @@ namespace SoldierStates
 
         public override INpcState<SoldierNpc> Update(SoldierNpc npc)
         {
+            // ── Early-Fire-Reaktion auf Dash ──
+            // Wenn der Spieler zu dashen beginnt, entscheidet die aktuelle Ausrichtung:
+            //   - Ausgerichtet → sofort schießen (dramatisch, verfehlt meist wegen Dash-Lock)
+            //   - Nicht ausgerichtet → Zielvorgang abbrechen, zurück zu Idle
+            if (npc.IsPlayerDashing)
+            {
+                if (npc.IsAimedAtPlayer())
+                {
+                    // Position sofort einfrieren — Kugeln fliegen an letzter bekannter Stelle vorbei
+                    npc.LockedTargetPosition = npc.TargetPosition;
+                    return new Firing();
+                }
+                else
+                {
+                    return new Idle();
+                }
+            }
+
             npc.RotateTowardTarget();
 
             if (!npc.HasLineOfSight())
