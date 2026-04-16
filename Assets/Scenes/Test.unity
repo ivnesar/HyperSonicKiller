@@ -9641,8 +9641,16 @@ PrefabInstance:
       value: 300
       objectReference: {fileID: 0}
     - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: autoPickupDistance
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
       propertyPath: throwLayerMask.m_Bits
       value: 192
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: autoPickupLOSMask.m_Bits
+      value: 128
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

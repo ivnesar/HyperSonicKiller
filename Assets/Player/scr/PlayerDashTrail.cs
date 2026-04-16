@@ -164,12 +164,16 @@ public class PlayerDashTrail : MonoBehaviour
 
         if (dash == null) return;
 
-        // Start from the camera position — same origin the dash uses to calculate its direction
-        Vector3 start = core.CameraTransform.position;
+        // Use the dash's recorded start point (= camera position at dash start).
+        // This guarantees the trail is anchored exactly to the dash axis and
+        // doesn't shift if the camera moves a tiny bit between dash trigger
+        // and the next frame.
+        Vector3 start = dash.DashStartPosition;
         Vector3 direction = dash.DashDirection;
 
-        // Find how far the dash actually goes (surface hit or max distance)
-        float dashDistance = GetActualDashDistance(start, direction);
+        // Distance from the dash's own data — guaranteed identical to the
+        // length the player actually traverses. No extra raycast needed.
+        float dashDistance = Vector3.Distance(start, dash.DashTargetPosition);
 
         // How many planes to spawn
         // First plane at spawnInterval, then every spawnInterval until end
@@ -200,21 +204,6 @@ public class PlayerDashTrail : MonoBehaviour
         }
 
         activePlaneCount = planeCount;
-    }
-
-    /// <summary>
-    /// Raycasts along the dash direction to find how far the dash actually goes.
-    /// Falls back to DashMaxDistance if nothing is hit (open-air dash).
-    /// </summary>
-    private float GetActualDashDistance(Vector3 origin, Vector3 direction)
-    {
-        // We raycast from slightly behind the player to avoid self-hits
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, dash.DashMaxDistance))
-        {
-            return hit.distance;
-        }
-
-        return dash.DashMaxDistance;
     }
 
     #endregion

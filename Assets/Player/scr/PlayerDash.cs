@@ -157,6 +157,12 @@ public class PlayerDash : MonoBehaviour
     private Collider dashTargetCollider;   // collider of the surface we're landing on (null if none)
     private Vector3 stuckSurfaceNormal;
 
+    // Offset between camera and root at the moment a dash starts.
+    // Needed because the dash AXIS is calculated from the camera (so trail/marker
+    // align with the crosshair), while the player ROOT must move in parallel
+    // and end up at (cameraEndPoint - thisOffset).
+    private Vector3 rootToCameraOffsetAtDashStart;
+
     // Wall stick state
     private Vector3 stuckPosition;
     private bool isWallStickActive;
@@ -218,6 +224,27 @@ public class PlayerDash : MonoBehaviour
     /// <summary>The timeScale used during dash slow-mo. Read by PlayerMovement for sprint burst.</summary>
     public float DashTimeScale => dashTimeScale;
 
+    /// <summary>
+    /// The world-space point the dash is heading toward, calculated from the
+    /// CAMERA position (= where the crosshair was aimed at dash start).
+    /// This is intentionally NOT the player root's end position — the root
+    /// ends up at (this position - cameraOffset) so it moves parallel to the
+    /// camera axis. Use this for visualizations (trail, marker) so they align
+    /// with the line of sight.
+    /// </summary>
+    public Vector3 DashTargetPosition => dashTargetPosition;
+
+    /// <summary>
+    /// The world-space point the dash axis STARTS at (= camera position at
+    /// the moment the dash was triggered). Pair with DashTargetPosition or
+    /// DashDirection for visualizations (trail, debug lines).
+    /// </summary>
+    public Vector3 DashStartPosition => dashStartPosition;
+
+    /// <summary>True if this dash ends on a real surface (not open air).</summary>
+    public bool DashHitSurface => dashHitSurface;
+    
+    
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -385,8 +412,11 @@ public class PlayerDash : MonoBehaviour
         }
         else
         {
-            // No surface found — dash full distance into open air
-            Vector3 openAirTarget = transform.position + direction * dashMaxDistance;
+            // No surface found — dash full distance into open air.
+            // Important: target point is calculated from the CAMERA, not the root,
+            // so that the dash axis (camera → target) is straight and the trail
+            // visualization stays exactly on the flight path.
+            Vector3 openAirTarget = origin + direction * dashMaxDistance;
             StartAttackDash(openAirTarget, -direction, null);
         }
     }
@@ -399,9 +429,22 @@ public class PlayerDash : MonoBehaviour
         currentCharges--;
         OnChargesChanged?.Invoke(currentCharges);
 
-        dashStartPosition = transform.position;
-        dashTargetPosition = targetPoint + surfaceNormal * wallStickOffset;
+        // === Dash axis is calculated from the CAMERA, not the root ===
+        // The player aimed with the crosshair (= camera), so the flight path
+        // must originate at the camera. Otherwise trail and marker would drift
+        // off the actual line of sight.
+        Vector3 cameraStart = core.CameraTransform.position;
+        Vector3 cameraTarget = targetPoint + surfaceNormal * wallStickOffset;
+
+        dashStartPosition = cameraStart;          // semantic: where the dash axis starts (camera)
+        dashTargetPosition = cameraTarget;        // semantic: where the dash axis ends (camera-end)
         dashDirection = (dashTargetPosition - dashStartPosition).normalized;
+
+        // The player root must move parallel to the camera axis. We remember
+        // the offset between camera and root at dash start so we can compute
+        // the correct root end position when CompleteDash() runs.
+        rootToCameraOffsetAtDashStart = cameraStart - transform.position;
+
         dashProgress = 0f;
         stuckSurfaceNormal = surfaceNormal;
         dashTargetIsWall = IsWallSurface(surfaceNormal);
@@ -425,33 +468,39 @@ public class PlayerDash : MonoBehaviour
 
     private void ProcessAttackDashMovement()
     {
+        // dashStartPosition / dashTargetPosition describe the CAMERA axis
+        // (start = camera position at dash start, target = where the crosshair pointed).
+        // The player ROOT moves parallel to this axis, offset by rootToCameraOffsetAtDashStart.
         float dashDistance = Vector3.Distance(dashStartPosition, dashTargetPosition);
-        
+
         if (dashDistance < 0.01f)
         {
             CompleteDash(hitSurface: dashHitSurface);
             return;
         }
-        
+
         // GameDeltaTime: runs at full speed during SlowMo, but stops during Pause/HitStop
         float moveDistance = dashSpeed * TimeManager.Instance.GameDeltaTime;
         dashProgress += moveDistance / dashDistance;
 
         if (dashProgress >= 1f)
         {
-            // Reached target
-            Vector3 finalMove = dashTargetPosition - transform.position;
+            // Reached target — snap the root to its parallel end position.
+            // Root end = camera end - the offset we recorded at dash start.
+            Vector3 rootTargetPosition = dashTargetPosition - rootToCameraOffsetAtDashStart;
+            Vector3 finalMove = rootTargetPosition - transform.position;
             core.Controller.Move(finalMove);
-            
+
             // Final check for enemies at destination
             CheckAndDamageEnemiesInRadius();
-            
+
             CompleteDash(hitSurface: dashHitSurface);
         }
         else
         {
+            // Move root in the same direction as the camera axis (they're parallel).
             core.Controller.Move(dashDirection * moveDistance);
-            
+
             // Check for enemies to hit during movement
             CheckAndDamageEnemiesInRadius();
         }
