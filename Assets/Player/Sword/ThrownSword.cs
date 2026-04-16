@@ -23,6 +23,9 @@ public class ThrownSword : MonoBehaviour
     /// <summary>Fired when sword hits something and sticks.</summary>
     public event Action<GameObject> OnHitTarget;
 
+    /// <summary>Fired when sword exceeds max throw distance (still in flight, never hit anything).</summary>
+    public event Action OnMaxDistanceExceeded;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -55,7 +58,12 @@ public class ThrownSword : MonoBehaviour
     private Vector3 flyDirection;
     private float flySpeed;
     private float returnSpeed;
+    private float maxFlyDistance;
     private LayerMask hitMask;
+
+    // Flight tracking
+    private float distanceTraveled;
+    private bool maxDistanceEventFired;
 
     // Return target
     private Transform returnTarget;
@@ -120,7 +128,8 @@ public class ThrownSword : MonoBehaviour
     /// <param name="stunDuration">Residual stun duration after removal</param>
     /// <param name="damageOnRemoval">Damage dealt when sword is removed from enemy</param>
     /// <param name="collisionMask">Layer mask for collision detection</param>
-    public void Initialize(Vector3 direction, float speed, float recallSpeed, float stunDuration, int damageOnRemoval, LayerMask collisionMask)
+    /// <param name="maxDistance">Max flight distance before OnMaxDistanceExceeded fires (0 = unlimited)</param>
+    public void Initialize(Vector3 direction, float speed, float recallSpeed, float stunDuration, int damageOnRemoval, LayerMask collisionMask, float maxDistance = 0f)
     {
         flyDirection = direction.normalized;
         flySpeed = speed;
@@ -128,6 +137,10 @@ public class ThrownSword : MonoBehaviour
         postRemovalStunDuration = stunDuration;
         removalDamage = damageOnRemoval;
         hitMask = collisionMask;
+        maxFlyDistance = maxDistance;
+
+        distanceTraveled = 0f;
+        maxDistanceEventFired = false;
 
         isFlying = true;
         isStuck = false;
@@ -296,6 +309,14 @@ public class ThrownSword : MonoBehaviour
 
             // Move forward one segment
             transform.position += flyDirection * segmentLength;
+            distanceTraveled += segmentLength;
+        }
+
+        // Check if max fly distance was exceeded (fire event once)
+        if (!maxDistanceEventFired && maxFlyDistance > 0f && distanceTraveled >= maxFlyDistance)
+        {
+            maxDistanceEventFired = true;
+            OnMaxDistanceExceeded?.Invoke();
         }
     }
 

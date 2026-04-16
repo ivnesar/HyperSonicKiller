@@ -1168,7 +1168,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3138810100061786520, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
       propertyPath: earlyColor.b
@@ -1198,6 +1198,10 @@ PrefabInstance:
       propertyPath: impactSphere
       value: 
       objectReference: {fileID: 778874552}
+    - target: {fileID: 7963086460737711400, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: chargeDuration
+      value: 0.5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9623,6 +9627,22 @@ PrefabInstance:
     - target: {fileID: 3935032124739193074, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
       propertyPath: m_Name
       value: FirstPersonController
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: recallDelay
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: returnSpeed
+      value: 1800
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: maxThrowDistance
+      value: 300
+      objectReference: {fileID: 0}
+    - target: {fileID: 4948156137820876829, guid: 6b205b24af894764e9be11d33bbd102b, type: 3}
+      propertyPath: throwLayerMask.m_Bits
+      value: 192
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

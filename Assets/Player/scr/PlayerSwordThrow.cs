@@ -54,6 +54,16 @@ public class PlayerSwordThrow : MonoBehaviour
     [SerializeField] private float maxThrowDistance = 1000f;
     [SerializeField] private LayerMask throwLayerMask = -1;
 
+    [Header("Auto Pickup (when close to stuck sword)")]
+    [Tooltip("Max distance at which a stuck sword is automatically recalled. 0 = disabled.")]
+    [SerializeField] private float autoPickupDistance = 3f;
+
+    [Tooltip("Layers that block line of sight between player and sword (usually walls/floors).")]
+    [SerializeField] private LayerMask autoPickupLOSMask = ~0;
+
+    [Tooltip("Vertical offset from player transform used as LOS origin (approximates chest/eye height).")]
+    [SerializeField] private float autoPickupLOSHeightOffset = 1.0f;
+
     [Header("Damage Settings")]
     [Tooltip("Damage dealt to enemy when sword is recalled/removed from them")]
     [SerializeField] private int swordRemovalDamage = 30;
@@ -89,6 +99,12 @@ public class PlayerSwordThrow : MonoBehaviour
 
     // Recall delay after hit
     private float lastHitTime = -999f;
+
+    // Pending auto-recall: set when player dashes while sword is stuck but delay not yet elapsed
+    private bool recallPending;
+
+    // Cached reference to dash module (for auto-recall on dash)
+    private PlayerDash dash;
 
     // Aim zoom state
     private bool isAiming;
@@ -148,6 +164,23 @@ public class PlayerSwordThrow : MonoBehaviour
         combat = GetComponent<PlayerCombat>();
         dashFOV = GetComponent<PlayerDashFOV>();
         look = GetComponent<PlayerLook>();
+        dash = GetComponent<PlayerDash>();
+    }
+
+    private void OnEnable()
+    {
+        if (dash != null)
+        {
+            dash.OnDashStarted += HandleDashStarted;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (dash != null)
+        {
+            dash.OnDashStarted -= HandleDashStarted;
+        }
     }
 
     private void Update()
@@ -163,6 +196,16 @@ public class PlayerSwordThrow : MonoBehaviour
         {
             StopAim();
         }
+
+        // If a dash-triggered recall is pending (delay wasn't up yet),
+        // check every frame whether the delay has elapsed.
+        if (recallPending)
+        {
+            TryExecutePendingRecall();
+        }
+
+        // Auto-pickup: if the stuck sword is close enough and has line of sight, recall it.
+        CheckAutoPickup();
 
         HandleInput();
     }
@@ -239,7 +282,12 @@ public class PlayerSwordThrow : MonoBehaviour
 
     private bool CanRecall()
     {
-        // Must wait 1 second after sword hits something before recall
+        // Sword must be stuck somewhere — recall during flight is no longer allowed.
+        // (Auto-recall from max distance exceed is handled separately via event.)
+        if (activeSword == null) return false;
+        if (!activeSword.IsStuck) return false;
+
+        // Must wait recallDelay seconds after sword hit something before recall
         float timeSinceHit = Time.time - lastHitTime;
         return timeSinceHit >= recallDelay;
     }
@@ -356,15 +404,17 @@ public class PlayerSwordThrow : MonoBehaviour
         // Subscribe to events
         activeSword.OnReturnedToPlayer += HandleSwordReturned;
         activeSword.OnHitTarget += HandleSwordHit;
+        activeSword.OnMaxDistanceExceeded += HandleSwordMaxDistanceExceeded;
 
-        // Initialize and launch - pass removal damage and stun duration
+        // Initialize and launch - pass removal damage, stun duration, and max distance
         activeSword.Initialize(
             throwDir,
             throwSpeed,
             returnSpeed,
             postRemovalStunDuration,
             swordRemovalDamage,
-            throwLayerMask
+            throwLayerMask,
+            maxThrowDistance
         );
 
         OnSwordThrown?.Invoke();
@@ -433,6 +483,46 @@ public class PlayerSwordThrow : MonoBehaviour
         OnSwordRecalled?.Invoke();
     }
 
+    /// <summary>
+    /// Automatically recalls the sword if the player is close enough to it and has line of sight.
+    /// Uses the same recall pipeline as manual recall and dash-triggered recall.
+    /// </summary>
+    private void CheckAutoPickup()
+    {
+        // Feature disabled
+        if (autoPickupDistance <= 0f) return;
+
+        // No sword out, or sword is flying/returning — nothing to pick up
+        if (activeSword == null) return;
+        if (!activeSword.IsStuck) return;
+
+        // Respect recall delay (consistent with manual/dash recall)
+        if (!CanRecall()) return;
+
+        // Distance check (squared for cheapness)
+        Vector3 swordPos = activeSword.transform.position;
+        Vector3 playerPos = transform.position;
+        float sqrDist = (swordPos - playerPos).sqrMagnitude;
+        if (sqrDist > autoPickupDistance * autoPickupDistance) return;
+
+        // Line-of-sight check from approximate chest/eye height on the player body
+        Vector3 losOrigin = playerPos + Vector3.up * autoPickupLOSHeightOffset;
+        Vector3 toSword = swordPos - losOrigin;
+        float losDistance = toSword.magnitude;
+
+        if (losDistance > 0.01f)
+        {
+            // If a blocker is hit before reaching the sword, LOS is broken
+            if (Physics.Raycast(losOrigin, toSword.normalized, losDistance, autoPickupLOSMask, QueryTriggerInteraction.Ignore))
+            {
+                return;
+            }
+        }
+
+        // All checks passed — recall
+        RecallSword();
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -446,9 +536,11 @@ public class PlayerSwordThrow : MonoBehaviour
         {
             activeSword.OnReturnedToPlayer -= HandleSwordReturned;
             activeSword.OnHitTarget -= HandleSwordHit;
+            activeSword.OnMaxDistanceExceeded -= HandleSwordMaxDistanceExceeded;
         }
 
         activeSword = null;
+        recallPending = false;
         RestoreSword();
 
         OnSwordCaught?.Invoke();
@@ -460,6 +552,64 @@ public class PlayerSwordThrow : MonoBehaviour
         lastHitTime = Time.time;
         
         OnSwordHitTarget?.Invoke(target);
+    }
+
+    /// <summary>
+    /// Fired by ThrownSword when it flies past maxThrowDistance without hitting anything.
+    /// Auto-recalls the sword immediately (even mid-flight).
+    /// </summary>
+    private void HandleSwordMaxDistanceExceeded()
+    {
+        if (activeSword == null) return;
+        if (activeSword.IsReturning) return;
+
+        Debug.Log("[PlayerSwordThrow] Sword exceeded max throw distance - auto-recalling");
+
+        Transform returnTarget = throwOrigin != null ? throwOrigin : transform;
+        activeSword.Recall(returnTarget, catchDistance);
+        OnSwordRecalled?.Invoke();
+    }
+
+    /// <summary>
+    /// Called when the dash module fires OnDashStarted.
+    /// If the sword is stuck and the recall delay has elapsed, the sword is recalled.
+    /// If the delay is not yet up, the recall is queued and executed as soon as it is.
+    /// </summary>
+    private void HandleDashStarted()
+    {
+        // Only react if a sword is actually out and stuck somewhere
+        if (activeSword == null) return;
+        if (!activeSword.IsStuck) return;
+
+        if (CanRecall())
+        {
+            RecallSword();
+        }
+        else
+        {
+            // Delay not yet elapsed — queue the recall for later
+            recallPending = true;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether a queued recall can now be executed (delay elapsed, sword still stuck).
+    /// </summary>
+    private void TryExecutePendingRecall()
+    {
+        // Sword gone, mid-flight, or already returning → cancel pending recall
+        if (activeSword == null || !activeSword.IsStuck)
+        {
+            recallPending = false;
+            return;
+        }
+
+        float timeSinceHit = Time.time - lastHitTime;
+        if (timeSinceHit >= recallDelay)
+        {
+            recallPending = false;
+            RecallSword();
+        }
     }
 
     private void RestoreSword()
@@ -493,6 +643,7 @@ public class PlayerSwordThrow : MonoBehaviour
             activeSword = null;
         }
 
+        recallPending = false;
         RestoreSword();
     }
 
@@ -512,6 +663,7 @@ public class PlayerSwordThrow : MonoBehaviour
             activeSword = null;
         }
 
+        recallPending = false;
         RestoreSword();
         OnSwordCaught?.Invoke();
     }
@@ -532,17 +684,33 @@ public class PlayerSwordThrow : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (!debugHasTarget) return;
-
-        // Draw sphere at target point
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(debugTargetPoint, 0.2f);
-
-        // Draw line from throw origin to target point
-        if (throwOrigin != null)
+        if (debugHasTarget)
         {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(throwOrigin.position, debugTargetPoint);
+            // Draw sphere at target point
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(debugTargetPoint, 0.2f);
+
+            // Draw line from throw origin to target point
+            if (throwOrigin != null)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawLine(throwOrigin.position, debugTargetPoint);
+            }
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        // Auto-pickup radius around player
+        if (autoPickupDistance > 0f)
+        {
+            Gizmos.color = new Color(0f, 1f, 1f, 0.4f);
+            Gizmos.DrawWireSphere(transform.position, autoPickupDistance);
+
+            // LOS origin point
+            Vector3 losOrigin = transform.position + Vector3.up * autoPickupLOSHeightOffset;
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawSphere(losOrigin, 0.08f);
         }
     }
 
