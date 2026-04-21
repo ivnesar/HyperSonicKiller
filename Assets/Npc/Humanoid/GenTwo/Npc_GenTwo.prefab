@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2051350532570977417
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7594534604929292696}
+  m_Layer: 6
+  m_Name: laserOrigin
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7594534604929292696
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051350532570977417}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.7, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 614902531416003641}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2472838132611520362
 GameObject:
   m_ObjectHideFlags: 0
@@ -10,6 +41,7 @@ GameObject:
   m_Component:
   - component: {fileID: 614902531416003641}
   - component: {fileID: 3141529538732586769}
+  - component: {fileID: 6336807978104391087}
   - component: {fileID: 7963086460737711400}
   - component: {fileID: 3550488067644609114}
   - component: {fileID: 6565262033440337451}
@@ -43,6 +75,7 @@ Transform:
   m_Children:
   - {fileID: 7281300152633893920}
   - {fileID: 1721614003223164247}
+  - {fileID: 7594534604929292696}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!136 &3141529538732586769
@@ -68,6 +101,31 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.9, z: 0}
+--- !u!143 &6336807978104391087
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Height: 1.8
+  m_Radius: 0.33
+  m_SlopeLimit: 45
+  m_StepOffset: 0.3
+  m_SkinWidth: 0.08
+  m_MinMoveDistance: 0.001
+  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!114 &7963086460737711400
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -90,17 +148,21 @@ MonoBehaviour:
   destroyDelay: 10
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 1
-  displayName: 
+  displayName: Gen2
   detectionRange: 30
+  playerArrivalTime: 1
+  playerInterceptHeightOffset: 1.7
+  selfInterceptHeightOffset: 1.7
   chargeDuration: 1
   dashSpeed: 25
-  dashSpeedMultiplier: 1.3
   playerHitRadius: 1.2
   collisionDamage: 999
   surfaceLayerMask:
     serializedVersion: 2
     m_Bits: 8320
   raycastSegments: 4
+  maxDashRayDistance: 50
+  endPointWallStickOffset: 0.3
   recoveryDuration: 1.5
   chargeSound: {fileID: 0}
   dashSound: {fileID: 0}
@@ -257,7 +319,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 708c2019a08d59e4cbd792886869fa52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LaserPointer_Dash
-  laserOrigin: {fileID: 1293794461707330926}
+  laserOrigin: {fileID: 7594534604929292696}
   laserLength: 50
   collisionMask:
     serializedVersion: 2
@@ -266,6 +328,30 @@ MonoBehaviour:
   lockedWidth: 0.06
   earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
   lockedColor: {r: 1, g: 0, b: 0, a: 1}
+  colorWidthCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   impactSphere: {fileID: 3363251926924874602}
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
   showDebug: 0

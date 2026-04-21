@@ -307,7 +307,7 @@ public class GameManager : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        Debug.Log($"[GameManager] Scene loaded: {scene.name}");
+        //Debug.Log($"[GameManager] Scene loaded: {scene.name}");
 
         // Reset state
         isRestarting = false;

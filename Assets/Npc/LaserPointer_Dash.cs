@@ -192,8 +192,16 @@ public class LaserPointer_Dash : MonoBehaviour
         }
         else
         {
-            // DASH: Laser entspricht exakt der Flugbahn des NPCs
-            currentDirection = (interceptPoint - npc.transform.position).normalized;
+            // DASH: Laser zeigt von GenTwos "Kopf"-Höhe zum interceptPoint,
+            // damit die Linie nahtlos an die Charge-Phase anschließt.
+            // (Der Root bewegt sich trotzdem entlang dieser Richtung — das ist Absicht.)
+            Vector3 npcOriginPos = npc.transform.position;
+            if (npc is GenTwoNpc gen2)
+            {
+                npcOriginPos += Vector3.up * gen2.SelfInterceptHeightOffset;
+            }
+
+            currentDirection = (interceptPoint - npcOriginPos).normalized;
 
             if (currentDirection.sqrMagnitude < 0.01f)
                 currentDirection = npc.transform.forward;

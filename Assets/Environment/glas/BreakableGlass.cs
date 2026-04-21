@@ -1,79 +1,79 @@
 using UnityEngine;
 
-// ════════════════════════════════════════════════════════════════════════════
-// BREAKABLE GLASS - Zerstörbare Glasscheibe mit Splitter-Physik
-// ════════════════════════════════════════════════════════════════════════════
-//
-// Funktionsweise:
-//   Beim Treffer wird das ganze Scheiben-Mesh deaktiviert und die
-//   vorgefertigten Splitter-Objekte aktiviert. Jeder Splitter bekommt
-//   per AddExplosionForce einen Impuls, der mit der Nähe zum Einschlagspunkt
-//   skaliert. Nach einer einstellbaren Zeit werden die Rigidbodies
-//   auf kinematic gesetzt und die Collider deaktiviert.
-//
-// Auslöser:
-//   - SoldierBullet / SniperBullet  → über IDamageable
-//   - ThrownSword                   → über IDamageable
-//   - Spieler-Dash                  → über OnTriggerEnter (Player-Tag + Dash-State)
-//   - GenTwo-NPC-Dash               → über OnTriggerEnter (NPC mit GenTwoNpc)
-//
-// Prefab-Struktur (erwartet):
-//   GlassPane              ← dieses Script + Collider (Trigger)
-//     ├── WholeMesh        ← das intakte Scheiben-Mesh
-//     └── Splinters        ← deaktiviertes Parent-Objekt
-//          ├── Splinter_01 ← Mesh + Rigidbody (kinematic) + Collider
-//          ├── Splinter_02
-//          └── ...
-//
-// WICHTIG:
-//   - Die Splitter-Rigidbodies müssen im Editor auf "Is Kinematic = true" stehen.
-//   - Der Haupt-Collider auf dem GlassPane sollte ein Trigger sein, damit
-//     Dash-Erkennung funktioniert. Alternativ einen zweiten Trigger-Collider
-//     hinzufügen.
-//   - Bullets treffen über ihren eigenen Raycast/SphereCast und rufen
-//     TakeDamage() direkt auf. Dafür braucht die Glasscheibe AUCH einen
-//     normalen (nicht-Trigger) Collider auf dem richtigen Layer.
-//
-// ════════════════════════════════════════════════════════════════════════════
-
+/// <summary>
+/// Dekoratives, zerstörbares Glas im PS1-Stil.
+///
+/// Verhalten:
+/// - Wird von Kugeln, dem Spieler-Dash oder jedem anderen IDamageable-Sender zerstört.
+/// - Beim Zerbrechen: Glas-Mesh + Collider werden deaktiviert, Particle System wird aktiviert.
+/// - Jeder Partikel bekommt eine Velocity, die von der Einschlagsrichtung + Entfernung
+///   zum Einschlagspunkt abhängt (Partikel nahe am Treffer = schneller).
+///
+/// Setup im Editor:
+/// - GameObject mit MeshFilter + MeshRenderer (das sichtbare Glas)
+/// - Collider (Box oder Mesh). Wichtig: "Is Trigger" = true, damit der Spieler
+///   beim Dash hindurchfliegen kann.
+/// - Child-GameObject mit einem Particle System (ShatterParticles), das die
+///   Glassplitter darstellt. Emission sollte auf "Rate over Time = 0" und
+///   "Bursts" mit fester Anzahl konfiguriert sein (z.B. 40 Partikel in einem Burst).
+/// - Die ShatterParticles-Referenz im Inspector verknüpfen.
+/// - Auf einen eigenen Layer legen (z.B. "Glass") und diesen in die
+///   hitMask der SoldierBullet und dashSurfaceLayer NICHT aufnehmen,
+///   damit Kugeln/Dashes nicht vom Glas gestoppt werden. Stattdessen nutzt
+///   das Glas OnTriggerEnter für Kollisionen mit Kugel/Spieler.
+/// </summary>
+[RequireComponent(typeof(Collider))]
 public class BreakableGlass : MonoBehaviour, IDamageable
 {
     // ════════════════════════════════════════════════════════════════════════
     #region Inspector Settings
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Referenzen")]
-    [Tooltip("Das intakte Scheiben-Mesh (wird beim Bruch deaktiviert)")]
-    [SerializeField] private GameObject wholeMesh;
+    [Header("References")]
+    [Tooltip("Particle System, das die Glassplitter darstellt. Wird beim Zerbrechen aktiviert.")]
+    [SerializeField] private ParticleSystem shatterParticles;
 
-    [Tooltip("Parent-Objekt das alle Splitter enthält (wird beim Bruch aktiviert)")]
-    [SerializeField] private GameObject splintersParent;
+    [Tooltip("Das sichtbare Glas-Mesh. Wird beim Zerbrechen ausgeblendet. " +
+             "Wenn leer, wird automatisch der MeshRenderer dieses GameObjects verwendet.")]
+    [SerializeField] private MeshRenderer glassRenderer;
 
-    [Header("Explosionskraft")]
-    [Tooltip("Maximale Kraft auf Splitter direkt am Einschlagspunkt")]
-    [SerializeField] private float explosionForce = 300f;
+    [Header("Impact Settings")]
+    [Tooltip("Einflussbereichsradius um den Einschlagspunkt. " +
+             "Partikel innerhalb dieses Radius bekommen zusätzliche Velocity.")]
+    [SerializeField] private float impactRadius = 1.5f;
 
-    [Tooltip("Radius der Explosion. Splitter außerhalb bekommen keine Kraft.")]
-    [SerializeField] private float explosionRadius = 3f;
+    [Tooltip("Maximale zusätzliche Geschwindigkeit am Einschlagspunkt (Distanz = 0). " +
+             "Fällt mit Entfernung gemäß falloffCurve ab.")]
+    [SerializeField] private float maxImpactVelocity = 15f;
 
-    [Tooltip("Vertikaler Offset der Explosion (hebt Splitter leicht an)")]
-    [SerializeField] private float upwardsModifier = 0.5f;
+    [Tooltip("Wie die Velocity mit der Distanz zum Einschlagspunkt abfällt. " +
+             "X-Achse: 0 = am Einschlag, 1 = am Rand des impactRadius. " +
+             "Y-Achse: 1 = volle maxImpactVelocity, 0 = keine zusätzliche Velocity.")]
+    [SerializeField] private AnimationCurve falloffCurve =
+        AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
 
-    [Header("Physik-Lifecycle")]
-    [Tooltip("Sekunden bis Rigidbodies auf kinematic gesetzt werden")]
-    [SerializeField] private float physicsActiveTime = 2.5f;
+    [Tooltip("Grundgeschwindigkeit, die ALLE Partikel in Einschlagsrichtung bekommen " +
+             "(auch solche außerhalb des impactRadius).")]
+    [SerializeField] private float minVelocity = 1f;
 
-    [Tooltip("Sekunden bis die Splitter komplett entfernt werden (0 = nie)")]
-    [SerializeField] private float destroySplinterAfter = 0f;
+    [Tooltip("Zufällige Streuung der Velocity pro Partikel (für natürlicheren Look). " +
+             "Wird als zusätzlicher Vector mit zufälliger Richtung addiert.")]
+    [SerializeField] private float randomVelocityJitter = 2f;
 
-    [Header("Splitter-Kollision")]
-    [Tooltip("Layer auf den Splitter nach dem Bruch gesetzt werden (z.B. 'Debris').\n" +
-             "Auf 'Nothing' lassen, um den Layer nicht zu ändern.")]
-    [SerializeField] private LayerMask debrisLayer;
+    [Header("Health")]
+    [Tooltip("Lebenspunkte des Glases. Bei 1 zerbricht es beim ersten Treffer.")]
+    [SerializeField] private float maxHealth = 1f;
 
-    [Header("Audio (Optional)")]
-    [SerializeField] private AudioClip breakSound;
-    [SerializeField] private float breakSoundVolume = 1f;
+    [Header("Dash Interaction")]
+    [Tooltip("Ob das Glas auch zerbricht, wenn der Spieler beim normalen Gehen (nicht Dash) dagegenläuft. " +
+             "Empfohlen: false, damit nur Dash/Geschosse Glas zerstören.")]
+    [SerializeField] private bool breakOnPlayerTouch = false;
+
+    [Tooltip("Schaden, den der Spieler beim Dash durch das Glas verursacht.")]
+    [SerializeField] private float dashDamage = 999f;
+
+    [Header("Debug")]
+    [SerializeField] private bool drawGizmos = true;
 
     #endregion
 
@@ -81,11 +81,9 @@ public class BreakableGlass : MonoBehaviour, IDamageable
     #region Runtime State
     // ════════════════════════════════════════════════════════════════════════
 
+    private float currentHealth;
     private bool isBroken;
-
-    // Gecachte Splitter-Daten
-    private Rigidbody[] splinterBodies;
-    private Collider[] splinterColliders;
+    private Collider glassCollider;
 
     #endregion
 
@@ -95,54 +93,87 @@ public class BreakableGlass : MonoBehaviour, IDamageable
 
     private void Awake()
     {
-        // Splitter cachen, solange sie noch existieren
-        if (splintersParent != null)
+        currentHealth = maxHealth;
+
+        glassCollider = GetComponent<Collider>();
+
+        // Auto-resolve glass renderer if not set
+        if (glassRenderer == null)
         {
-            splinterBodies = splintersParent.GetComponentsInChildren<Rigidbody>(true);
-            splinterColliders = splintersParent.GetComponentsInChildren<Collider>(true);
+            glassRenderer = GetComponent<MeshRenderer>();
         }
 
-        // Sicherstellen, dass der Ausgangszustand korrekt ist
-        if (wholeMesh != null) wholeMesh.SetActive(true);
-        if (splintersParent != null) splintersParent.SetActive(false);
+        // Sanity check: warn if particle system is missing
+        if (shatterParticles == null)
+        {
+            Debug.LogWarning($"[BreakableGlass] '{name}' hat kein Shatter-ParticleSystem zugewiesen!", this);
+        }
+        else
+        {
+            // Sicherstellen, dass es nicht schon spielt
+            shatterParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
     }
 
-    /// <summary>
-    /// Erkennt Spieler-Dash und GenTwo-NPC-Dash.
-    /// Voraussetzung: Der Haupt-Collider ist ein Trigger.
-    /// </summary>
     private void OnTriggerEnter(Collider other)
+    {
+        // ── DEBUG: Log JEDEN Trigger, damit wir sehen ob OnTriggerEnter überhaupt feuert ──
+        Debug.Log($"[BreakableGlass] OnTriggerEnter gefeuert von: '{other.name}' (Tag: '{other.tag}', Layer: {LayerMask.LayerToName(other.gameObject.layer)})", this);
+
+        HandleTriggerContact(other, "OnTriggerEnter");
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        // Fallback: Falls OnTriggerEnter bei schnellem Dash übersprungen wird,
+        // greift OnTriggerStay solange der Spieler im Trigger ist.
+        if (isBroken) return;
+
+        // Weniger Spam: nur loggen wenn Player drin
+        if (other.CompareTag("Player"))
+        {
+            Debug.Log($"[BreakableGlass] OnTriggerStay mit Player (State={GetPlayerState(other)})", this);
+        }
+
+        HandleTriggerContact(other, "OnTriggerStay");
+    }
+
+    private string GetPlayerState(Collider other)
+    {
+        var pc = other.GetComponentInParent<PlayerCore>();
+        return pc != null ? pc.CurrentState.ToString() : "NO_PLAYERCORE";
+    }
+
+    private void HandleTriggerContact(Collider other, string source)
     {
         if (isBroken) return;
 
-        // ── Spieler-Dash ──
+        // Spieler hindurch-dashen lassen = Glas zerbrechen
         if (other.CompareTag("Player"))
         {
-            PlayerCore playerCore = other.GetComponent<PlayerCore>();
-            if (playerCore == null) playerCore = other.GetComponentInParent<PlayerCore>();
-
-            if (playerCore != null && playerCore.CurrentState == PlayerCore.PlayerState.Dashing)
+            PlayerCore player = other.GetComponentInParent<PlayerCore>();
+            if (player == null)
             {
-                // Einschlagspunkt: nächster Punkt auf dem Glas-Collider zum Spieler
-                Vector3 impactPoint = GetComponent<Collider>().ClosestPoint(other.transform.position);
-                Vector3 impactDirection = other.transform.forward;
-
-                Break(impactPoint, impactDirection);
+                Debug.LogWarning($"[BreakableGlass/{source}] ABBRUCH: PlayerCore nicht gefunden.", this);
                 return;
             }
-        }
 
-        // ── GenTwo-NPC-Dash ──
-        GenTwoNpc genTwo = other.GetComponent<GenTwoNpc>();
-        if (genTwo == null) genTwo = other.GetComponentInParent<GenTwoNpc>();
+            bool isDashing = player.CurrentState == PlayerCore.PlayerState.Dashing ||
+                             player.CurrentState == PlayerCore.PlayerState.SprintDashing ||
+                             player.CurrentState == PlayerCore.PlayerState.DashingToSword;
 
-        if (genTwo != null && genTwo.IsDashing)
-        {
-            // GenTwo dasht → Glas bricht
-            Vector3 impactPoint = GetComponent<Collider>().ClosestPoint(other.transform.position);
-            Vector3 impactDirection = genTwo.DashDirection;
+            if (isDashing || breakOnPlayerTouch)
+            {
+                Vector3 dashDir = player.transform.forward;
+                if (isDashing && player.CameraTransform != null)
+                {
+                    dashDir = player.CameraTransform.forward;
+                }
 
-            Break(impactPoint, impactDirection);
+                Vector3 hitPoint = glassCollider.ClosestPoint(other.transform.position);
+                Debug.Log($"[BreakableGlass/{source}] → Shatter wird ausgelöst! State={player.CurrentState}", this);
+                TakeDamage(dashDamage, hitPoint, dashDir);
+            }
         }
     }
 
@@ -152,179 +183,130 @@ public class BreakableGlass : MonoBehaviour, IDamageable
     #region IDamageable Implementation
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Einfacher Schaden ohne Positionsinfo.
-    /// Nutzt die Mitte der Scheibe als Einschlagspunkt.
-    /// </summary>
     public void TakeDamage(float damage)
     {
-        if (isBroken) return;
-
-        Break(transform.position, Vector3.forward);
+        // Fallback ohne Positionsinfo: Einschlag in Glasmitte, keine Richtung
+        TakeDamage(damage, transform.position, transform.forward);
     }
 
-    /// <summary>
-    /// Schaden mit Einschlagspunkt und Richtung.
-    /// Wird von SoldierBullet, SniperBullet und ThrownSword aufgerufen.
-    /// </summary>
     public void TakeDamage(float damage, Vector3 hitPoint, Vector3 hitDirection)
     {
+        Debug.Log($"[BreakableGlass] TakeDamage aufgerufen: damage={damage}, currentHealth={currentHealth}, isBroken={isBroken}", this);
+
         if (isBroken) return;
 
-        Break(hitPoint, hitDirection);
+        currentHealth -= damage;
+
+        if (currentHealth <= 0f)
+        {
+            Shatter(hitPoint, hitDirection);
+        }
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Break Logic
+    #region Shatter Logic
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Zerstört die Glasscheibe. Kann auch von externen Scripts aufgerufen werden.
+    /// Zerbricht das Glas: Mesh + Collider aus, Particle System an,
+    /// und jeder Partikel bekommt seine Velocity basierend auf Distanz zum Einschlag.
     /// </summary>
-    /// <param name="impactPoint">Punkt an dem der Einschlag stattfand</param>
-    /// <param name="impactDirection">Richtung des Einschlags (für zusätzlichen Impuls)</param>
-    public void Break(Vector3 impactPoint, Vector3 impactDirection)
+    private void Shatter(Vector3 hitPoint, Vector3 hitDirection)
     {
-        if (isBroken) return;
+        Debug.Log($"[BreakableGlass] Shatter() START. shatterParticles={(shatterParticles != null ? shatterParticles.name : "NULL")}, glassRenderer={(glassRenderer != null ? glassRenderer.name : "NULL")}", this);
+
         isBroken = true;
 
-        // Visueller Swap: ganzes Mesh aus, Splitter an
-        if (wholeMesh != null) wholeMesh.SetActive(false);
-        if (splintersParent != null) splintersParent.SetActive(true);
-
-        // Sound abspielen
-        if (breakSound != null)
+        // 1. Glas-Mesh ausblenden
+        if (glassRenderer != null)
         {
-            AudioSource.PlayClipAtPoint(breakSound, impactPoint, breakSoundVolume);
+            glassRenderer.enabled = false;
         }
 
-        // Splitter aktivieren und Kraft anwenden
-        ActivateSplinters(impactPoint, impactDirection);
-
-        // Nach einer Weile Physik deaktivieren
-        Invoke(nameof(FreezeAllSplinters), physicsActiveTime);
-
-        // Optional: Splitter nach Zeit komplett entfernen
-        if (destroySplinterAfter > 0f)
+        // 2. Collider deaktivieren (nichts soll mehr hindurch-triggern)
+        if (glassCollider != null)
         {
-            Invoke(nameof(DestroyAllSplinters), destroySplinterAfter);
+            glassCollider.enabled = false;
+        }
+
+        // 3. Particle System starten und Velocity pro Partikel berechnen
+        if (shatterParticles != null)
+        {
+            // Erst emittieren lassen (spielt alle Bursts ab)
+            shatterParticles.Play();
+
+            // DEBUG: Wie viele Partikel wurden wirklich emittiert?
+            Debug.Log($"[BreakableGlass] Nach Play(): particleCount = {shatterParticles.particleCount}, isPlaying = {shatterParticles.isPlaying}, emission.enabled = {shatterParticles.emission.enabled}, emission.rateOverTime = {shatterParticles.emission.rateOverTime.constant}, emission.burstCount = {shatterParticles.emission.burstCount}", this);
+
+            // Partikel-Velocity anpassen (muss nach Play() passieren,
+            // da GetParticles() nur existierende Partikel lesen kann).
+            ApplyImpactVelocityToParticles(hitPoint, hitDirection.normalized);
+        }
+        else
+        {
+            Debug.LogError("[BreakableGlass] ABBRUCH bei Shatter: shatterParticles ist NULL!", this);
         }
     }
 
     /// <summary>
-    /// Aktiviert alle Splitter-Rigidbodies und wendet AddExplosionForce an.
+    /// Geht alle lebenden Partikel durch und addiert eine Velocity basierend auf
+    /// der Distanz zum Einschlagspunkt. Je näher, desto schneller.
     /// </summary>
-    private void ActivateSplinters(Vector3 impactPoint, Vector3 impactDirection)
+    private void ApplyImpactVelocityToParticles(Vector3 hitPoint, Vector3 hitDirectionNormalized)
     {
-        if (splinterBodies == null) return;
+        int particleCount = shatterParticles.particleCount;
+        if (particleCount == 0) return;
 
-        // Optionalen Debris-Layer bestimmen
-        int layerIndex = GetLayerFromMask(debrisLayer);
+        // Array für alle Partikel holen
+        ParticleSystem.Particle[] particles = new ParticleSystem.Particle[particleCount];
+        int actualCount = shatterParticles.GetParticles(particles);
 
-        for (int i = 0; i < splinterBodies.Length; i++)
+        // Particle-Space: Unity-Partikel liegen je nach simulationSpace in world
+        // oder local space. Wir konvertieren bei local auf world für die
+        // Distanzberechnung.
+        bool isLocalSpace = shatterParticles.main.simulationSpace == ParticleSystemSimulationSpace.Local;
+        Transform psTransform = shatterParticles.transform;
+
+        for (int i = 0; i < actualCount; i++)
         {
-            Rigidbody rb = splinterBodies[i];
-            if (rb == null) continue;
+            // Partikel-Weltposition bestimmen
+            Vector3 particleWorldPos = isLocalSpace
+                ? psTransform.TransformPoint(particles[i].position)
+                : particles[i].position;
 
-            // Kinematic ausschalten damit Physik wirkt
-            rb.isKinematic = false;
+            // Distanz zum Einschlagspunkt
+            float distance = Vector3.Distance(particleWorldPos, hitPoint);
 
-            // Optional Layer ändern
-            if (layerIndex >= 0)
+            // Einfluss per Falloff-Kurve
+            float impactStrength = 0f;
+            if (distance < impactRadius)
             {
-                rb.gameObject.layer = layerIndex;
+                float normalizedDist = distance / impactRadius; // 0..1
+                impactStrength = falloffCurve.Evaluate(normalizedDist) * maxImpactVelocity;
             }
 
-            // Explosionskraft anwenden
-            // AddExplosionForce skaliert automatisch mit Distanz:
-            // Je näher am impactPoint, desto stärker die Kraft
-            rb.AddExplosionForce(
-                explosionForce,
-                impactPoint,
-                explosionRadius,
-                upwardsModifier,
-                ForceMode.Impulse
-            );
+            // Gesamt-Velocity: existierende Velocity (falls PS welche gibt)
+            // + Grundgeschwindigkeit in Einschlagsrichtung
+            // + impactStrength in Einschlagsrichtung
+            // + etwas Zufall
+            Vector3 baseVelocity = hitDirectionNormalized * (minVelocity + impactStrength);
+            Vector3 jitter = Random.insideUnitSphere * randomVelocityJitter;
 
-            // Kleinen Richtungsimpuls in Einschlagrichtung geben
-            // (damit Splitter nicht nur radial wegfliegen, sondern
-            //  auch in Schussrichtung gedrückt werden)
-            float distanceToImpact = Vector3.Distance(rb.position, impactPoint);
-            float distanceFactor = 1f - Mathf.Clamp01(distanceToImpact / explosionRadius);
-            rb.AddForce(impactDirection.normalized * explosionForce * 0.3f * distanceFactor, ForceMode.Impulse);
-        }
-    }
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Cleanup
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Setzt alle Splinter-Rigidbodies auf kinematic und deaktiviert ihre Collider.
-    /// Wird per Invoke nach physicsActiveTime aufgerufen.
-    /// </summary>
-    private void FreezeAllSplinters()
-    {
-        if (splinterBodies != null)
-        {
-            for (int i = 0; i < splinterBodies.Length; i++)
+            // simulationSpace beachten: bei Local-Space müssen wir die Velocity
+            // in den Local-Space des Particle Systems transformieren.
+            Vector3 finalVelocity = baseVelocity + jitter;
+            if (isLocalSpace)
             {
-                if (splinterBodies[i] != null)
-                {
-                    splinterBodies[i].isKinematic = true;
-                }
+                finalVelocity = psTransform.InverseTransformDirection(finalVelocity);
             }
+
+            particles[i].velocity += finalVelocity;
         }
 
-        if (splinterColliders != null)
-        {
-            for (int i = 0; i < splinterColliders.Length; i++)
-            {
-                if (splinterColliders[i] != null)
-                {
-                    splinterColliders[i].enabled = false;
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Entfernt alle Splitter komplett aus der Scene.
-    /// Wird per Invoke nach destroySplinterAfter aufgerufen (wenn > 0).
-    /// </summary>
-    private void DestroyAllSplinters()
-    {
-        if (splintersParent != null)
-        {
-            Destroy(splintersParent);
-        }
-    }
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Utility
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Extrahiert den ersten aktiven Layer-Index aus einer LayerMask.
-    /// Gibt -1 zurück wenn die Maske leer ist ("Nothing").
-    /// </summary>
-    private int GetLayerFromMask(LayerMask mask)
-    {
-        int value = mask.value;
-        if (value == 0) return -1;
-
-        for (int i = 0; i < 32; i++)
-        {
-            if ((value & (1 << i)) != 0)
-                return i;
-        }
-        return -1;
+        // Partikel zurückschreiben
+        shatterParticles.SetParticles(particles, actualCount);
     }
 
     #endregion
@@ -335,9 +317,11 @@ public class BreakableGlass : MonoBehaviour, IDamageable
 
     private void OnDrawGizmosSelected()
     {
-        // Explosionsradius visualisieren
-        Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
-        Gizmos.DrawWireSphere(transform.position, explosionRadius);
+        if (!drawGizmos) return;
+
+        // Visualisierung des Impact-Radius in Glasmitte
+        Gizmos.color = new Color(0.5f, 0.8f, 1f, 0.3f);
+        Gizmos.DrawWireSphere(transform.position, impactRadius);
     }
 
     #endregion

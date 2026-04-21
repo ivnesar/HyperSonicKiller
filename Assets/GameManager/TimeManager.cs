@@ -323,7 +323,7 @@ public class TimeManager : MonoBehaviour
         activeLayers.Clear();
         ApplyTimeScale();
 
-        Debug.Log("[TimeManager] All layers cleared.");
+        //Debug.Log("[TimeManager] All layers cleared.");
     }
 
     #endregion

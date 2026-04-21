@@ -229,7 +229,13 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         get
         {
             if (cachedRenderer == null)
-                cachedRenderer = GetComponentInChildren<Renderer>();
+            {
+                // Bevorzugt: animierter Charakter (ignoriert LineRenderer, TrailRenderer, ParticleSystemRenderer)
+                cachedRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+                // Fallback: statisches Mesh (z.B. Drone, Turret, ProxyMine)
+                if (cachedRenderer == null)
+                    cachedRenderer = GetComponentInChildren<MeshRenderer>();
+            }
             return cachedRenderer;
         }
     }
