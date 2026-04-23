@@ -11,6 +11,8 @@ using System.Collections.Generic;
 //   - Kein SphereCollider nötig (nutzt Physics.OverlapSphere)
 //
 // Schaden:
+//   - Einheitlicher Schadenswert für Spieler und NPCs (explosionDamage)
+//   - Kann zur Laufzeit per SetDamage() überschrieben werden (z.B. von ProxyMineNpc)
 //   - Spieler: einmalig via PlayerCore.TakeDirectDamage (nicht blockbar)
 //   - NPCs/Minen: einmalig via IDamageable.TakeDamage
 //   - Ragdoll-NPCs erhalten Impact Force (Richtung: Explosion → NPC)
@@ -35,11 +37,8 @@ public class ExplosionSphere : MonoBehaviour
     [SerializeField] private float expandDuration = 0.3f;
 
     [Header("Damage")]
-    [Tooltip("Schaden am Spieler bei Berührung (einmalig)")]
-    [SerializeField] private float playerDamage = 80f;
-
-    [Tooltip("Schaden an NPCs bei Berührung (einmalig)")]
-    [SerializeField] private float npcDamage = 50f;
+    [Tooltip("Schaden an Spieler und NPCs bei Berührung (einmalig pro Ziel)")]
+    [SerializeField] private float explosionDamage = 50f;
 
     [Header("Detection")]
     [Tooltip("Welche Layer von der Explosion getroffen werden")]
@@ -60,6 +59,15 @@ public class ExplosionSphere : MonoBehaviour
     /// damit die Warn-Sphere synchron bleibt.
     /// </summary>
     public float MaxRadius => maxRadius;
+
+    /// <summary>
+    /// Setzt den Explosionsschaden zur Laufzeit (z.B. direkt nach Instantiate).
+    /// Ermöglicht, dass Quellen wie ProxyMineNpc ihren eigenen Schadenswert nutzen.
+    /// </summary>
+    public void SetDamage(float damage)
+    {
+        explosionDamage = damage;
+    }
 
     #endregion
 
@@ -152,7 +160,7 @@ public class ExplosionSphere : MonoBehaviour
         if (player != null)
         {
             damagedTargets.Add(rootObject);
-            player.TakeDirectDamage(playerDamage, "Explosion");
+            player.TakeDirectDamage(explosionDamage, "Explosion");
             return;
         }
 
@@ -166,7 +174,7 @@ public class ExplosionSphere : MonoBehaviour
 
             Vector3 hitDirection = (hit.transform.position - transform.position).normalized;
             Vector3 hitPoint = hit.ClosestPoint(transform.position);
-            damageable.TakeDamage(npcDamage, hitPoint, hitDirection);
+            damageable.TakeDamage(explosionDamage, hitPoint, hitDirection);
 
             // Impact registrieren (falls vorhanden)
             NpcImpactTracker impactTracker = hit.GetComponent<NpcImpactTracker>();

@@ -73,6 +73,9 @@ public class ProxyMineNpc : NpcBase
     [Tooltip("Explosions-Prefab (braucht ExplosionSphere-Script)")]
     [SerializeField] private GameObject explosionPrefab;
 
+    [Tooltip("Schaden der Explosion (wird beim Spawn an ExplosionSphere übergeben)")]
+    [SerializeField] private float explosionDamage = 50f;
+
     [Tooltip("Partikel-Prefab (wird parallel gespawnt, zerstört sich selbst)")]
     [SerializeField] private GameObject particlePrefab;
 
@@ -281,7 +284,14 @@ public class ProxyMineNpc : NpcBase
 
         if (explosionPrefab != null)
         {
-            Instantiate(explosionPrefab, spawnPos, Quaternion.identity);
+            GameObject explosionGO = Instantiate(explosionPrefab, spawnPos, Quaternion.identity);
+
+            // Schaden an die ExplosionSphere übergeben
+            ExplosionSphere explosionSphere = explosionGO.GetComponent<ExplosionSphere>();
+            if (explosionSphere != null)
+            {
+                explosionSphere.SetDamage(explosionDamage);
+            }
         }
 
         if (particlePrefab != null)

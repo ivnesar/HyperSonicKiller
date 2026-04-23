@@ -520,7 +520,7 @@ public class TurretNpc : NpcBase
         if (playerCore != null)
         {
             Vector3 attackDir = (playerTransform.position - origin).normalized;
-            playerCore.TakeDamage(laserDamage, attackDir, "Turret");
+            playerCore.TakeDamage(laserDamage, attackDir, "Turret", transform);
         }
 
         // ── Visueller Beam: Raycast für Endpunkt ──

@@ -32,8 +32,23 @@ public class PlayerLook : MonoBehaviour
     [SerializeField] private float sensitivity = 2f;
     [SerializeField] private float maxVerticalAngle = 80f;
 
-    [Header("Death Camera Effect")]
-    [SerializeField] private float deathRotationSpeed = 30f;
+    [Header("Death Camera")]
+    [Tooltip("Das CameraParent GameObject, dessen lokale Y-Höhe beim Tod fällt " +
+             "(simuliert den Spieler, der zu Boden geht). " +
+             "Wenn leer, wird kein Fall-Effekt ausgeführt.")]
+    [SerializeField] private Transform cameraParent;
+
+    [Tooltip("Lokale Y-Position des CameraParent nach dem Tod " +
+             "(z.B. 0.2 für 'liegt am Boden'). Start-Höhe wird automatisch gemerkt.")]
+    [SerializeField] private float deathCameraHeight = 0.2f;
+
+    [Tooltip("SmoothDamp-Zeit für die Todes-Drehung zum Killer (Sekunden). " +
+             "Kleiner = schneller.")]
+    [SerializeField] private float deathRotationSmoothTime = 0.4f;
+
+    [Tooltip("SmoothDamp-Zeit für das Fallen der Kamera-Höhe (Sekunden). " +
+             "Kleiner = schnellerer Sturz.")]
+    [SerializeField] private float deathFallSmoothTime = 0.5f;
 
     [Header("Camera Snap")]
     [Tooltip("Dauer der Transition zum Ziel (in Sekunden, Echtzeit)")]
@@ -98,6 +113,13 @@ public class PlayerLook : MonoBehaviour
 
     private PlayerCore core;
     private float currentVerticalAngle;
+
+    // ── Death Camera State ──
+    private bool deathInitialized;          // Einmalig pro Tod: Roll zurücksetzen, Ausgangshöhe merken
+    private float initialCameraHeight;      // Wird beim ersten Death-Frame gesichert (für Revive)
+    private float deathYawVelocity;         // SmoothDampAngle ref
+    private float deathPitchVelocity;       // SmoothDampAngle ref
+    private float deathHeightVelocity;      // SmoothDamp ref
 
     #endregion
 
@@ -164,8 +186,100 @@ public class PlayerLook : MonoBehaviour
 
     private void HandleDeathCamera()
     {
-        // Spin camera on death for dramatic effect
-        rotationTarget.Rotate(Vector3.forward * deathRotationSpeed * Time.deltaTime);
+        // Einmalige Initialisierung pro Tod
+        if (!deathInitialized)
+        {
+            InitializeDeathCamera();
+            deathInitialized = true;
+        }
+
+        // ── 1. Zum Killer drehen (nur wenn eine Position bekannt ist) ──
+        if (core.HasDeathTarget)
+        {
+            RotateTowardsDeathTarget();
+        }
+        // Fallback: kein Target bekannt → Kamera bleibt in aktueller Ausrichtung.
+        // Weil wir rotationTarget/transform.rotation hier nicht anfassen,
+        // friert die Blickrichtung einfach ein (currentVerticalAngle wird nicht mehr verändert).
+
+        // ── 2. CameraParent smooth nach unten sinken lassen ──
+        if (cameraParent != null)
+        {
+            FallCameraParent();
+        }
+    }
+
+    /// <summary>
+    /// Einmaliger Setup-Schritt beim ersten Update nach Tod:
+    ///   - Z-Roll des Kamera-Pivots neutralisieren (falls ein anderer Effekt einen Roll hinterlassen hat)
+    ///   - Initiale CameraParent-Höhe sichern (für evtl. späteren Revive-Reset)
+    ///   - SmoothDamp-Velocitys zurücksetzen
+    /// </summary>
+    private void InitializeDeathCamera()
+    {
+        // Kamera-Pivot Roll auf 0 setzen (X und Y behalten)
+        Vector3 rt = rotationTarget.localEulerAngles;
+        rotationTarget.localEulerAngles = new Vector3(rt.x, rt.y, 0f);
+
+        // CameraParent-Start-Höhe sichern
+        if (cameraParent != null)
+        {
+            initialCameraHeight = cameraParent.localPosition.y;
+        }
+
+        // SmoothDamp-Velocities frisch
+        deathYawVelocity = 0f;
+        deathPitchVelocity = 0f;
+        deathHeightVelocity = 0f;
+    }
+
+    /// <summary>
+    /// Smooth drehen in Richtung der gespeicherten Killer-Position.
+    /// Yaw (horizontal) → transform (Player-Body).
+    /// Pitch (vertikal) → rotationTarget (Kamera-Pivot).
+    /// </summary>
+    private void RotateTowardsDeathTarget()
+    {
+        Vector3 toTarget = core.DeathTargetPosition - transform.position;
+
+        // Safety: falls der Killer auf exakt der gleichen Position wie der Spieler stand
+        if (toTarget.sqrMagnitude < 0.001f) return;
+
+        // ── Horizontal (Yaw am Player-Body) ──
+        Vector3 flat = new Vector3(toTarget.x, 0f, toTarget.z);
+        if (flat.sqrMagnitude > 0.001f)
+        {
+            float currentYaw = transform.eulerAngles.y;
+            float targetYaw = Quaternion.LookRotation(flat.normalized).eulerAngles.y;
+
+            // SmoothDampAngle kümmert sich um den 360°-Wrap automatisch
+            float newYaw = Mathf.SmoothDampAngle(
+                currentYaw, targetYaw, ref deathYawVelocity, deathRotationSmoothTime);
+
+            transform.rotation = Quaternion.Euler(0f, newYaw, 0f);
+        }
+
+        // ── Vertikal (Pitch am Kamera-Pivot) ──
+        float horizontalDistance = flat.magnitude;
+        float heightDiff = toTarget.y;
+        float targetPitch = -Mathf.Atan2(heightDiff, horizontalDistance) * Mathf.Rad2Deg;
+        targetPitch = Mathf.Clamp(targetPitch, -maxVerticalAngle, maxVerticalAngle);
+
+        currentVerticalAngle = Mathf.SmoothDampAngle(
+            currentVerticalAngle, targetPitch, ref deathPitchVelocity, deathRotationSmoothTime);
+
+        rotationTarget.localEulerAngles = new Vector3(currentVerticalAngle, 0f, 0f);
+    }
+
+    /// <summary>
+    /// CameraParent smooth auf deathCameraHeight absenken.
+    /// </summary>
+    private void FallCameraParent()
+    {
+        Vector3 localPos = cameraParent.localPosition;
+        float newY = Mathf.SmoothDamp(
+            localPos.y, deathCameraHeight, ref deathHeightVelocity, deathFallSmoothTime);
+        cameraParent.localPosition = new Vector3(localPos.x, newY, localPos.z);
     }
 
     #endregion
@@ -434,6 +548,25 @@ public class PlayerLook : MonoBehaviour
     {
         nudgeRemainingYaw = 0f;
         nudgeRemainingPitch = 0f;
+    }
+
+    /// <summary>
+    /// Setzt die Death-Camera zurück (bei Revive aufgerufen).
+    /// Stellt die ursprüngliche CameraParent-Höhe wieder her und
+    /// löscht das Init-Flag, damit beim nächsten Tod wieder frisch initialisiert wird.
+    /// </summary>
+    public void ResetDeathCamera()
+    {
+        deathInitialized = false;
+        deathYawVelocity = 0f;
+        deathPitchVelocity = 0f;
+        deathHeightVelocity = 0f;
+
+        if (cameraParent != null && initialCameraHeight != 0f)
+        {
+            Vector3 p = cameraParent.localPosition;
+            cameraParent.localPosition = new Vector3(p.x, initialCameraHeight, p.z);
+        }
     }
 
     #endregion

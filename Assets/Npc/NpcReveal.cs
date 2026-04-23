@@ -52,7 +52,7 @@ public class NpcReveal : MonoBehaviour
 
     [Header("Fade")]
     [Tooltip("Dauer der Fade-Out-Phase am Ende (in Sekunden). 0 = kein Fade.")]
-    [SerializeField] private float fadeDuration = 0.5f;
+    [SerializeField] private float fadeDuration = 0.1f;
 
     [Header("Debug")]
     [SerializeField] private bool logDebug = false;

@@ -654,7 +654,10 @@ MonoBehaviour:
   rotationTarget: {fileID: 4254791061503729056}
   sensitivity: 1.5
   maxVerticalAngle: 80
-  deathRotationSpeed: 30
+  cameraParent: {fileID: 4254791061503729056}
+  deathCameraHeight: 0.2
+  deathRotationSmoothTime: 0.3
+  deathFallSmoothTime: 0.3
   snapTransitionDuration: 0.05
   snapHoldDuration: 0.1
   nudgeRotationSpeed: 300
@@ -1153,7 +1156,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8904402282855584470}
   m_Layer: 3
-  m_Name: DashDestination
+  m_Name: DashDestinationVis
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

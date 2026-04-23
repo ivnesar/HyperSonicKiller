@@ -117,13 +117,13 @@ MonoBehaviour:
   displayName: 
   maxShootingRange: 24
   preferredRange: 12
-  aimDuration: 2
-  timeBetweenShots: 0.06
+  aimDuration: 0.7
+  timeBetweenShots: 0.05
   shotsPerSalvo: 31
   reloadDuration: 2
   baseAccuracy: 0.85
-  accuracySpreadAngle: 5
-  damagePerShot: 5
+  accuracySpreadAngle: 10
+  damagePerShot: 25
   muzzlePoint: {fileID: 325190508397620359}
   bulletPrefab: {fileID: 8718130687482727725, guid: 04c8d0b7aff6e234db9c7771d9633f6d, type: 3}
   bulletHitMask:
@@ -539,7 +539,7 @@ MonoBehaviour:
   revealObjects:
   - {fileID: 2487980154493581614}
   - {fileID: 6764424172546879382}
-  fadeDuration: 0.5
+  fadeDuration: 0.1
   logDebug: 1
 --- !u!1 &2487980154493581614
 GameObject:

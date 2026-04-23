@@ -178,7 +178,7 @@ public class SoldierBullet : MonoBehaviour
             {
                 // Pass bullet travel direction so player camera nudges toward attacker
                 string sourceName = shooter != null ? shooter.gameObject.name : "Soldier";
-                playerCore.TakeDamage(damage, direction, sourceName);
+                playerCore.TakeDamage(damage, direction, sourceName,shooter.transform);
                 //Debug.Log($"[SoldierBullet] Hit player for {damage} damage!");
             }
         }

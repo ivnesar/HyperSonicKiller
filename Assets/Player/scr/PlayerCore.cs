@@ -96,15 +96,48 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public Transform LaserTarget => laserTarget;
 
-    // ── Last Damage Source (für Game Over Screen) ──
+    // ── Last Damage Source (für Game Over Screen + Death Camera) ──
     private string lastDamageSourceName = "";
     private float lastDamageAmount;
+    private Transform lastDamageSourceTransform;     // Live-Referenz: Kamera folgt diesem Transform
+    private Vector3 lastKnownSourcePosition;         // Fallback-Snapshot für den Fall, dass der Transform zerstört wird
+    private bool hasDeathTarget;
 
     /// <summary>Name der letzten Schadensquelle (z.B. "Soldier", "Proxy Mine").</summary>
     public string LastDamageSourceName => lastDamageSourceName;
 
     /// <summary>Schadensmenge des letzten Treffers.</summary>
     public float LastDamageAmount => lastDamageAmount;
+
+    /// <summary>
+    /// Welt-Position der letzten Schadensquelle.
+    /// Folgt dem NPC live, solange dessen Transform existiert.
+    /// Wird der Transform zerstört (NPC stirbt nach dem Spieler), gibt diese Property
+    /// die zuletzt bekannte Position zurück — die Kamera "friert" dann auf der
+    /// Position ein, an der der NPC zuletzt war.
+    /// Nur gültig wenn HasDeathTarget true ist.
+    /// </summary>
+    public Vector3 DeathTargetPosition
+    {
+        get
+        {
+            // Wenn der Transform noch lebt: aktuelle Position holen UND als
+            // Snapshot updaten (für später, falls er gleich zerstört wird).
+            if (lastDamageSourceTransform != null)
+            {
+                lastKnownSourcePosition = lastDamageSourceTransform.position;
+                return lastKnownSourcePosition;
+            }
+            // Transform tot → letzten Snapshot zurückgeben (Kamera bleibt fix dort).
+            return lastKnownSourcePosition;
+        }
+    }
+
+    /// <summary>
+    /// True, wenn beim Tod eine gültige Killer-Position bekannt ist.
+    /// False z.B. bei Umgebungsschaden ohne Source-Transform.
+    /// </summary>
+    public bool HasDeathTarget => hasDeathTarget;
 
     #endregion
 
@@ -181,7 +214,7 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage)
     {
-        return TakeDamage(damage, Vector3.zero, "");
+        return TakeDamage(damage, Vector3.zero, "", null);
     }
 
     /// <summary>
@@ -191,7 +224,7 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage, Vector3 attackDirection)
     {
-        return TakeDamage(damage, attackDirection, "");
+        return TakeDamage(damage, attackDirection, "", null);
     }
 
     /// <summary>
@@ -199,13 +232,24 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDamage(float damage, Vector3 attackDirection, string sourceName)
     {
+        return TakeDamage(damage, attackDirection, sourceName, null);
+    }
+
+    /// <summary>
+    /// Full damage entry point with attacker transform — used for death camera.
+    /// sourceTransform is the root GameObject transform of the attacker.
+    /// The death camera will follow this transform live, until either the player revives
+    /// or the transform is destroyed (then it stays on the last known position).
+    /// </summary>
+    public bool TakeDamage(float damage, Vector3 attackDirection, string sourceName, Transform sourceTransform)
+    {
         if (IsDead || damage <= 0) return false;
         
         // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
 
         // Track damage source (even if blocked — the last hit that connects matters)
-        TrackDamageSource(sourceName, damage);
+        TrackDamageSource(sourceName, damage, sourceTransform);
 
         // Combat handles block logic, Health handles actual HP
         if (Combat != null && Combat.IsBlocking)
@@ -238,7 +282,7 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDirectDamage(float damage)
     {
-        return TakeDirectDamage(damage, "");
+        return TakeDirectDamage(damage, "", null);
     }
 
     /// <summary>
@@ -246,12 +290,20 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool TakeDirectDamage(float damage, string sourceName)
     {
+        return TakeDirectDamage(damage, sourceName, null);
+    }
+
+    /// <summary>
+    /// Direct damage with source name and transform — used for death camera.
+    /// </summary>
+    public bool TakeDirectDamage(float damage, string sourceName, Transform sourceTransform)
+    {
         if (IsDead || damage <= 0) return false;
         
         // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
 
-        TrackDamageSource(sourceName, damage);
+        TrackDamageSource(sourceName, damage, sourceTransform);
         
         Health?.TakeDamage(damage);
         return true;
@@ -275,6 +327,7 @@ public class PlayerCore : MonoBehaviour
         Health?.ResetHealth();
         Combat?.ResetCombat();
         ClearDamageSource();
+        Look?.ResetDeathCamera();
         SetState(PlayerState.Normal);
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -292,14 +345,26 @@ public class PlayerCore : MonoBehaviour
     /// <summary>
     /// Merkt sich die letzte Schadensquelle. Wird bei jedem Treffer aufgerufen.
     /// Leerer Name wird ignoriert (alte Aufrufe ohne sourceName behalten den vorherigen Wert).
+    /// Transform wird als Live-Referenz gespeichert — die Kamera folgt ihm.
+    /// Zusätzlich speichern wir die aktuelle Position als Snapshot, falls der
+    /// Transform später zerstört wird.
     /// </summary>
-    private void TrackDamageSource(string sourceName, float damage)
+    private void TrackDamageSource(string sourceName, float damage, Transform sourceTransform)
     {
         if (!string.IsNullOrEmpty(sourceName))
         {
             lastDamageSourceName = sourceName;
         }
         lastDamageAmount = damage;
+
+        if (sourceTransform != null)
+        {
+            lastDamageSourceTransform = sourceTransform;
+            lastKnownSourcePosition = sourceTransform.position;
+            hasDeathTarget = true;
+        }
+        // Wenn null übergeben wurde, behalten wir die vorherige Quelle —
+        // so hat zumindest der letzte Hit, der *eine* Quelle hatte, Gültigkeit.
     }
 
     /// <summary>
@@ -309,6 +374,9 @@ public class PlayerCore : MonoBehaviour
     {
         lastDamageSourceName = "";
         lastDamageAmount = 0f;
+        lastDamageSourceTransform = null;
+        lastKnownSourcePosition = Vector3.zero;
+        hasDeathTarget = false;
     }
 
     #endregion
