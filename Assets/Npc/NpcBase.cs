@@ -92,6 +92,22 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     [Tooltip("Anzeigename im UI-Overlay. Wenn leer, wird der NpcType verwendet.")]
     [SerializeField] protected string displayName = "";
 
+    [Header("Aim Wiggle")]
+    [Tooltip("Maximaler Wiggle-Radius in Metern bei AimProgress = 0. Wird relativ zum Aim-Target " +
+             "angewendet. Durch AimIK bewegt sich der ganze Oberkörper (und damit auch Waffe/Laser).")]
+    [SerializeField] protected float wiggleMaxRadius = 1.2f;
+
+    [Tooltip("Geschwindigkeit der Wiggle-Bewegung. Höhere Werte = unruhigeres Zielen.")]
+    [SerializeField] protected float wiggleFrequency = 3f;
+
+    [Tooltip("Steuert wie viel Wiggle bei gegebenem AimProgress übrig bleibt (0→1). " +
+             "X = AimProgress, Y = verbleibender Wiggle-Anteil (1 = voll, 0 = kein Wiggle). " +
+             "Default: Schnelle Abnahme am Ende (≈ 1 - progress²).")]
+    [SerializeField] protected AnimationCurve wiggleFalloffCurve = new AnimationCurve(
+        new Keyframe(0f, 1f, 0f, 0f),
+        new Keyframe(1f, 0f, -2f, 0f)
+    );
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -169,6 +185,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     private float aimTotalDuration;
     private float aimProgress;
     private bool isTrackingAim;
+
+    // Aim Wiggle — Noise-Seeds pro NPC damit NPCs nicht synchron wackeln
+    private float wiggleNoiseSeedX;
+    private float wiggleNoiseSeedY;
 
     // Movement Smoothing (für UpdateAnimator)
     private float currentSpeedVelocity;
@@ -324,6 +344,10 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         laserPointer = GetComponent<NpcLaserPointer>();
 
         currentHealth = maxHealth;
+
+        // Zufällige Noise-Seeds damit verschiedene NPCs nicht synchron wackeln
+        wiggleNoiseSeedX = Random.Range(0f, 1000f);
+        wiggleNoiseSeedY = Random.Range(0f, 1000f);
 
         if (navAgent != null)
         {
@@ -566,6 +590,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// Subklassen können GetAimTargetPosition() überschreiben, um eine
     /// andere Zielposition zu verwenden (z.B. LockedTargetPosition beim Soldier).
     /// 
+    /// Wiggle: Solange AimProgress < 1 ist, wird ein Offset auf das Target
+    /// gelegt. AimIK blendet den gesamten Oberkörper dorthin — dadurch wackelt
+    /// auch die Waffe (und der an ihr befestigte Laser) mit. Das ersetzt den
+    /// früheren Laser-internen Wiggle.
+    /// 
     /// Der Dash-Override läuft intern im AimController — hier muss nichts
     /// extra geprüft werden.
     /// </summary>
@@ -579,8 +608,11 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         else
             aimController.DisableAim();
 
-        // Zielposition aktualisieren
-        aimController.SetTargetPosition(GetAimTargetPosition());
+        // Ziel ermitteln und Wiggle draufrechnen
+        Vector3 targetPosition = GetAimTargetPosition();
+        targetPosition = ApplyAimWiggle(targetPosition);
+
+        aimController.SetTargetPosition(targetPosition);
     }
 
     /// <summary>
@@ -592,6 +624,45 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     protected virtual Vector3 GetAimTargetPosition()
     {
         return TargetPosition;
+    }
+
+    /// <summary>
+    /// Legt einen zeitlich variierenden Offset auf das Aim-Target.
+    /// Der Offset liegt in der Ebene senkrecht zur NPC→Target-Achse
+    /// (also seitlich + vertikal aus Sicht des NPCs).
+    /// 
+    /// Intensität skaliert mit (1 - AimProgress) über die wiggleFalloffCurve:
+    /// am Anfang der Aim-Phase voll, am Ende komplett weg.
+    /// 
+    /// Gibt bei wiggleMaxRadius = 0 oder AimProgress = 1 die Originalposition
+    /// zurück — keine Allokation, kein merklicher Overhead.
+    /// </summary>
+    private Vector3 ApplyAimWiggle(Vector3 targetPosition)
+    {
+        if (wiggleMaxRadius <= 0f) return targetPosition;
+
+        float falloff = wiggleFalloffCurve.Evaluate(aimProgress);
+        float radius = wiggleMaxRadius * falloff;
+
+        if (radius < 0.001f) return targetPosition;
+
+        // Zwei unabhängige Perlin-Samples im Bereich -1..+1 für X und Y
+        float t = Time.time * wiggleFrequency;
+        float noiseX = (Mathf.PerlinNoise(t, wiggleNoiseSeedX) - 0.5f) * 2f;
+        float noiseY = (Mathf.PerlinNoise(wiggleNoiseSeedY, t) - 0.5f) * 2f;
+
+        // Achsen senkrecht zur NPC→Target-Richtung bilden
+        Vector3 toTarget = targetPosition - transform.position;
+        if (toTarget.sqrMagnitude < 0.0001f) return targetPosition;
+
+        Vector3 forward = toTarget.normalized;
+        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
+        // Wenn NPC direkt nach oben/unten zielt, fällt right zusammen — Fallback
+        if (right.sqrMagnitude < 0.0001f) right = Vector3.right;
+        Vector3 up = Vector3.Cross(forward, right).normalized;
+
+        Vector3 offset = (right * noiseX + up * noiseY) * radius;
+        return targetPosition + offset;
     }
 
     #endregion

@@ -73,7 +73,7 @@ public class DroppedEquipment : MonoBehaviour
     public void Activate(Vector3 impactDirection)
     {
         if (isActivated) return;
-
+        
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {

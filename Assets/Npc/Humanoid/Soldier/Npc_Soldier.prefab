@@ -115,6 +115,32 @@ MonoBehaviour:
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 0
   displayName: 
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   maxShootingRange: 24
   preferredRange: 12
   aimDuration: 0.7
@@ -267,20 +293,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1d082698f93f3d4da8f5a53ce67adb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcLaserPointer
-  laserOrigin: {fileID: 5558143100792388019}
-  fieldOfView: 60
-  collisionMask:
-    serializedVersion: 2
-    m_Bits: 192
-  losCheckMask:
-    serializedVersion: 2
-    m_Bits: 136
-  laserLength: 50
-  transitionDuration: 0.3
-  earlyWidth: 0.01
-  lockedWidth: 0.03
-  earlyColor: {r: 1, g: 0.50980395, b: 0, a: 0.15686275}
-  lockedColor: {r: 1, g: 1, b: 0, a: 1}
+  laserRenderer: {fileID: 7183905207287916140}
+  earlyWidth: 0.03
+  lockedWidth: 0.06
+  earlyColor: {r: 1, g: 1, b: 0, a: 0.15686275}
+  lockedColor: {r: 1, g: 0, b: 0, a: 1}
   colorWidthCurve:
     serializedVersion: 2
     m_Curve:
@@ -305,36 +322,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  wiggleFalloffCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 0.8
-      value: 0
-      inSlope: -2
-      outSlope: -2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  wiggleMaxAngle: 12
-  wiggleFrequency: 2
-  enableWiggle: 1
-  laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
-  useUnscaledTime: 0
-  showDebug: 0
 --- !u!114 &6267239683382934993
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -961,6 +948,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5227657955217703689, guid: ff7d307c69b2df1438e7416d114ef9d3, type: 3}
   m_PrefabInstance: {fileID: 2194908336093354991}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7183905207287916140 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9063417533295164803, guid: ff7d307c69b2df1438e7416d114ef9d3, type: 3}
+  m_PrefabInstance: {fileID: 2194908336093354991}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ff10193d3a255140afc21b2c0b6ded6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugAxesVisualizer
 --- !u!1001 &7099615387301495755
 PrefabInstance:
   m_ObjectHideFlags: 0

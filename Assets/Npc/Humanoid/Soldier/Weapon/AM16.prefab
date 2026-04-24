@@ -154,10 +154,37 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7308392400199042523, guid: f9db66a24a0c4c84d95ae4cbfccfd341, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9063417533295164803}
   m_SourcePrefab: {fileID: 100100000, guid: f9db66a24a0c4c84d95ae4cbfccfd341, type: 3}
 --- !u!4 &5227657955217703689 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f9db66a24a0c4c84d95ae4cbfccfd341, type: 3}
   m_PrefabInstance: {fileID: 5694491992902493410}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &6167039355689557703 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -7308392400199042523, guid: f9db66a24a0c4c84d95ae4cbfccfd341, type: 3}
+  m_PrefabInstance: {fileID: 5694491992902493410}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &9063417533295164803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6167039355689557703}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ff10193d3a255140afc21b2c0b6ded6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugAxesVisualizer
+  direction: {x: 0, y: 0, z: 1}
+  maxDistance: 100
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 128
+  laserColor: {r: 1, g: 0, b: 0, a: 1}
+  lineWidth: 0.06

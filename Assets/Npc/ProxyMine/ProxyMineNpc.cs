@@ -6,7 +6,7 @@ using UnityEngine;
 //
 // Auslöser (jeder startet den Fuse-Timer):
 //   1. Spieler betritt Radius + Line-of-Sight
-//   2. Schaden nach Sword-Removal + Stun-Ende
+//   2. Sword-Removal (Residual-Stun wird ignoriert, Fuse startet sofort)
 //   3. Explosions-Schaden von einer anderen Mine / Quelle
 //
 // Besonderheiten:
@@ -362,9 +362,14 @@ public class ProxyMineNpc : NpcBase
         TriggerFuseFromDamage();
     }
 
-    // ── Sword Throw: normales NpcBase-Verhalten (Stun + pending damage) ─
+    // ── Sword Throw: Embed = Stun, Removal = sofortiger Fuse-Start ──────
     // OnThrownSwordHit, OnSwordEmbedded bleiben von NpcBase.
-    // Nach Sword-Removal + Residual-Stun-Ende → OnStunEnd() → StartFuse()
+    // Bei Removal (Recall oder Dash) wird der Residual-Stun ignoriert.
+
+    // ── Hinweis zu Sword-Removal ────────────────────────────────────────
+    // Mine ignoriert den Residual-Stun nach Sword-Removal und startet den
+    // Fuse sofort. Stun wird aktiv beendet (stunEndTime = 0), damit
+    // UpdateFuseTimer() nicht durch isStunned pausiert wird.
 
     public override void OnSwordRemoved(int damage, float residualStunDuration)
     {
@@ -372,17 +377,14 @@ public class ProxyMineNpc : NpcBase
 
         hasSwordEmbedded = false;
 
-        // Schaden merken → nach Stun-Ende wird Fuse gestartet
-        if (damage > 0)
-        {
-            damagePendingFuse = true;
-        }
-
         // Kein pending sword damage (Mine hat keine HP)
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 
-        stunEndTime = Time.time + residualStunDuration;
+        // Residual-Stun überspringen und Fuse sofort starten
+        stunEndTime = 0f;
+        damagePendingFuse = false;
+        StartFuse();
     }
 
     public override void OnSwordDashRemoval(int damage, float residualStunDuration)
@@ -391,17 +393,13 @@ public class ProxyMineNpc : NpcBase
 
         hasSwordEmbedded = false;
 
-        // Bei Dash-Removal: Schaden kommt eigentlich sofort,
-        // aber Mine hat keine HP → Fuse merken, startet nach Stun-Ende
-        if (damage > 0)
-        {
-            damagePendingFuse = true;
-        }
-
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 
-        stunEndTime = Time.time + residualStunDuration;
+        // Residual-Stun überspringen und Fuse sofort starten
+        stunEndTime = 0f;
+        damagePendingFuse = false;
+        StartFuse();
     }
 
     // ── Gemeinsame Fuse-Aktivierung durch Schaden ───────────────────────

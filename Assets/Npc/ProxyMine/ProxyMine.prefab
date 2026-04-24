@@ -333,7 +333,7 @@ MonoBehaviour:
   showDebugInfo: 1
   displayName: 
   detectionRadius: 3
-  raycastOffset: {x: 0, y: 0.5, z: 0}
+  raycastOffset: {x: 0, y: 0.1, z: 0}
   lineOfSightBlockers:
     serializedVersion: 2
     m_Bits: 128
