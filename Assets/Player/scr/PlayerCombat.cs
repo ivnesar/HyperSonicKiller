@@ -137,6 +137,17 @@ public class PlayerCombat : MonoBehaviour
     public float BlockHPPercent => currentBlockHP / maxBlockHP;
     public float ExhaustionDuration => exhaustionDuration;
 
+    /// <summary>
+    /// Verbleibende Zeit im Exhausted-State (in Sekunden).
+    /// Gibt 0 zur\u00fcck wenn der Spieler nicht exhausted ist.
+    /// Wird z.B. vom PlayerArmAnimator genutzt, um die Exit-Animation
+    /// rechtzeitig vor Recovery zu starten.
+    /// </summary>
+    public float RemainingExhaustionTime =>
+        currentState == CombatState.Exhausted
+            ? Mathf.Max(0f, exhaustionEndTime - Time.time)
+            : 0f;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════

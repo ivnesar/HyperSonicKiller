@@ -73,6 +73,19 @@ public class PlayerArmAnimator : MonoBehaviour
     [SerializeField] private ClipTransition swordThrow;
     [SerializeField] private ClipTransition swordRecover;
 
+    [Header("Exhaust Transitions (One-Shot)")]
+    [Tooltip("Plays once when the player enters Exhausted state (e.g. sword bouncing off shield).")]
+    [SerializeField] private ClipTransition exhaustedEnter;
+
+    [Tooltip("Plays once shortly before Exhausted ends, timed so the animation finishes " +
+             "right when the player recovers (e.g. player resets sword grip).")]
+    [SerializeField] private ClipTransition exhaustedExit;
+
+    [Tooltip("How many seconds before the end of Exhausted to start the exit animation. " +
+             "Set this to roughly the length of your exit clip so it lines up with recovery. " +
+             "If 0, the exit animation never plays.")]
+    [SerializeField] private float exhaustedExitLeadTime = 0.4f;
+
     // ── Movement Threshold ───────────────────────────────────────────────
 
     [Header("Movement")]
@@ -96,6 +109,10 @@ public class PlayerArmAnimator : MonoBehaviour
 
     // Tracks whether the graph was paused by us (to avoid conflicts)
     private bool wasFrozenLastFrame;
+
+    // True wenn die Exit-Animation f\u00fcr den aktuellen Exhaust-Cycle bereits gestartet wurde.
+    // Wird beim Eintritt in Exhaust zur\u00fcckgesetzt, damit der n\u00e4chste Cycle wieder triggern kann.
+    private bool hasTriggeredExhaustExit;
 
     #endregion
 
@@ -154,6 +171,13 @@ public class PlayerArmAnimator : MonoBehaviour
         // Wenn eingefroren, keine Animation-Updates
         if (wasFrozenLastFrame) return;
 
+        // ── Exhaust-Exit-Lead-Time Check ──
+        // Startet die Exit-Animation, sobald die verbleibende Exhaust-Zeit
+        // unter das Lead-Time-Fenster f\u00e4llt — so dass die Animation genau
+        // zum Recovery-Zeitpunkt fertig ist. Vor isPlayingOneShot-Check, damit
+        // dieser Trigger auch w\u00e4hrend des Loops greift.
+        TryTriggerExhaustExit();
+
         // One-shots override base clips — don't interrupt them
         if (isPlayingOneShot) return;
 
@@ -206,6 +230,8 @@ public class PlayerArmAnimator : MonoBehaviour
         {
             core.Combat.OnAttack += HandleAttack;
             core.Combat.OnBlockedHit += HandleBlockedHit;
+            core.Combat.OnExhausted += HandleExhausted;
+            core.Combat.OnExhaustionRecovered += HandleExhaustionRecovered;
         }
 
         if (core.SwordThrow != null)
@@ -223,6 +249,8 @@ public class PlayerArmAnimator : MonoBehaviour
         {
             core.Combat.OnAttack -= HandleAttack;
             core.Combat.OnBlockedHit -= HandleBlockedHit;
+            core.Combat.OnExhausted -= HandleExhausted;
+            core.Combat.OnExhaustionRecovered -= HandleExhaustionRecovered;
         }
 
         if (core.SwordThrow != null)
@@ -319,7 +347,32 @@ public class PlayerArmAnimator : MonoBehaviour
 
     private void HandleBlockedHit()
     {
+        // Wenn dieser Block den Spieler exhausted hat (BlockHP nun bei 0),
+        // \u00fcberspringen wir die Block-Variant. Der OnExhausted-Event feuert
+        // direkt im Anschluss und startet stattdessen die Exhaust-Enter-Animation.
+        if (core.Combat != null && core.Combat.CurrentBlockHP <= 0f)
+            return;
+
         PlayOneShotVariantInstant(blockVariants, ref lastBlockVariant);
+    }
+
+    private void HandleExhausted()
+    {
+        hasTriggeredExhaustExit = false;
+        PlayOneShotInstant(exhaustedEnter);
+    }
+
+    private void HandleExhaustionRecovered()
+    {
+        // Exit-Animation wird NICHT hier gestartet, sondern bereits vorher in Update(),
+        // damit sie genau zum Zeitpunkt der Recovery fertig ist.
+        // Falls aus irgendeinem Grund Recovery passiert ohne dass das Lead-Time-Polling
+        // den Exit getriggert hat (z.B. sehr kurze ExhaustionDuration), holen wir es hier nach.
+        if (!hasTriggeredExhaustExit)
+        {
+            PlayOneShotInstant(exhaustedExit);
+            hasTriggeredExhaustExit = true;
+        }
     }
 
     private void HandleSwordThrown()
@@ -408,6 +461,36 @@ public class PlayerArmAnimator : MonoBehaviour
         // Immediately transition to the correct base clip
         // so there's no single-frame gap
         UpdateBaseAnimation();
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Exhaust Exit Lead-Time
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Pr\u00fcft jeden Frame ob die Exit-Animation gestartet werden soll.
+    /// Startet sie genau dann, wenn die verbleibende Exhaust-Zeit dem Lead-Time
+    /// entspricht, sodass die Animation perfekt zum Recovery-Zeitpunkt endet.
+    /// </summary>
+    private void TryTriggerExhaustExit()
+    {
+        // Schon getriggert in diesem Cycle, oder Exit-Clip nicht zugewiesen
+        if (hasTriggeredExhaustExit) return;
+        if (exhaustedExit == null || exhaustedExit.Clip == null) return;
+        if (exhaustedExitLeadTime <= 0f) return;
+        if (core.Combat == null) return;
+
+        // Nur w\u00e4hrend Exhaust aktiv triggern
+        if (!core.Combat.IsExhausted) return;
+
+        // Lead-Time erreicht?
+        if (core.Combat.RemainingExhaustionTime <= exhaustedExitLeadTime)
+        {
+            hasTriggeredExhaustExit = true;
+            PlayOneShotInstant(exhaustedExit);
+        }
     }
 
     #endregion

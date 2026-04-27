@@ -121,7 +121,7 @@ public class DefenderShield : MonoBehaviour
 
     /// <summary>
     /// Called by PlayerDash/PlayerCombat when a melee attack is parried.
-    /// Exhausts the player and plays feedback.
+    /// Exhausts the player, triggers the Defender's shield hit reaction, and plays feedback.
     /// </summary>
     public void ParryMeleeAttack()
     {
@@ -129,6 +129,10 @@ public class DefenderShield : MonoBehaviour
 
         if (cachedPlayerCombat != null)
             cachedPlayerCombat.ForceExhaust();
+
+        // Defender spielt Schild-Treffer-Reaktion (One-Shot auf Upper-Layer)
+        if (defender != null)
+            defender.OnShieldBlocked();
 
         PlayParryFeedback();
 

@@ -463,7 +463,6 @@ GameObject:
   - component: {fileID: 6295242138573287136}
   - component: {fileID: 4948156137820876829}
   - component: {fileID: 7005038953154893743}
-  - component: {fileID: 9190051213164589030}
   - component: {fileID: 6255646037874087239}
   - component: {fileID: 6872239883917322336}
   - component: {fileID: 7071042562543658868}
@@ -471,6 +470,7 @@ GameObject:
   - component: {fileID: 3251378297847425365}
   - component: {fileID: 6742892932711821385}
   - component: {fileID: 8241524766172378457}
+  - component: {fileID: 9190051213164589030}
   m_Layer: 3
   m_Name: FirstPersonController
   m_TagString: Player
@@ -733,44 +733,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 10
   currentHP: 0
---- !u!114 &9190051213164589030
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3935032124739193074}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 06d352b93b6a43342a62f92356debcd0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerDebugInspector
-  currentState: 
-  isDead: 0
-  isInvulnerable: 0
-  currentHP: 0
-  maxHP: 0
-  combatState: 
-  blockHP: 0
-  isExhausted: 0
-  hasSword: 0
-  dashCharges: 0
-  isDashing: 0
-  isSwordDashing: 0
-  isStuckToSurface: 0
-  isSprinting: 0
-  isSprintDashing: 0
-  sprintDashOnCooldown: 0
-  sprintDashCooldownRemaining: 0
-  isGrounded: 0
-  verticalVelocity: 0
-  showDashRay: 1
-  dashRayColor: {r: 0, g: 1, b: 1, a: 1}
-  swordDashRayColor: {r: 1, g: 0, b: 1, a: 1}
-  lookDirectionRayLength: 10
-  showLookDirection: 1
-  lookDirectionColor: {r: 0.5, g: 0.5, b: 1, a: 0.5}
-  showScreenOverlay: 1
 --- !u!114 &6255646037874087239
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -879,7 +841,7 @@ MonoBehaviour:
       _NormalizedTimes: []
       _Callbacks: []
       _Names: []
-    _Clip: {fileID: -5252816984213320552, guid: 51d232db8c2d66b4cb8b06607456d440, type: 3}
+    _Clip: {fileID: -851199388697429409, guid: 532a1ed86fd4b88469b75c736949af14, type: 3}
     _NormalizedStartTime: NaN
   disarmedIdle:
     _FadeDuration: 0.25
@@ -966,6 +928,25 @@ MonoBehaviour:
       _Names: []
     _Clip: {fileID: -3479850984791167260, guid: a5e9248caeeb9c94d806f9b6f8ff9a16, type: 3}
     _NormalizedStartTime: NaN
+  exhaustedEnter:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -3479850984791167260, guid: a5e9248caeeb9c94d806f9b6f8ff9a16, type: 3}
+    _NormalizedStartTime: NaN
+  exhaustedExit:
+    _FadeDuration: 0.25
+    _Speed: 1
+    _Events:
+      _NormalizedTimes: []
+      _Callbacks: []
+      _Names: []
+    _Clip: {fileID: -7092634530270860565, guid: 4e2bab48a9410a54cba56878bc4d0564, type: 3}
+    _NormalizedStartTime: NaN
+  exhaustedExitLeadTime: 0.4
   walkThreshold: 0.1
   references:
     version: 2
@@ -1080,6 +1061,44 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2e5d8efc69974e498110045a106ee7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DashPositionDebug
+--- !u!114 &9190051213164589030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06d352b93b6a43342a62f92356debcd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDebugInspector
+  currentState: 
+  isDead: 0
+  isInvulnerable: 0
+  currentHP: 0
+  maxHP: 0
+  combatState: 
+  blockHP: 0
+  isExhausted: 0
+  hasSword: 0
+  dashCharges: 0
+  isDashing: 0
+  isSwordDashing: 0
+  isStuckToSurface: 0
+  isSprinting: 0
+  isSprintDashing: 0
+  sprintDashOnCooldown: 0
+  sprintDashCooldownRemaining: 0
+  isGrounded: 0
+  verticalVelocity: 0
+  showDashRay: 1
+  dashRayColor: {r: 0, g: 1, b: 1, a: 1}
+  swordDashRayColor: {r: 1, g: 0, b: 1, a: 1}
+  lookDirectionRayLength: 10
+  showLookDirection: 1
+  lookDirectionColor: {r: 0.5, g: 0.5, b: 1, a: 0.5}
+  showScreenOverlay: 1
 --- !u!1 &4252055413702551478
 GameObject:
   m_ObjectHideFlags: 0
