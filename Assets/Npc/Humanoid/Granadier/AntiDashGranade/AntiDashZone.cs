@@ -4,10 +4,14 @@ using UnityEngine;
 // ANTI-DASH ZONE - Temporäre Dash-Sperrzone (z.B. von Granaten erzeugt)
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Gleiche Kernlogik wie AntiDashDroneNpc.UpdateZoneCheck():
-//   - Spieler betritt Zone → Dash wird geblockt
-//   - Spieler dasht in Zone → Dash wird nach kurzer Verzögerung abgebrochen
-//   - Spieler verlässt Zone → Dash wird wieder erlaubt
+// Ablauf (analog zu ProxyMineNpc):
+//   1. WARNING: Beim Spawn ist die Warn-Sphere sichtbar, Farbverlauf läuft,
+//      Dash funktioniert noch normal (faire Reaktionszeit).
+//   2. ACTIVE:  Nach warnDuration startet die scharfe Zone für volle duration:
+//               - Spieler in Zone → Dash blockiert
+//               - Spieler dasht in Zone → Dash wird nach kurzer Verzögerung abgebrochen
+//               - Spieler verlässt Zone → Dash wieder erlaubt
+//   3. EXPIRED: Zone deaktiviert sich, Billboard verschwindet, GameObject zerstört sich.
 //
 // Unterschiede zur Drone:
 //   - Zeitbegrenzt (zerstört sich nach Ablauf)
@@ -20,6 +24,7 @@ using UnityEngine;
 //   1. Root: Empty GameObject mit diesem Script
 //   2. Child: Quad (Billboard) mit transparentem Material
 //      → Wird automatisch auf effectRadius * 2 skaliert
+//      → Material wird zur Laufzeit als Instanz geklont (Farbverlauf)
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -33,29 +38,52 @@ public class AntiDashZone : MonoBehaviour
     [Tooltip("Radius der Dash-Sperrzone in Metern")]
     [SerializeField] private float effectRadius = 6f;
 
-    [Tooltip("Wie lange die Zone aktiv bleibt (in Sekunden)")]
+    [Tooltip("Wie lange die Zone aktiv bleibt (in Sekunden, NACH der Warn-Phase)")]
     [SerializeField] private float duration = 5f;
 
     [Tooltip("Verzögerung (unscaled Sekunden) bevor ein aktiver Dash abgebrochen wird")]
     [SerializeField] private float dashCancelDelay = 0.1f;
 
-    [Header("Billboard")]
-    [Tooltip("Child-Quad/Sprite das den Zonenradius visualisiert")]
+    [Header("Warning Phase")]
+    [Tooltip("Wie lange die Warn-Phase dauert bevor die Zone scharf wird (Sekunden)")]
+    [SerializeField] private float warnDuration = 1f;
+
+    [Tooltip("Renderer der Warn-Sphere (separates Child mit transparentem Material). " +
+             "Wird nur während der Warn-Phase angezeigt.")]
+    [SerializeField] private MeshRenderer warnSphereRenderer;
+
+    [Tooltip("Startfarbe der Warn-Sphere (Beginn der Warn-Phase)")]
+    [SerializeField] private Color warnColorStart = new Color(1f, 0.9f, 0f, 0.15f);
+
+    [Tooltip("Endfarbe der Warn-Sphere (kurz vor Aktivierung)")]
+    [SerializeField] private Color warnColorEnd = new Color(1f, 0f, 0f, 0.4f);
+
+    [Tooltip("Farbverlauf über die Warn-Zeit (X: 0=Start, 1=Aktivierung / Y: 0=StartColor, 1=EndColor)")]
+    [SerializeField] private AnimationCurve warnColorCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Header("Billboard (Active Phase)")]
+    [Tooltip("Child-Quad/Sprite das den Zonenradius während der aktiven Phase visualisiert")]
     [SerializeField] private Transform billboardTransform;
 
     [Header("Visual Feedback")]
     [Tooltip("Wenn true, wird das Billboard kurz vor Ablauf ausgeblendet (Blink-Effekt)")]
     [SerializeField] private bool blinkBeforeExpiry = true;
 
-    [Tooltip("Wann das Blinken beginnt (Sekunden vor Ablauf)")]
+    [Tooltip("Wann das Blinken beginnt (Sekunden vor Ablauf der Active-Phase)")]
     [SerializeField] private float blinkStartTime = 1.5f;
 
     [Tooltip("Blink-Geschwindigkeit (Zyklen pro Sekunde)")]
     [SerializeField] private float blinkFrequency = 4f;
 
     [Header("Audio")]
+    [Tooltip("Wird beim Übergang von Warning → Active abgespielt")]
     [SerializeField] private AudioClip activateSound;
+
+    [Tooltip("Wird beim Übergang von Active → Expired abgespielt")]
     [SerializeField] private AudioClip deactivateSound;
+
+    [Tooltip("Optional: Wird beim Spawn (Beginn der Warn-Phase) abgespielt")]
+    [SerializeField] private AudioClip warnSound;
 
     #endregion
 
@@ -63,24 +91,37 @@ public class AntiDashZone : MonoBehaviour
     #region Runtime State
     // ════════════════════════════════════════════════════════════════════════
 
+    private enum ZoneState
+    {
+        Warning,    // Warn-Phase: Sphere sichtbar, Dash noch erlaubt
+        Active,     // Scharfe Phase: Dash wird in Zone blockiert
+        Expired     // Zone abgelaufen, wird gerade zerstört
+    }
+
+    private ZoneState zoneState = ZoneState.Warning;
+
     // Player-Referenzen
     private PlayerCore playerCore;
     private PlayerDash playerDash;
     private Transform playerTransform;
 
-    // Zone-Tracking
+    // Zone-Tracking (nur in Active-Phase relevant)
     private bool playerInZone;
     private bool isDashDisabled;
     private float dashCancelTimer;
     private bool dashCancelActive;
 
     // Timer
-    private float remainingTime;
-    private bool isActive;
+    private float warnTimer;        // läuft hoch von 0 → warnDuration
+    private float remainingTime;    // läuft runter von duration → 0
 
-    // Billboard
+    // Billboard / Warn-Sphere
     private Transform cameraTransform;
     private AudioSource audioSource;
+    private Material warnSphereMaterial;
+
+    // Shader-Property-ID für die Hauptfarbe (gecacht für Performance)
+    private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
     #endregion
 
@@ -133,20 +174,158 @@ public class AntiDashZone : MonoBehaviour
         // Kamera cachen für Billboard
         cameraTransform = Camera.main != null ? Camera.main.transform : null;
 
-        // Billboard skalieren
+        // Setup
+        SetupWarnSphere();
         SetupBillboard();
 
-        // Zone aktivieren
-        remainingTime = duration;
-        isActive = true;
+        // Active-Billboard zu Beginn ausblenden (wird erst in Active-Phase sichtbar)
+        if (billboardTransform != null)
+            billboardTransform.gameObject.SetActive(false);
 
-        PlaySound(activateSound);
+        // In Warn-Phase starten
+        zoneState = ZoneState.Warning;
+        warnTimer = 0f;
+        remainingTime = duration;
+
+        PlaySound(warnSound);
     }
 
     private void Update()
     {
-        if (!isActive) return;
+        switch (zoneState)
+        {
+            case ZoneState.Warning:
+                UpdateWarningPhase();
+                break;
 
+            case ZoneState.Active:
+                UpdateActivePhase();
+                break;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Sicherheit: Dash immer wieder aktivieren wenn Zone zerstört wird
+        if (isDashDisabled && playerDash != null)
+        {
+            playerDash.SetDashEnabled(true);
+        }
+
+        // Material-Instanz aufräumen (verhindert Memory Leak)
+        if (warnSphereMaterial != null)
+        {
+            Destroy(warnSphereMaterial);
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Phase: Warning
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void UpdateWarningPhase()
+    {
+        warnTimer += Time.deltaTime;
+
+        // Farbverlauf der Warn-Sphere
+        UpdateWarnSphereColor();
+
+        // Warn-Sphere zur Kamera drehen (falls sie ein Billboard-Quad ist)
+        UpdateWarnSphereRotation();
+
+        // Warn-Phase abgelaufen → Zone scharf schalten
+        if (warnTimer >= warnDuration)
+        {
+            ActivateZone();
+        }
+    }
+
+    /// <summary>
+    /// Aktualisiert die Farbe der Warn-Sphere basierend auf dem Warn-Fortschritt.
+    /// Analog zu ProxyMineNpc.UpdateWarnSphereColor().
+    /// </summary>
+    private void UpdateWarnSphereColor()
+    {
+        if (warnSphereMaterial == null) return;
+
+        // Warn-Fortschritt: 0 = gerade gestartet, 1 = kurz vor Aktivierung
+        float warnProgress = warnTimer / warnDuration;
+        warnProgress = Mathf.Clamp01(warnProgress);
+
+        // AnimationCurve auswerten → steuert den Blend zwischen den Farben
+        float curveValue = warnColorCurve.Evaluate(warnProgress);
+
+        Color currentColor = Color.Lerp(warnColorStart, warnColorEnd, curveValue);
+        warnSphereMaterial.SetColor(BaseColorID, currentColor);
+    }
+
+    private void UpdateWarnSphereRotation()
+    {
+        if (warnSphereRenderer == null || cameraTransform == null) return;
+
+        // Nur drehen wenn die Sphere ein flaches Billboard ist.
+        // Bei einer echten 3D-Sphere ist das harmlos (sieht aus wie immer).
+        // Falls du das nicht willst, kannst du diese Methode komplett entfernen.
+    }
+
+    private void SetupWarnSphere()
+    {
+        if (warnSphereRenderer == null)
+        {
+            Debug.LogWarning($"[AntiDashZone] '{name}': Kein WarnSphere-Renderer zugewiesen! Warn-Phase wird ohne Visual ablaufen.", this);
+            return;
+        }
+
+        // Material-Instanz erstellen (verhindert, dass alle Zones dasselbe Material teilen)
+        warnSphereMaterial = warnSphereRenderer.material;
+
+        // Größe an Effekt-Radius anpassen
+        float diameter = effectRadius * 2f;
+        warnSphereRenderer.transform.localScale = Vector3.one * diameter;
+
+        // Sichtbar während Warn-Phase
+        warnSphereRenderer.enabled = true;
+
+        // Startfarbe sofort setzen (statt auf ersten Update-Frame zu warten)
+        warnSphereMaterial.SetColor(BaseColorID, warnColorStart);
+    }
+
+    private void HideWarnSphere()
+    {
+        if (warnSphereRenderer == null) return;
+        warnSphereRenderer.enabled = false;
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Phase Transition: Warning → Active
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void ActivateZone()
+    {
+        zoneState = ZoneState.Active;
+        remainingTime = duration;
+
+        // Warn-Sphere ausblenden, scharfes Billboard einblenden
+        HideWarnSphere();
+
+        if (billboardTransform != null)
+            billboardTransform.gameObject.SetActive(true);
+
+        PlaySound(activateSound);
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Phase: Active
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void UpdateActivePhase()
+    {
         // Timer herunterzählen
         remainingTime -= Time.deltaTime;
 
@@ -165,15 +344,6 @@ public class AntiDashZone : MonoBehaviour
         // Blink-Effekt kurz vor Ablauf
         if (blinkBeforeExpiry)
             UpdateBlink();
-    }
-
-    private void OnDestroy()
-    {
-        // Sicherheit: Dash immer wieder aktivieren wenn Zone zerstört wird
-        if (isDashDisabled && playerDash != null)
-        {
-            playerDash.SetDashEnabled(true);
-        }
     }
 
     #endregion
@@ -287,12 +457,12 @@ public class AntiDashZone : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Deactivation
+    #region Phase Transition: Active → Expired
     // ════════════════════════════════════════════════════════════════════════
 
     private void Deactivate()
     {
-        isActive = false;
+        zoneState = ZoneState.Expired;
         DisableZone();
         PlaySound(deactivateSound);
 
@@ -307,7 +477,7 @@ public class AntiDashZone : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Billboard
+    #region Billboard (Active Phase)
     // ════════════════════════════════════════════════════════════════════════
 
     private void SetupBillboard()
@@ -368,10 +538,18 @@ public class AntiDashZone : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = new Color(1f, 0.5f, 0f, 0.25f);
+        // Farbe je nach Phase
+        Color sphereColor = zoneState switch
+        {
+            ZoneState.Warning => new Color(1f, 0.9f, 0f, 0.25f),    // gelb
+            ZoneState.Active  => new Color(1f, 0.5f, 0f, 0.25f),    // orange
+            _                 => new Color(0.5f, 0.5f, 0.5f, 0.15f) // grau
+        };
+
+        Gizmos.color = sphereColor;
         Gizmos.DrawSphere(transform.position, effectRadius);
 
-        Gizmos.color = new Color(1f, 0.5f, 0f, 0.8f);
+        Gizmos.color = new Color(sphereColor.r, sphereColor.g, sphereColor.b, 0.8f);
         Gizmos.DrawWireSphere(transform.position, effectRadius);
 
         // Spieler-Verbindung zur Laufzeit

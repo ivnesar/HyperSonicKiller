@@ -90,7 +90,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &1351833780686682325
+--- !u!1 &2902684729662022810
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -98,53 +98,53 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 7522855587419424146}
-  - component: {fileID: 1124456011142625982}
-  - component: {fileID: 713118681364110098}
+  - component: {fileID: 9154709175401993273}
+  - component: {fileID: 3330455369731475114}
+  - component: {fileID: 8848335857601831016}
   m_Layer: 0
-  m_Name: Quad
+  m_Name: warnZone
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &7522855587419424146
+  m_IsActive: 1
+--- !u!4 &9154709175401993273
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1351833780686682325}
+  m_GameObject: {fileID: 2902684729662022810}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4385345642068278412}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &1124456011142625982
+--- !u!33 &3330455369731475114
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1351833780686682325}
-  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &713118681364110098
+  m_GameObject: {fileID: 2902684729662022810}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!23 &8848335857601831016
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1351833780686682325}
+  m_GameObject: {fileID: 2902684729662022810}
   m_Enabled: 1
-  m_CastShadows: 1
+  m_CastShadows: 0
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
-  m_LightProbeUsage: 1
+  m_LightProbeUsage: 0
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
   m_RayTraceProcedural: 0
@@ -156,7 +156,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 82ad287273cdf764192b86a9aa476cac, type: 2}
+  - {fileID: 2100000, guid: 9b261df0e516b4a4794cb46c70bbbabe, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -210,8 +210,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 7522855587419424146}
   - {fileID: 918054737053291440}
+  - {fileID: 9154709175401993273}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &6305089387292487818
@@ -226,12 +226,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82de08a8af2fa7542b733d7ef5a2b4e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AntiDashZone
-  effectRadius: 6
+  effectRadius: 4
   duration: 5
   dashCancelDelay: 0.1
+  warnDuration: 0.5
+  warnSphereRenderer: {fileID: 8848335857601831016}
+  warnColorStart: {r: 1, g: 1, b: 1, a: 0.15}
+  warnColorEnd: {r: 0, g: 0.2200644, b: 1, a: 0.4}
+  warnColorCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.8
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   billboardTransform: {fileID: 918054737053291440}
   blinkBeforeExpiry: 0
   blinkStartTime: 1.5
   blinkFrequency: 4
   activateSound: {fileID: 0}
   deactivateSound: {fileID: 0}
+  warnSound: {fileID: 0}
