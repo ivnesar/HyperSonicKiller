@@ -90,137 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &1249378481284488554
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4369384095485321866}
-  - component: {fileID: 8515939327025181648}
-  - component: {fileID: 8162427630629669055}
-  - component: {fileID: 9182207149295349333}
-  m_Layer: 0
-  m_Name: Billboard
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &4369384095485321866
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1249378481284488554}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
-  m_Children: []
-  m_Father: {fileID: 2125247001574764681}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &8515939327025181648
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1249378481284488554}
-  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &8162427630629669055
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1249378481284488554}
-  m_Enabled: 1
-  m_CastShadows: 0
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 0
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 6536b91f9604db64180a6e2a343d5716, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &9182207149295349333
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1249378481284488554}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7287f9072250daf4ca132036c7055daa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TextureSequencePlayer
-  frames:
-  - {fileID: 2800000, guid: 33cdbea316abc6545bce2992807574c2, type: 3}
-  - {fileID: 2800000, guid: 05694c88bdb0bd342aaf56e63028118c, type: 3}
-  - {fileID: 2800000, guid: fda8fe16cd4d25d43872394db9ad6a59, type: 3}
-  - {fileID: 2800000, guid: 3b1c557f26e909a40991c4af87d4e550, type: 3}
-  - {fileID: 2800000, guid: 9d2e577c7ef21894ba8dda59df7307ac, type: 3}
-  - {fileID: 2800000, guid: f8e3478adb77e9040bddd43dde8bc35a, type: 3}
-  - {fileID: 2800000, guid: c7044aa3b9f45374ca4864d58a76af67, type: 3}
-  - {fileID: 2800000, guid: 5898e33e8289eab4e9c55f6083236900, type: 3}
-  - {fileID: 2800000, guid: ea8d117efc3874545ba9da53664b884b, type: 3}
-  - {fileID: 2800000, guid: 02cbaae7e5975c7439f7c30fe543bf27, type: 3}
-  - {fileID: 2800000, guid: 11a910de224ac6c4e8760d1daa75e6b1, type: 3}
-  - {fileID: 2800000, guid: f05f286d39b436e41b7d1ca9b36b6fac, type: 3}
-  - {fileID: 2800000, guid: 17d07e2be727889498faf8e8f4907723, type: 3}
-  - {fileID: 2800000, guid: f65e040959257eb4c98fc9cf94bc5a70, type: 3}
-  - {fileID: 2800000, guid: 97586206762e0c349916ed279da49392, type: 3}
-  - {fileID: 2800000, guid: ee6d0ad3f97f7664ea6e71f1da9773ee, type: 3}
-  - {fileID: 2800000, guid: 84cd7924c63553045af0833531ea7090, type: 3}
-  - {fileID: 2800000, guid: bb5aa3c207e53c04cbdb269b3b0edb97, type: 3}
-  - {fileID: 2800000, guid: d6c3db2a99f746d4c879af097be8e40b, type: 3}
-  - {fileID: 2800000, guid: ef979aa1be491d74889757487501ddf7, type: 3}
-  - {fileID: 2800000, guid: 9a753f9a4bb1df5408510d8230e7f6d1, type: 3}
-  - {fileID: 2800000, guid: c98d6de9bb7b89a4b8287bd67a96d54c, type: 3}
-  - {fileID: 2800000, guid: dbe243e4a299ca0439bdecc88ff752f5, type: 3}
-  - {fileID: 2800000, guid: 78a2ee1b48c1d5442a242a8446d42a19, type: 3}
-  - {fileID: 2800000, guid: c47e7b8ede4b675479d0023fe7a63eaa, type: 3}
-  - {fileID: 2800000, guid: 569fa327a000ba24e8ad3d731b5b7464, type: 3}
-  fps: 15
 --- !u!1 &1589101246721323227
 GameObject:
   m_ObjectHideFlags: 0
@@ -527,7 +396,6 @@ Transform:
   m_Children:
   - {fileID: 4945390485093824976}
   - {fileID: 4116985019460331483}
-  - {fileID: 4369384095485321866}
   - {fileID: 1344255643146877446}
   - {fileID: 8050792347309021504}
   m_Father: {fileID: 0}
@@ -576,6 +444,32 @@ MonoBehaviour:
   snapTarget: {fileID: 0}
   showDebugInfo: 1
   displayName: 
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   effectRadius: 5
   dashCancelDelay: 0.3
   billboardTransform: {fileID: 0}

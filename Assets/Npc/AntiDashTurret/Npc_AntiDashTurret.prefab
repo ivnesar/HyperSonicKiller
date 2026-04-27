@@ -374,6 +374,7 @@ GameObject:
   - component: {fileID: 7180852223888601617}
   - component: {fileID: 4677948153725549190}
   - component: {fileID: 463668093891964045}
+  - component: {fileID: 7150337310831107149}
   - component: {fileID: 2581505014689217962}
   - component: {fileID: 2849521392424702093}
   - component: {fileID: 5462431333476793964}
@@ -400,6 +401,7 @@ Transform:
   - {fileID: 8566227258423984171}
   - {fileID: 229885552721379776}
   - {fileID: 6862643932063592509}
+  - {fileID: 6364884070772566143}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!136 &7180852223888601617
@@ -448,6 +450,32 @@ MonoBehaviour:
   snapTarget: {fileID: 6862643932063592509}
   showDebugInfo: 1
   displayName: Turret
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   detectionRange: 30
   laserTargetOverride: {fileID: 0}
   chargeDuration: 1.2
@@ -475,16 +503,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1d082698f93f3d4da8f5a53ce67adb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcLaserPointer
-  laserOrigin: {fileID: 8566227258423984171}
-  fieldOfView: 60
-  collisionMask:
-    serializedVersion: 2
-    m_Bits: 192
-  losCheckMask:
-    serializedVersion: 2
-    m_Bits: 136
-  laserLength: 50
-  transitionDuration: 0.3
+  laserRenderer: {fileID: 2597750874060130835}
   earlyWidth: 0.01
   lockedWidth: 0.06
   earlyColor: {r: 0.66498095, g: 0.514151, b: 1, a: 0.5}
@@ -513,12 +532,33 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  wiggleFalloffCurve:
+--- !u!114 &7150337310831107149
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8742668367218396410}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 708c2019a08d59e4cbd792886869fa52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LaserPointer_Dash
+  laserOrigin: {fileID: 8566227258423984171}
+  laserLength: 50
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 136
+  earlyWidth: 0.01
+  lockedWidth: 0.06
+  earlyColor: {r: 0.5149193, g: 0, b: 1, a: 0.5}
+  lockedColor: {r: 1, g: 0, b: 0.8248067, a: 1}
+  colorWidthCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 1
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -526,10 +566,10 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.8
-      value: 0
-      inSlope: -2
-      outSlope: -2
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 0
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -537,11 +577,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  wiggleMaxAngle: 8
-  wiggleFrequency: 3
-  enableWiggle: 1
-  laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
-  useUnscaledTime: 1
+  impactSphere: {fileID: 0}
+  laserMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   showDebug: 0
 --- !u!114 &2581505014689217962
 MonoBehaviour:
@@ -611,6 +648,58 @@ MonoBehaviour:
   - {fileID: 7465361257736954109}
   fadeDuration: 0.1
   logDebug: 0
+--- !u!1 &9024119787425347952
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6364884070772566143}
+  - component: {fileID: 2597750874060130835}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6364884070772566143
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9024119787425347952}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 6.5, y: 0, z: 5.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3597042216008839902}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2597750874060130835
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9024119787425347952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ff10193d3a255140afc21b2c0b6ded6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LaserRenderer
+  direction: {x: 0, y: 0, z: 1}
+  maxDistance: 100
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 72
+  initialColor: {r: 1, g: 0, b: 0, a: 1}
+  initialWidth: 0.01
+  initiallyVisible: 1
 --- !u!1 &9182164351864447353
 GameObject:
   m_ObjectHideFlags: 0

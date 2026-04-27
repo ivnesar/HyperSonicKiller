@@ -469,7 +469,7 @@ GameObject:
   - component: {fileID: 7859752730291968028}
   - component: {fileID: 3251378297847425365}
   - component: {fileID: 6742892932711821385}
-  - component: {fileID: 8241524766172378457}
+  - component: {fileID: 4144847731736527006}
   - component: {fileID: 9190051213164589030}
   m_Layer: 3
   m_Name: FirstPersonController
@@ -1049,7 +1049,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   logDebug: 0
---- !u!114 &8241524766172378457
+--- !u!114 &4144847731736527006
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1058,9 +1058,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 3935032124739193074}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2e5d8efc69974e498110045a106ee7a, type: 3}
+  m_Script: {fileID: 11500000, guid: f08790f4b7b50c748b2d81b609ca9f4a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DashPositionDebug
+  m_EditorClassIdentifier: Assembly-CSharp::GlassBreaker
+  glassLayer:
+    serializedVersion: 2
+    m_Bits: 16384
+  sweepRadius: 0.5
+  minSweepDistance: 0.01
+  calculateVelocityFromMovement: 1
 --- !u!114 &9190051213164589030
 MonoBehaviour:
   m_ObjectHideFlags: 0

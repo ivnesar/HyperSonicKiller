@@ -48,12 +48,12 @@ GameObject:
   - component: {fileID: 3138810100061786520}
   - component: {fileID: 6267239683382934993}
   - component: {fileID: 5009157187022586306}
-  - component: {fileID: 4221902022032833579}
   - component: {fileID: 3847955758969704611}
   - component: {fileID: 1493484320626804606}
   - component: {fileID: 2300341250759812020}
   - component: {fileID: 6037814341563429023}
   - component: {fileID: 1019041554508067350}
+  - component: {fileID: 4221902022032833579}
   m_Layer: 6
   m_Name: Npc_GenTwo
   m_TagString: Enemy
@@ -150,6 +150,32 @@ MonoBehaviour:
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 1
   displayName: Gen2
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   detectionRange: 30
   playerArrivalTime: 1
   playerInterceptHeightOffset: 1.7
@@ -393,42 +419,6 @@ MonoBehaviour:
     lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
   droppableEquipment: []
   showDebugInfo: 0
---- !u!114 &4221902022032833579
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2472838132611520362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa64e76d9deb88449974112c59975987, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NpcDebugInspector
-  currentState: "\u2014"
-  behaviorMode: 0
-  currentHealth: 0
-  isDead: 0
-  isStunned: 0
-  distanceToTarget: 0
-  canReachPlayer: 0
-  showForwardRaycast: 1
-  solidLayerMask:
-    serializedVersion: 2
-    m_Bits: 0
-  raycastDistance: 999
-  hitPointSphereSize: 0.5
-  rayColor: {r: 0, g: 1, b: 1, a: 1}
-  hitPointColor: {r: 1, g: 0, b: 1, a: 1}
-  noHitRayColor: {r: 1, g: 0, b: 0, a: 1}
-  showInterceptDebug: 1
-  interceptRayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  genTwoDashRayColor: {r: 1, g: 0, b: 0, a: 1}
-  interceptPointColor: {r: 1, g: 0.5, b: 0, a: 1}
-  interceptPointSize: 0.6
-  genTwoIsDashing: 0
-  genTwoHasValidIntercept: 0
-  genTwoPlayerInRange: 0
 --- !u!95 &3847955758969704611
 Animator:
   serializedVersion: 7
@@ -559,6 +549,42 @@ MonoBehaviour:
   - {fileID: 6494557163037032923}
   fadeDuration: 0.1
   logDebug: 0
+--- !u!114 &4221902022032833579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa64e76d9deb88449974112c59975987, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcDebugInspector
+  currentState: "\u2014"
+  behaviorMode: 0
+  currentHealth: 0
+  isDead: 0
+  isStunned: 0
+  distanceToTarget: 0
+  canReachPlayer: 0
+  showForwardRaycast: 1
+  solidLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  raycastDistance: 999
+  hitPointSphereSize: 0.5
+  rayColor: {r: 0, g: 1, b: 1, a: 1}
+  hitPointColor: {r: 1, g: 0, b: 1, a: 1}
+  noHitRayColor: {r: 1, g: 0, b: 0, a: 1}
+  showInterceptDebug: 1
+  interceptRayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  genTwoDashRayColor: {r: 1, g: 0, b: 0, a: 1}
+  interceptPointColor: {r: 1, g: 0.5, b: 0, a: 1}
+  interceptPointSize: 0.6
+  genTwoIsDashing: 0
+  genTwoHasValidIntercept: 0
+  genTwoPlayerInRange: 0
 --- !u!1 &3363251926924874602
 GameObject:
   m_ObjectHideFlags: 0
@@ -570,7 +596,7 @@ GameObject:
   - component: {fileID: 1721614003223164247}
   - component: {fileID: 3876846718573562972}
   - component: {fileID: 7012494726264946044}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: impactSphere
   m_TagString: Untagged
   m_Icon: {fileID: 0}
