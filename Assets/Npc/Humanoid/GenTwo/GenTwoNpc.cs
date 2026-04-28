@@ -179,7 +179,7 @@ public class GenTwoNpc : NpcBase
     /// <summary>
     /// Referenz auf den LaserPointer_Dash für Intercept-Modus Steuerung.
     /// </summary>
-    public LaserPointer_Dash LaserPointer { get; private set; }
+    public Gentwo_LaserPointer gentwoLaserPointer { get; private set; }
 
     /// <summary>Current dash direction (set once, never changes during dash).</summary>
     public Vector3 DashDirection => dashDirection;
@@ -234,7 +234,7 @@ public class GenTwoNpc : NpcBase
         }
 
         // GenTwo uses LaserPointer_Dash, not the standard NpcLaserPointer
-        LaserPointer = GetComponent<LaserPointer_Dash>();
+        gentwoLaserPointer = GetComponent<Gentwo_LaserPointer>();
     }
 
     protected override void Start()
@@ -776,7 +776,7 @@ public class GenTwoNpc : NpcBase
         hasPendingSwordDamage = false;
         pendingSwordRemovalDamage = 0;
 
-        LaserPointer?.ClearInterceptMode();
+        gentwoLaserPointer?.ClearInterceptMode();
 
         base.Die();
     }

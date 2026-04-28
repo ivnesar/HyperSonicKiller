@@ -147,7 +147,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
     /// NPCs die LaserPointer_Dash nutzen (z.B. GenTwo) finden und verwalten
     /// ihre eigene Referenz in der Subklasse.
     /// </summary>
-    protected NpcLaserPointer laserPointer;
+    protected NpcLaserPointer_aimIK laserPointerAimIK;
 
     /// <summary>
     /// Cached PlayerCore-Referenz für Dash-Erkennung und andere Spieler-Queries.
@@ -341,7 +341,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         aimController = GetComponent<AimController>();
 
         // LaserPointer finden (optional — nicht alle NPCs haben einen)
-        laserPointer = GetComponent<NpcLaserPointer>();
+        laserPointerAimIK = GetComponent<NpcLaserPointer_aimIK>();
 
         currentHealth = maxHealth;
 

@@ -373,11 +373,10 @@ GameObject:
   - component: {fileID: 3597042216008839902}
   - component: {fileID: 7180852223888601617}
   - component: {fileID: 4677948153725549190}
-  - component: {fileID: 463668093891964045}
-  - component: {fileID: 7150337310831107149}
+  - component: {fileID: 7682030954416122822}
   - component: {fileID: 2581505014689217962}
-  - component: {fileID: 2849521392424702093}
   - component: {fileID: 5462431333476793964}
+  - component: {fileID: 2849521392424702093}
   m_Layer: 6
   m_Name: Npc_AntiDashTurret
   m_TagString: Enemy
@@ -491,7 +490,7 @@ MonoBehaviour:
   fireBeamFadeDuration: 0.3
   chargeSound: {fileID: 0}
   fireSound: {fileID: 0}
---- !u!114 &463668093891964045
+--- !u!114 &7682030954416122822
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -500,59 +499,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 8742668367218396410}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b1d082698f93f3d4da8f5a53ce67adb2, type: 3}
+  m_Script: {fileID: 11500000, guid: 0465f63f9dc2808449d1dc5ce7ca8f5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcLaserPointer
-  laserRenderer: {fileID: 2597750874060130835}
-  earlyWidth: 0.01
-  lockedWidth: 0.06
-  earlyColor: {r: 0.66498095, g: 0.514151, b: 1, a: 0.5}
-  lockedColor: {r: 1, g: 0, b: 0.9425912, a: 1}
-  colorWidthCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 2
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!114 &7150337310831107149
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8742668367218396410}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 708c2019a08d59e4cbd792886869fa52, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LaserPointer_Dash
   laserOrigin: {fileID: 8566227258423984171}
-  laserLength: 50
+  fieldOfView: 90
   collisionMask:
     serializedVersion: 2
     m_Bits: 136
-  earlyWidth: 0.01
-  lockedWidth: 0.06
-  earlyColor: {r: 0.5149193, g: 0, b: 1, a: 0.5}
-  lockedColor: {r: 1, g: 0, b: 0.8248067, a: 1}
+  losCheckMask:
+    serializedVersion: 2
+    m_Bits: 128
+  laserLength: 50
+  transitionDuration: 0.3
+  earlyWidth: 0.03
+  lockedWidth: 0.1
+  earlyColor: {r: 0.2901961, g: 0, b: 1, a: 0.3529412}
+  lockedColor: {r: 1, g: 0, b: 0.7687216, a: 1}
   colorWidthCurve:
     serializedVersion: 2
     m_Curve:
@@ -577,8 +540,35 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  impactSphere: {fileID: 0}
-  laserMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.8
+      value: 0
+      inSlope: -2
+      outSlope: -2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wiggleMaxAngle: 8
+  wiggleFrequency: 3
+  enableWiggle: 1
+  laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
+  useUnscaledTime: 1
   showDebug: 0
 --- !u!114 &2581505014689217962
 MonoBehaviour:
@@ -596,6 +586,22 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &5462431333476793964
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8742668367218396410}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 553cb9e95c7537e48b9b9333cf1b2bb4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcReveal
+  revealObjects:
+  - {fileID: 7465361257736954109}
+  fadeDuration: 0.1
+  logDebug: 0
 --- !u!114 &2849521392424702093
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -632,22 +638,6 @@ MonoBehaviour:
   genTwoIsDashing: 0
   genTwoHasValidIntercept: 0
   genTwoPlayerInRange: 0
---- !u!114 &5462431333476793964
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8742668367218396410}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 553cb9e95c7537e48b9b9333cf1b2bb4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NpcReveal
-  revealObjects:
-  - {fileID: 7465361257736954109}
-  fadeDuration: 0.1
-  logDebug: 0
 --- !u!1 &9024119787425347952
 GameObject:
   m_ObjectHideFlags: 0

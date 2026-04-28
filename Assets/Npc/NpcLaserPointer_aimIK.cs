@@ -33,7 +33,7 @@ using UnityEngine;
 // ════════════════════════════════════════════════════════════════════════════
 
 [RequireComponent(typeof(NpcBase))]
-public class NpcLaserPointer : MonoBehaviour
+public class NpcLaserPointer_aimIK : MonoBehaviour
 {
     // ════════════════════════════════════════════════════════════════════════
     #region Inspector Fields

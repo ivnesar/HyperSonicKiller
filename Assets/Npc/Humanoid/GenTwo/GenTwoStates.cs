@@ -15,7 +15,7 @@ namespace GenTwoStates
             npc.ClearInterceptData();
             npc.IsLaserActive = false;
             npc.ResetAimProgressPublic();
-            npc.LaserPointer?.ClearInterceptMode();
+            npc.gentwoLaserPointer?.ClearInterceptMode();
             npc.AnimManager?.PlayIdle();
         }
 
@@ -62,9 +62,9 @@ namespace GenTwoStates
             npc.IsLaserActive = true;
             npc.SetAimProgressPublic(0f);
 
-            if (npc.HasValidIntercept && npc.LaserPointer != null)
+            if (npc.HasValidIntercept && npc.gentwoLaserPointer != null)
             {
-                npc.LaserPointer.SetInterceptMode(npc.InterceptPoint);
+                npc.gentwoLaserPointer.SetInterceptMode(npc.InterceptPoint);
             }
 
             Debug.Log($"[GenTwo] {npc.name}: Charging — intercept in " +
@@ -154,7 +154,7 @@ namespace GenTwoStates
             npc.AnimManager?.PlayLanding();
             npc.IsLaserActive = false;
             npc.ResetAimProgressPublic();
-            npc.LaserPointer?.ClearInterceptMode();
+            npc.gentwoLaserPointer?.ClearInterceptMode();
         }
     }
 
@@ -202,7 +202,7 @@ namespace GenTwoStates
             npc.ClearInterceptData();
             npc.IsLaserActive = false;
             npc.ResetAimProgressPublic();
-            npc.LaserPointer?.ClearInterceptMode();
+            npc.gentwoLaserPointer?.ClearInterceptMode();
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc) => null;

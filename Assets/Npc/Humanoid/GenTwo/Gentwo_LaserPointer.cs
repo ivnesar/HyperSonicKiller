@@ -37,7 +37,7 @@ using UnityEngine;
 // ════════════════════════════════════════════════════════════════════════════
 
 [RequireComponent(typeof(NpcBase))]
-public class LaserPointer_Dash : MonoBehaviour
+public class Gentwo_LaserPointer : MonoBehaviour
 {
     // ════════════════════════════════════════════════════════════════════════
     #region Inspector Fields
