@@ -22,7 +22,7 @@ namespace GenTwoStates
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
         {
             // Reagiere nur wenn der Spieler dasht, in Range ist UND Sichtlinie besteht
-            if (!npc.IsPlayerDashing) return null;
+            if (!npc.IsPlayerInAttackDash) return null;
             if (!npc.IsPlayerInRange) return null;
             if (!npc.HasLineOfSightToPlayer()) return null;
 
@@ -64,11 +64,12 @@ namespace GenTwoStates
 
             if (npc.HasValidIntercept && npc.gentwoLaserPointer != null)
             {
-                npc.gentwoLaserPointer.SetInterceptMode(npc.InterceptPoint);
+                npc.gentwoLaserPointer.SetInterceptMode(npc.VisualInterceptPoint);
             }
 
-            Debug.Log($"[GenTwo] {npc.name}: Charging — intercept in " +
-                      $"{npc.PlayerArrivalTime:F2}s, charge: {npc.ChargeDuration:F2}s");
+            Debug.Log($"[GenTwo] {npc.name}: Charging — impact in " +
+                      $"{npc.InterceptArrivalTime:F2}s, charge: {npc.ChargeDuration:F2}s, " +
+                      $"flight: {npc.InterceptFlightTime:F2}s");
         }
 
         public override INpcState<GenTwoNpc> Update(GenTwoNpc npc)
@@ -95,9 +96,9 @@ namespace GenTwoStates
     // DASHING - Flying toward intercept point
     //
     // GenTwo ist während des Dashes unangreifbar (handled in GenTwoNpc).
-    // Er fliegt geradeaus bis er eine Oberfläche trifft.
-    // Die Dash-Richtung wurde einmalig in TryCalculateIntercept() berechnet
-    // und ändert sich nicht mehr.
+    // Er fliegt auf den einmalig berechneten mathematischen Intercept zu.
+    // Surface-Kontakt stoppt ihn erst, nachdem der Intercept erreicht/überschritten wurde.
+    // Die Dash-Richtung wurde einmalig in TryCalculateIntercept() berechnet und ändert sich nicht mehr.
     // ─────────────────────────────────────────────────────────────────────
     public class Dashing : NpcStateBase<GenTwoNpc>
     {
@@ -144,7 +145,7 @@ namespace GenTwoStates
                 return new Recovery();
             }
 
-            // Kein Selbst-Abbruch — GenTwo fliegt bis zur Wand
+            // Kein Re-Targeting — GenTwo fliegt bis Intercept + Surface-Stop/Failsafe
             return null;
         }
 

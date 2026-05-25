@@ -51,8 +51,9 @@ MonoBehaviour:
   bulletRadius: 0.05
   maxSegmentsPerFrame: 10
   segmentLength: 2
-  impactEffectPrefab: {fileID: 0}
+  impactEffectPrefab: {fileID: 3404209282769709407, guid: 387124f1c0b88124babab0a4077ac52c, type: 3}
   trailRenderer: {fileID: 877083383349012279}
+  impactEffectDestructionTimer: 10
   showDebugRays: 1
   bulletDebugColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!96 &877083383349012279

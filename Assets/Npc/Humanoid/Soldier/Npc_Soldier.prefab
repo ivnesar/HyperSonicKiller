@@ -143,7 +143,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   maxShootingRange: 24
   preferredRange: 12
-  aimDuration: 0.7
+  aimDuration: 0.9
   timeBetweenShots: 0.05
   shotsPerSalvo: 31
   reloadDuration: 2

@@ -142,6 +142,7 @@ public class ExplosionSphere : MonoBehaviour
 
         foreach (Collider hit in hits)
         {
+            Debug.Log("[MINE EXPLOSION HIT] "+hit.gameObject.name);
             ProcessHit(hit);
         }
     }

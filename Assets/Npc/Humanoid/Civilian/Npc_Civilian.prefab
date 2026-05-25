@@ -132,7 +132,6 @@ GameObject:
   - component: {fileID: 6329124793579017172}
   - component: {fileID: 5996686098694072418}
   - component: {fileID: 6565262033440337451}
-  - component: {fileID: 5241556215887614238}
   - component: {fileID: 6267239683382934993}
   - component: {fileID: 5009157187022586306}
   - component: {fileID: 4221902022032833579}
@@ -230,6 +229,32 @@ MonoBehaviour:
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 1
   displayName: 
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   civilianBehavior: 1
   detectionDistance: 15
   fleeDistance: 10
@@ -351,86 +376,6 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 0
---- !u!114 &5241556215887614238
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2472838132611520362}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b1d082698f93f3d4da8f5a53ce67adb2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NpcLaserPointer
-  laserOrigin: {fileID: 0}
-  fieldOfView: 60
-  collisionMask:
-    serializedVersion: 2
-    m_Bits: 192
-  losCheckMask:
-    serializedVersion: 2
-    m_Bits: 136
-  laserLength: 50
-  transitionDuration: 0.3
-  earlyWidth: 0.01
-  lockedWidth: 0.06
-  earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
-  lockedColor: {r: 1, g: 0, b: 0, a: 1}
-  colorWidthCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 2
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  wiggleFalloffCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: -2
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  wiggleMaxAngle: 8
-  wiggleFrequency: 3
-  enableWiggle: 1
-  laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
-  useUnscaledTime: 0
-  showDebug: 0
 --- !u!114 &6267239683382934993
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -29,6 +29,7 @@ public class SoldierBullet : MonoBehaviour
     [Header("Visual")]
     [SerializeField] private GameObject impactEffectPrefab;
     [SerializeField] private TrailRenderer trailRenderer;
+    [SerializeField] private float impactEffectDestructionTimer = 5;
 
     [Header("Debug")]
     [SerializeField] private bool showDebugRays = true;
@@ -196,7 +197,7 @@ public class SoldierBullet : MonoBehaviour
         if (impactEffectPrefab != null)
         {
             GameObject impact = Instantiate(impactEffectPrefab, hit.point, Quaternion.LookRotation(hit.normal));
-            Destroy(impact, 2f);
+            Destroy(impact, impactEffectDestructionTimer);
         }
 
         // Destroy the bullet

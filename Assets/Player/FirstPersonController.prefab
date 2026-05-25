@@ -614,8 +614,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 348fffb6243982541adad8be7518fcbf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
-  maxDashCharges: 3
-  dashSpeed: 8
+  maxDashCharges: 2
+  dashSpeed: 6
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
@@ -683,7 +683,7 @@ MonoBehaviour:
   maxBlockHP: 300
   blockRegenDelay: 1
   blockRegenRate: 30
-  exhaustionDuration: 1.5
+  exhaustionDuration: 2
 --- !u!114 &4948156137820876829
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -787,7 +787,7 @@ MonoBehaviour:
       _NormalizedTimes: []
       _Callbacks: []
       _Names: []
-    _Clip: {fileID: 0}
+    _Clip: {fileID: -3419257869308726280, guid: f97e31264c14f594ab69ed711267cb20, type: 3}
     _NormalizedStartTime: NaN
   sprintDash:
     _FadeDuration: 0.25
@@ -796,7 +796,7 @@ MonoBehaviour:
       _NormalizedTimes: []
       _Callbacks: []
       _Names: []
-    _Clip: {fileID: 0}
+    _Clip: {fileID: -3419257869308726280, guid: f97e31264c14f594ab69ed711267cb20, type: 3}
     _NormalizedStartTime: NaN
   dash:
     _FadeDuration: 0.25
@@ -935,7 +935,7 @@ MonoBehaviour:
       _NormalizedTimes: []
       _Callbacks: []
       _Names: []
-    _Clip: {fileID: -3479850984791167260, guid: a5e9248caeeb9c94d806f9b6f8ff9a16, type: 3}
+    _Clip: {fileID: 2281661950476445769, guid: 08af30cf12f75ed41b11d9559426610e, type: 3}
     _NormalizedStartTime: NaN
   exhaustedExit:
     _FadeDuration: 0.25
@@ -944,7 +944,7 @@ MonoBehaviour:
       _NormalizedTimes: []
       _Callbacks: []
       _Names: []
-    _Clip: {fileID: -7092634530270860565, guid: 4e2bab48a9410a54cba56878bc4d0564, type: 3}
+    _Clip: {fileID: -778064746037936713, guid: c791291157050ea489e1e3a21ef71efe, type: 3}
     _NormalizedStartTime: NaN
   exhaustedExitLeadTime: 0.4
   walkThreshold: 0.1
