@@ -22,7 +22,6 @@ public class PlayerCore : MonoBehaviour
         Normal,
         SprintDashing,      // Sprint-dash (short dodge, NOT cancellable)
         Dashing,            // Attack dash (NOT invulnerable)
-        DashingToSword,     // Invulnerable dash to retrieve thrown sword
         StuckToSurface,
         Airborne,
         Dead
@@ -85,9 +84,9 @@ public class PlayerCore : MonoBehaviour
     
     /// <summary>
     /// Returns true if player is currently invulnerable.
-    /// Only sword dash grants invulnerability - normal attack dash does NOT.
+    /// Normal attack dash does NOT grant invulnerability.
     /// </summary>
-    public bool IsInvulnerable => CurrentState == PlayerState.DashingToSword;
+    public bool IsInvulnerable => false;
 
     /// <summary>
     /// Zielpunkt auf den NPC-Laser zeigen sollen.
@@ -182,8 +181,6 @@ public class PlayerCore : MonoBehaviour
             Dash.OnDashCompleted += HandleDashCompleted;
             Dash.OnWallStick += () => SetState(PlayerState.StuckToSurface);
             Dash.OnUnstick += () => SetState(PlayerState.Airborne);
-            Dash.OnSwordDashStarted += () => SetState(PlayerState.DashingToSword);
-            Dash.OnSwordDashCompleted += HandleSwordDashCompleted;
         }
 
         // Subscribe to movement for airborne detection
@@ -436,9 +433,6 @@ public class PlayerCore : MonoBehaviour
                 // Normal attack dash - NOT invulnerable
                 break;
                 
-            case PlayerState.DashingToSword:
-                // Sword dash - INVULNERABLE
-                break;
 
             case PlayerState.Dead:
                 // Cancel any active dash (this also resets Time.timeScale)
@@ -462,8 +456,6 @@ public class PlayerCore : MonoBehaviour
                 Cursor.visible = false;
                 break;
                 
-            case PlayerState.DashingToSword:
-                break;
                 
             case PlayerState.Dashing:
                 break;
@@ -520,18 +512,6 @@ public class PlayerCore : MonoBehaviour
         }
     }
     
-    private void HandleSwordDashCompleted()
-    {
-        // After sword dash, determine state based on grounding
-        if (Controller.isGrounded)
-        {
-            SetState(PlayerState.Normal);
-        }
-        else
-        {
-            SetState(PlayerState.Airborne);
-        }
-    }
 
     #endregion
 
@@ -544,7 +524,6 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     public bool CanMove => CurrentState != PlayerState.Dead && 
                            CurrentState != PlayerState.Dashing && 
-                           CurrentState != PlayerState.DashingToSword &&
                            CurrentState != PlayerState.StuckToSurface &&
                            CurrentState != PlayerState.SprintDashing;
     
@@ -555,16 +534,6 @@ public class PlayerCore : MonoBehaviour
                            CurrentState == PlayerState.Airborne || 
                            CurrentState == PlayerState.StuckToSurface;
     
-    /// <summary>
-    /// Returns true if player can initiate a sword dash.
-    /// (Sword must be stuck somewhere)
-    /// </summary>
-    public bool CanSwordDash => CurrentState != PlayerState.Dead && 
-                                CurrentState != PlayerState.Dashing &&
-                                CurrentState != PlayerState.DashingToSword &&
-                                CurrentState != PlayerState.SprintDashing &&
-                                SwordThrow != null && 
-                                SwordThrow.IsSwordStuck;
 
     /// <summary>
     /// DEPRECATED: Manual attacks no longer exist.
@@ -577,8 +546,7 @@ public class PlayerCore : MonoBehaviour
     /// <summary>
     /// Returns true if player can block incoming damage.
     /// </summary>
-    public bool CanBlock => CurrentState != PlayerState.Dead && 
-                            CurrentState != PlayerState.DashingToSword;  // Can still block during attack dash
+    public bool CanBlock => CurrentState != PlayerState.Dead;  // Can still block during attack dash
 
     #endregion
 

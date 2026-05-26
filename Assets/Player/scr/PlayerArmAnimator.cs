@@ -301,9 +301,6 @@ public class PlayerArmAnimator : MonoBehaviour
             case PlayerCore.PlayerState.Dashing:
                 return dash;
 
-            case PlayerCore.PlayerState.DashingToSword:
-                return swordDash;
-
             case PlayerCore.PlayerState.StuckToSurface:
                 return stuck;
         }

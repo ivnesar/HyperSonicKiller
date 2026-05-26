@@ -6,9 +6,7 @@ using System;
 /// Uses segmented spherecasting for reliable collision detection at high speeds.
 /// 
 /// UPDATED: Now deals damage when sword is recalled/removed from an embedded enemy.
-/// UPDATED: Two removal modes:
-///   - Normal recall (RMB): Uses OnSwordRemoved() - damage after stun
-///   - Sword dash: Uses OnSwordDashRemoval() - damage IMMEDIATELY
+/// UPDATED: Normal recall and dash instant-pickup both remove embedded swords via OnSwordRemoved().
 /// UPDATED: Sword passes through breakable objects (BreakableGlass) instead of sticking.
 /// </summary>
 public class ThrownSword : MonoBehaviour
@@ -207,27 +205,32 @@ public class ThrownSword : MonoBehaviour
     }
 
     /// <summary>
-    /// Apply damage when sword is removed via sword dash (player dashes to sword).
-    /// Deals extra damage on top of normal removal damage.
-    /// Damage is applied IMMEDIATELY (not after stun).
-    /// Called by PlayerSwordThrow.ForceRecallWithDashDamage().
+    /// Removes the stuck sword immediately without return flight.
+    /// Used by dash auto-pickup when the player initiates a normal attack dash close to the stuck sword.
+    /// Applies the same removal damage/stun as normal recall.
     /// </summary>
-    /// <param name="extraDamage">Additional damage from the dash attack</param>
-    /// <param name="stunDuration">Residual stun duration after removal</param>
-    public void ApplyDashRemovalDamage(int extraDamage, float stunDuration)
+    public void RemoveInstantlyFromTarget()
     {
+        if (isReturning) return;
+
+        isReturning = false;
+        isStuck = false;
+        isFlying = false;
+
+        transform.SetParent(null);
+
+        if (flyingParticles != null) flyingParticles.Stop();
+        if (impactParticles != null) impactParticles.Stop();
+        if (trail != null) trail.emitting = false;
+
         if (embeddedEnemy != null)
         {
-            // Calculate total damage: normal removal damage + dash bonus damage
-            int totalDamage = removalDamage + extraDamage;
-            
-            // Use OnSwordDashRemoval for IMMEDIATE damage application
-            embeddedEnemy.OnSwordDashRemoval(totalDamage, stunDuration);
-            
-            Debug.Log($"[ThrownSword] Dash removal from enemy - Dealt {totalDamage} damage IMMEDIATELY ({removalDamage} base + {extraDamage} dash bonus), {stunDuration}s residual stun");
-            
+            embeddedEnemy.OnSwordRemoved(removalDamage, postRemovalStunDuration);
+            Debug.Log($"[ThrownSword] Instant pickup removed sword from enemy - Dealt {removalDamage} damage, {postRemovalStunDuration}s residual stun");
             embeddedEnemy = null;
         }
+
+        SwordMarkerUI.Instance?.ClearSword();
     }
 
     /// <summary>

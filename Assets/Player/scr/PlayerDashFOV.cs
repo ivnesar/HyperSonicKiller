@@ -83,7 +83,6 @@ public class PlayerDashFOV : MonoBehaviour
         targetFOV = core.CurrentState switch
         {
             PlayerCore.PlayerState.Dashing        => dashFOV,
-            PlayerCore.PlayerState.DashingToSword  => swordDashFOV,
             // SprintDashing uses normal FOV — it's a short ground dodge, no dramatic FOV shift
             _                                      => normalFOV
         };

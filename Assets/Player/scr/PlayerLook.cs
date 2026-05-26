@@ -531,7 +531,6 @@ public class PlayerLook : MonoBehaviour
     {
         // Nicht während Dash oder Tod
         if (core.CurrentState == PlayerCore.PlayerState.Dashing ||
-            core.CurrentState == PlayerCore.PlayerState.DashingToSword ||
             core.IsDead)
             return;
 

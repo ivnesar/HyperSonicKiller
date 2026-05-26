@@ -322,8 +322,7 @@ public class GenOneNpc : NpcBase
     {
         if (playerCore == null) return false;
 
-        return playerCore.CurrentState == PlayerCore.PlayerState.Dashing ||
-               playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+        return playerCore.CurrentState == PlayerCore.PlayerState.Dashing;
     }
 
     /// <summary>

@@ -1211,6 +1211,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 7963086460737711400, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: endPointWallStickOffset
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 7963086460737711400, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
       propertyPath: surfaceLayerMask.m_Bits
       value: 128
       objectReference: {fileID: 0}

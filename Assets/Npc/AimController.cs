@@ -172,8 +172,8 @@ public class AimController : MonoBehaviour
             return;
         }
 
-        bool playerIsDashing = playerCore.CurrentState == PlayerCore.PlayerState.Dashing
-                            || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+        bool playerIsDashing = playerCore.CurrentState == PlayerCore.PlayerState.Dashing;
+            
 
         isDashOverrideActive = playerIsDashing;
     }

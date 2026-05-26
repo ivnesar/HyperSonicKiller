@@ -96,10 +96,7 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Maximale zusätzliche Flugzeit NACH dem Intercept, falls GenTwo keine Surface mehr berührt. " +
              "Failsafe gegen endloses Fliegen in unerwarteter Level-Geometrie.")]
     [SerializeField] private float maxPostInterceptFlightTime = 1.5f;
-
-    [Tooltip("Abstand (in Metern) entlang der Surface-Normale, mit dem GenTwo beim finalen Stop " +
-             "minimal von der Oberfläche weggerückt wird, damit er nicht sichtbar in der Wand steckt.")]
-    [SerializeField] private float endPointWallStickOffset = 0.05f;
+    
 
     [Header("Recovery")]
     [Tooltip("Time GenTwo stays stuck after a dash before returning to Idle")]
@@ -292,7 +289,6 @@ public class GenTwoNpc : NpcBase
         raycastSegments = Mathf.Max(1, raycastSegments);
         maxDashSegmentLength = Mathf.Max(0.05f, maxDashSegmentLength);
         maxPostInterceptFlightTime = Mathf.Max(0f, maxPostInterceptFlightTime);
-        endPointWallStickOffset = Mathf.Max(0f, endPointWallStickOffset);
 
         if (chargeDuration >= playerArrivalTime)
         {
@@ -826,11 +822,6 @@ public class GenTwoNpc : NpcBase
 
         surfaceNormal.Normalize();
         lastSurfaceNormal = surfaceNormal;
-
-        if (endPointWallStickOffset > 0f)
-        {
-            characterController.Move(surfaceNormal * endPointWallStickOffset);
-        }
 
         DetermineWallOrGround(surfaceNormal);
         PlaySound(impactSound);

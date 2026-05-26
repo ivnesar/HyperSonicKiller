@@ -3,13 +3,11 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Handles all dash mechanics: Attack Dash, Sword Dash, and wall-stick.
+/// Handles dash mechanics: Attack Dash and wall-stick.
 /// 
 /// NEW SYSTEM:
 /// - Attack Dash (LMB): Player dashes to a surface, automatically attacking NPCs in the path
-/// - Sword Dash (LMB while looking at stuck sword): Invulnerable dash to retrieve thrown sword
-///   * Requires sword to be within crosshair FOV cone (default 9°)
-///   * Requires line of sight to sword (not blocked by walls)
+/// - Dash auto-pickup: if a stuck sword is close enough, it is instantly picked up before the normal attack dash starts
 /// - Wall Stick: Cling to walls after dashing
 /// 
 /// The player acts like a "projectile" - dashing THROUGH enemies to reach surfaces.
@@ -26,8 +24,7 @@ public class PlayerDash : MonoBehaviour
     /// </summary>
     public enum DashType
     {
-        Attack,     // Normal dash with auto-attack on NPCs in path
-        ToSword     // Invulnerable dash to retrieve sword
+        Attack      // Normal dash with auto-attack on NPCs in path
     }
 
     #endregion
@@ -41,10 +38,7 @@ public class PlayerDash : MonoBehaviour
     public event Action OnWallStick;
     public event Action OnUnstick;
     public event Action<int> OnChargesChanged;  // remaining charges
-    
-    // Sword dash events
-    public event Action OnSwordDashStarted;
-    public event Action OnSwordDashCompleted;
+
     
     // NEW: Attack dash events
     public event Action<IEnemy> OnEnemyHitDuringDash;  // Fired for each enemy hit
@@ -109,31 +103,6 @@ public class PlayerDash : MonoBehaviour
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════
-    #region Inspector Settings - Sword Dash
-    // ════════════════════════════════════════════════════════════════════════
-
-    [Header("Sword Dash")]
-    [Tooltip("Sword Dash komplett deaktivieren (LMB bei Schwert löst dann immer Attack Dash aus)")]
-    [SerializeField] private bool disableSwordDash = false;
-    
-    [Tooltip("Speed when dashing to retrieve the thrown sword")]
-    [SerializeField] private float swordDashSpeed = 40f;
-    
-    [Tooltip("How close the player needs to be to 'catch' the sword")]
-    [SerializeField] private float swordCatchDistance = 1.5f;
-    
-    [Tooltip("Damage dealt to enemy when retrieving sword via dash")]
-    [SerializeField] private int swordDashDamage = 50;
-    
-    [Tooltip("Time to smoothly rotate towards the sword during dash")]
-    [SerializeField] private float swordDashRotationDuration = 0.2f;
-    
-    [Header("Sword Dash Targeting")]
-    [Tooltip("Maximum angle from crosshair to sword for Sword Dash to trigger (in degrees)")]
-    [SerializeField] private float swordDashMaxAngle = 9f;
-
-    #endregion
 
     // ════════════════════════════════════════════════════════════════════════
     #region Runtime State - General
@@ -183,16 +152,6 @@ public class PlayerDash : MonoBehaviour
 
     #endregion
 
-    // ════════════════════════════════════════════════════════════════════════
-    #region Runtime State - Sword Dash
-    // ════════════════════════════════════════════════════════════════════════
-
-    private bool isSwordDashing;
-    private Transform swordDashTarget;
-    private Quaternion swordDashStartRotation;
-    private float swordDashRotationTimer;
-
-    #endregion
 
     // ════════════════════════════════════════════════════════════════════════
     #region Properties
@@ -203,7 +162,6 @@ public class PlayerDash : MonoBehaviour
     public bool IsDashing => core.CurrentState == PlayerCore.PlayerState.Dashing;
     public bool IsStuck => core.CurrentState == PlayerCore.PlayerState.StuckToSurface;
     public Vector3 StuckSurfaceNormal => stuckSurfaceNormal;
-    public bool IsSwordDashing => isSwordDashing;
     public bool IsWallStickActive => isWallStickActive;
     
     /// <summary>Current dash speed (for external systems like GenTwo intercept calculation).</summary>
@@ -275,9 +233,6 @@ public class PlayerDash : MonoBehaviour
                 CheckDashCancels();
                 break;
                 
-            case PlayerCore.PlayerState.DashingToSword:
-                ProcessSwordDashMovement();
-                break;
 
             case PlayerCore.PlayerState.StuckToSurface:
                 MaintainWallStick();
@@ -324,48 +279,13 @@ public class PlayerDash : MonoBehaviour
         if (dashDisabled) return;
         if (!core.CanDash) return;
 
-        if (core.Input.GetActionDown("Dash"))
+        if (core.Input.GetActionDown("Dash") && currentCharges > 0)
         {
-            // Check if sword is thrown and stuck AND player is looking at it
-            if (!disableSwordDash && swordThrow != null && swordThrow.IsSwordStuck && IsSwordInCrosshairFOV())
-            {
-                TryStartSwordDash();
-            }
-            else if (currentCharges > 0)
-            {
-                // Normal attack dash (either no sword out, or not looking at sword)
-                TryStartAttackDash();
-            }
+            // If a thrown sword is stuck close to the player, pick it up instantly before
+            // the normal attack dash starts. RMB recall still uses visible return flight.
+            swordThrow?.TryInstantPickupForDash();
+            TryStartAttackDash();
         }
-    }
-    
-    /// <summary>
-    /// Checks if the stuck sword is within the crosshair FOV cone.
-    /// Returns true if the angle between camera forward and direction to sword
-    /// is less than or equal to swordDashMaxAngle.
-    /// </summary>
-    private bool IsSwordInCrosshairFOV()
-    {
-        if (swordThrow == null || swordThrow.ActiveSword == null) return false;
-        
-        Vector3 cameraPosition = core.CameraTransform.position;
-        Vector3 cameraForward = core.CameraTransform.forward;
-        Vector3 swordPosition = swordThrow.ActiveSword.transform.position;
-        
-        // Direction from camera to sword
-        Vector3 toSword = (swordPosition - cameraPosition).normalized;
-        
-        // Angle between look direction and sword direction
-        float angleToSword = Vector3.Angle(cameraForward, toSword);
-        
-        bool isInFOV = angleToSword <= swordDashMaxAngle;
-        
-        if (!isInFOV)
-        {
-            Debug.Log($"[PlayerDash] Sword outside FOV cone ({angleToSword:F1}° > {swordDashMaxAngle}°) - using Attack Dash");
-        }
-        
-        return isInFOV;
     }
 
     #endregion
@@ -661,145 +581,6 @@ public class PlayerDash : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Sword Dash Logic
-    // ════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Attempts to start a sword dash. Returns true if successful.
-    /// Called only after FOV check has passed (sword is in crosshair cone).
-    /// Still checks visibility (line of sight not blocked by walls).
-    /// </summary>
-    public bool TryStartSwordDash()
-    {
-        if (swordThrow == null || !swordThrow.IsSwordStuck) return false;
-        if (swordThrow.ActiveSword == null) return false;
-        if (isSwordDashing) return false;
-        if (core.IsDead) return false;
-        
-        swordDashTarget = swordThrow.ActiveSword.transform;
-        if (swordDashTarget == null) return false;
-        
-        // Check if sword is visible (not blocked)
-        if (!IsSwordVisible())
-        {
-            Debug.Log("[PlayerDash] Sword not visible - recalling instead of dashing");
-            swordThrow.ForceRecall();
-            swordDashTarget = null;
-            return false;
-        }
-        
-        StartSwordDash();
-        return true;
-    }
-    
-    private bool IsSwordVisible()
-    {
-        if (swordDashTarget == null) return false;
-        
-        Vector3 playerPos = transform.position + Vector3.up * 1f;
-        Vector3 swordPos = swordDashTarget.position;
-        Vector3 toSword = swordPos - playerPos;
-        float distanceToSword = toSword.magnitude;
-        
-        if (Physics.Raycast(playerPos, toSword.normalized, out RaycastHit hit, distanceToSword, dashSurfaceLayer))
-        {
-            float hitDistance = hit.distance;
-            if (hitDistance < distanceToSword - 0.5f)
-            {
-                Debug.Log($"[PlayerDash] Sword blocked by {hit.collider.name}");
-                return false;
-            }
-        }
-        
-        return true;
-    }
-
-    private void StartSwordDash()
-    {
-        DeactivateWallStick();
-        
-        isSwordDashing = true;
-        dashStartPosition = transform.position;
-        swordDashStartRotation = transform.rotation;
-        swordDashRotationTimer = 0f;
-        
-        TimeManager.Instance.StartDashSlowMo(dashTimeScale);
-        
-        OnSwordDashStarted?.Invoke();
-        
-        Debug.Log("[PlayerDash] Sword dash started!");
-    }
-
-    private void ProcessSwordDashMovement()
-    {
-        if (swordDashTarget == null || swordThrow == null || swordThrow.ActiveSword == null)
-        {
-            CompleteSwordDash(caughtSword: false);
-            return;
-        }
-        
-        Vector3 targetPos = swordDashTarget.position;
-        Vector3 toTarget = targetPos - transform.position;
-        float distance = toTarget.magnitude;
-        
-        if (distance <= swordCatchDistance)
-        {
-            CompleteSwordDash(caughtSword: true);
-            return;
-        }
-        
-        Vector3 moveDirection = toTarget.normalized;
-        float moveDistance = Mathf.Min(swordDashSpeed * TimeManager.Instance.GameDeltaTime, distance);
-        
-        core.Controller.Move(moveDirection * moveDistance);
-        
-        // Smooth rotation towards sword
-        swordDashRotationTimer += TimeManager.Instance.GameDeltaTime;
-        float rotationProgress = Mathf.Clamp01(swordDashRotationTimer / swordDashRotationDuration);
-        
-        Vector3 lookDir = toTarget;
-        lookDir.y = 0;
-        if (lookDir.sqrMagnitude > 0.01f)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(lookDir.normalized);
-            transform.rotation = Quaternion.Slerp(swordDashStartRotation, targetRotation, rotationProgress);
-        }
-    }
-
-    private void CompleteSwordDash(bool caughtSword)
-    {
-        TimeManager.Instance.StopDashSlowMo();
-        isSwordDashing = false;
-        swordDashTarget = null;
-        
-        if (caughtSword && swordThrow != null)
-        {
-            swordThrow.ForceRecallWithDashDamage(swordDashDamage);
-            Debug.Log("[PlayerDash] Sword dash completed - sword caught!");
-        }
-        else
-        {
-            Debug.Log("[PlayerDash] Sword dash ended without catching sword");
-        }
-        
-        OnSwordDashCompleted?.Invoke();
-    }
-
-    public void ForceCancelSwordDash()
-    {
-        if (!isSwordDashing) return;
-        
-        TimeManager.Instance.StopDashSlowMo();
-        isSwordDashing = false;
-        swordDashTarget = null;
-        swordDashRotationTimer = 0f;
-        
-        OnSwordDashCompleted?.Invoke();
-    }
-
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
     #region Wall Stick Logic
     // ════════════════════════════════════════════════════════════════════════
 
@@ -945,11 +726,6 @@ public class PlayerDash : MonoBehaviour
         {
             CancelDash(-5f);
         }
-        else if (isSwordDashing)
-        {
-            ForceCancelSwordDash();
-            core.SetState(PlayerCore.PlayerState.Airborne);
-        }
         else if (IsStuck)
         {
             Unstick(-5f);
@@ -973,9 +749,6 @@ public class PlayerDash : MonoBehaviour
         
         TimeManager.Instance.StopDashSlowMo();
         
-        isSwordDashing = false;
-        swordDashTarget = null;
-        swordDashRotationTimer = 0f;
         enemiesHitThisDash.Clear();
     }
 
@@ -1006,12 +779,6 @@ public class PlayerDash : MonoBehaviour
             Gizmos.DrawLine(dashTargetPosition, dashTargetPosition + stuckSurfaceNormal);
         }
         
-        if (isSwordDashing && swordDashTarget != null)
-        {
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawLine(transform.position, swordDashTarget.position);
-            Gizmos.DrawWireSphere(swordDashTarget.position, swordCatchDistance);
-        }
 
         if (isWallStickActive)
         {

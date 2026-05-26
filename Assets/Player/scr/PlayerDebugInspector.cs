@@ -165,7 +165,6 @@ public class PlayerDebugInspector : MonoBehaviour
         if (dash == null) return;
         dashCharges = dash.CurrentCharges;
         isDashing = dash.IsDashing;
-        isSwordDashing = dash.IsSwordDashing;
         isStuckToSurface = dash.IsStuck;
     }
 
@@ -205,7 +204,7 @@ public class PlayerDebugInspector : MonoBehaviour
             hasDashData = true;
             cachedDashDirection = dashDir;
         }
-        else if (dash != null && dash.IsSwordDashing && swordThrow != null && swordThrow.ActiveSword != null)
+        else if (dash != null && swordThrow != null && swordThrow.ActiveSword != null)
         {
             // Sword Dash: zeige Richtung zum Schwert
             Vector3 toSword = (swordThrow.ActiveSword.transform.position - transform.position).normalized;
@@ -243,7 +242,7 @@ public class PlayerDebugInspector : MonoBehaviour
         // Dash-Richtungs-Pfeil während Dash
         if (showDashRay && hasDashData)
         {
-            Gizmos.color = dash != null && dash.IsSwordDashing ? swordDashRayColor : dashRayColor;
+            Gizmos.color = dash != null ? swordDashRayColor : dashRayColor;
 
             // Pfeil-Spitze am Ende des Rays
             Vector3 arrowTip = origin + cachedDashDirection * 5f;
@@ -314,7 +313,6 @@ public class PlayerDebugInspector : MonoBehaviour
         {
             PlayerCore.PlayerState.SprintDashing => "<color=orange>SPRINT DASH</color>",
             PlayerCore.PlayerState.Dashing => "<color=cyan>DASHING</color>",
-            PlayerCore.PlayerState.DashingToSword => "<color=magenta>SWORD DASH</color>",
             PlayerCore.PlayerState.StuckToSurface => "<color=yellow>STUCK</color>",
             PlayerCore.PlayerState.Airborne => "<color=white>AIRBORNE</color>",
             PlayerCore.PlayerState.Dead => "<color=red>DEAD</color>",

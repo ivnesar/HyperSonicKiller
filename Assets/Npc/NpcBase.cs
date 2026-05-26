@@ -313,8 +313,7 @@ public abstract class NpcBase : MonoBehaviour, IEnemy
         get
         {
             if (playerCore == null) return false;
-            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing
-                || playerCore.CurrentState == PlayerCore.PlayerState.DashingToSword;
+            return playerCore.CurrentState == PlayerCore.PlayerState.Dashing;
         }
     }
 
