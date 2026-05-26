@@ -411,6 +411,11 @@ public class PlayerDash : MonoBehaviour
             Vector3 finalMove = rootTargetPosition - transform.position;
             core.Controller.Move(finalMove);
 
+            // If we pass close enough to a stuck sword during the dash, pick it up
+            // instantly before enemy damage is checked. This lets later enemies in
+            // the same dash be auto-attacked again after the sword is recovered.
+            swordThrow?.TryInstantPickupForDash();
+
             // Final check for enemies at destination
             CheckAndDamageEnemiesInRadius();
 
@@ -420,6 +425,11 @@ public class PlayerDash : MonoBehaviour
         {
             // Move root in the same direction as the camera axis (they're parallel).
             core.Controller.Move(dashDirection * moveDistance);
+
+            // If we pass close enough to a stuck sword during the dash, pick it up
+            // instantly before enemy damage is checked. Existing pickup rules still
+            // apply (stuck sword, distance threshold, line of sight).
+            swordThrow?.TryInstantPickupForDash();
 
             // Check for enemies to hit during movement
             CheckAndDamageEnemiesInRadius();
