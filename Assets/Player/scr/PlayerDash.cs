@@ -409,7 +409,7 @@ public class PlayerDash : MonoBehaviour
             // Root end = camera end - the offset we recorded at dash start.
             Vector3 rootTargetPosition = dashTargetPosition - rootToCameraOffsetAtDashStart;
             Vector3 finalMove = rootTargetPosition - transform.position;
-            core.Controller.Move(finalMove);
+            core.MovePlayer(finalMove);
 
             // If we pass close enough to a stuck sword during the dash, pick it up
             // instantly before enemy damage is checked. This lets later enemies in
@@ -424,7 +424,7 @@ public class PlayerDash : MonoBehaviour
         else
         {
             // Move root in the same direction as the camera axis (they're parallel).
-            core.Controller.Move(dashDirection * moveDistance);
+            core.MovePlayer(dashDirection * moveDistance);
 
             // If we pass close enough to a stuck sword during the dash, pick it up
             // instantly before enemy damage is checked. Existing pickup rules still

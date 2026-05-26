@@ -140,7 +140,7 @@ public class PlayerMovement : MonoBehaviour
     private void ApplyMovement()
     {
         moveDirection.y = verticalVelocity;
-        core.Controller.Move(moveDirection * Time.deltaTime);
+        core.MovePlayer(moveDirection * Time.deltaTime);
     }
 
     private void CheckGroundStateChange()

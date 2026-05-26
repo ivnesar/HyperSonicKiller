@@ -9,6 +9,7 @@ using System;
 /// UPDATED: Adjusted for new dash-attack system where LMB = Dash with auto-attack.
 /// UPDATED: Added SprintDashing state and PlayerSprint subsystem.
 /// UPDATED: Actual HP damage while disarmed requests sword recall as soon as possible.
+/// UPDATED: Stores player movement detection segment for reliable high-speed laser/mine checks.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(PlayerInputHandler))]
@@ -38,6 +39,11 @@ public class PlayerCore : MonoBehaviour
     [Tooltip("Transform auf das NPC-Laser zeigen sollen (z.B. Brusthöhe). " +
              "Wenn leer, wird transform.position als Fallback genutzt.")]
     [SerializeField] private Transform laserTarget;
+
+    [Header("Movement Detection")]
+    [Tooltip("Radius um die gespeicherte Player-Detection-Position. Wird z.B. von ProxyMineNpc genutzt, damit schnelle Bewegungen nicht zwischen Frames durch Laser springen.")]
+    [Min(0.01f)]
+    [SerializeField] private float movementDetectionRadius = 0.35f;
 
     #endregion
 
@@ -95,6 +101,21 @@ public class PlayerCore : MonoBehaviour
     /// NpcLaserPointer nutzt dies als automatisches Target.
     /// </summary>
     public Transform LaserTarget => laserTarget;
+
+    /// <summary>Radius um die gespeicherte Detection-Position des Spielers.</summary>
+    public float MovementDetectionRadius => Mathf.Max(0.01f, movementDetectionRadius);
+
+    /// <summary>Detection-Position vor der letzten zentral registrierten CharacterController-Bewegung.</summary>
+    public Vector3 PreviousDetectionPosition { get; private set; }
+
+    /// <summary>Aktuelle Detection-Position nach der letzten zentral registrierten CharacterController-Bewegung.</summary>
+    public Vector3 CurrentDetectionPosition { get; private set; }
+
+    /// <summary>Letzte registrierte Detection-Bewegung. Nützlich für Debug/High-Speed-Checks.</summary>
+    public Vector3 LastDetectionDelta => CurrentDetectionPosition - PreviousDetectionPosition;
+
+    /// <summary>Frame, in dem MovePlayer() zuletzt ein Detection-Segment geschrieben hat.</summary>
+    public int LastDetectionMoveFrame { get; private set; }
 
     // ── Last Damage Source (für Game Over Screen + Death Camera) ──
     private string lastDamageSourceName = "";
@@ -161,6 +182,8 @@ public class PlayerCore : MonoBehaviour
         Combat = GetComponent<PlayerCombat>();
         Health = GetComponent<PlayerHealth>();
         SwordThrow = GetComponent<PlayerSwordThrow>();
+
+        ResetMovementDetectionPositions();
 
         // Lock cursor
         Cursor.lockState = CursorLockMode.Locked;
@@ -330,6 +353,7 @@ public class PlayerCore : MonoBehaviour
         ClearDamageSource();
         Look?.ResetDeathCamera();
         SetState(PlayerState.Normal);
+        ResetMovementDetectionPositions();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -338,6 +362,61 @@ public class PlayerCore : MonoBehaviour
     }
 
     #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Movement Detection API
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Central wrapper for CharacterController.Move().
+    /// Any player subsystem that moves the controller should use this method
+    /// so external systems can reliably test the segment between the previous
+    /// and current player positions, even during very fast unscaled movement.
+    /// </summary>
+    public CollisionFlags MovePlayer(Vector3 motion)
+    {
+        if (Controller == null || !Controller.enabled)
+        {
+            return CollisionFlags.None;
+        }
+
+        PreviousDetectionPosition = CurrentDetectionPosition;
+        CollisionFlags flags = Controller.Move(motion);
+        CurrentDetectionPosition = GetMovementDetectionPosition();
+        LastDetectionMoveFrame = Time.frameCount;
+        return flags;
+    }
+
+    /// <summary>
+    /// Resets the stored movement segment to the player's current detection position.
+    /// Use after teleports, respawns, or manual transform changes where the previous
+    /// frame segment should not trigger hazards.
+    /// </summary>
+    public void ResetMovementDetectionPositions()
+    {
+        Vector3 currentPosition = GetMovementDetectionPosition();
+        PreviousDetectionPosition = currentPosition;
+        CurrentDetectionPosition = currentPosition;
+        LastDetectionMoveFrame = Time.frameCount;
+    }
+
+    private Vector3 GetMovementDetectionPosition()
+    {
+        if (laserTarget != null)
+        {
+            return laserTarget.position;
+        }
+
+        if (Controller != null)
+        {
+            return transform.TransformPoint(Controller.center);
+        }
+
+        return transform.position;
+    }
+
+    #endregion
+
 
     // ════════════════════════════════════════════════════════════════════════
     #region Damage Source Tracking

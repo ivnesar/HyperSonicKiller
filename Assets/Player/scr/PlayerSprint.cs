@@ -10,7 +10,7 @@ using System;
 /// Sprint has no cooldown and activates immediately when Shift is held.
 ///
 /// Sits on the Player GameObject alongside other subsystems.
-/// Moves the player via CharacterController.Move() during Sprint-Dash.
+/// Moves the player via PlayerCore.MovePlayer() during Sprint-Dash.
 /// Sets IsSprinting flag for PlayerMovement to read during normal Sprint.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
@@ -199,7 +199,7 @@ public class PlayerSprint : MonoBehaviour
         // Apply a small downward force to keep grounded
         move.y = -1f * Time.deltaTime;
 
-        core.Controller.Move(move);
+        core.MovePlayer(move);
     }
 
     private void CompleteDash()

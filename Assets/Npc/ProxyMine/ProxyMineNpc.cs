@@ -1,11 +1,11 @@
 using UnityEngine;
 
 // ════════════════════════════════════════════════════════════════════════════
-// PROXY MINE - Statische Mine die bei Spieler-Nähe explodiert
+// PROXY MINE - Statische Mine die durch ein gerichtetes Laser-Segment explodiert
 // ════════════════════════════════════════════════════════════════════════════
 //
 // Auslöser (jeder startet den Fuse-Timer):
-//   1. Spieler betritt Radius + Line-of-Sight
+//   1. Player-Bewegungssegment kreuzt das Laser-Segment
 //   2. Sword-Removal (Residual-Stun wird ignoriert, Fuse startet sofort)
 //   3. Explosions-Schaden von einer anderen Mine / Quelle
 //
@@ -14,6 +14,7 @@ using UnityEngine;
 //   - Kann durch Sword-Throw gestunnt werden (normales Embed/Remove)
 //   - Stun pausiert den Fuse-Timer
 //   - Kein NavMeshAgent / Animator nötig auf dem GameObject
+//   - Spielerkennung ist unabhängig von Trigger-/OverlapBox-Timing
 //
 // Warn-Sphere:
 //   - Child-Objekt mit MeshRenderer (transparentes Unlit-Material)
@@ -52,15 +53,35 @@ public class ProxyMineNpc : NpcBase
     #region Inspector Fields
     // ════════════════════════════════════════════════════════════════════════
 
-    [Header("Mine - Detection")]
-    [Tooltip("Radius in dem der Spieler erkannt wird")]
-    [SerializeField] private float detectionRadius = 8f;
+    [Header("Mine - Laser Detection")]
+    [Tooltip("Startpunkt und Richtung des Laser-Segments. Der Laser läuft entlang der lokalen Y+-Achse dieses Transforms.")]
+    [SerializeField] private Transform rayOrigin;
 
-    [Tooltip("Offset für den Raycast-Start (verhindert Start in Boden/Wand)")]
-    [SerializeField] private Vector3 raycastOffset = new Vector3(0f, 0.5f, 0f);
+    [Tooltip("Optionaler direkter Verweis auf den PlayerCore. Wenn leer, wird er beim Start automatisch gesucht.")]
+    [SerializeField] private PlayerCore playerCore;
 
-    [Tooltip("LayerMask für LoS-Blockierung (Wände, Boden etc.)")]
-    [SerializeField] private LayerMask lineOfSightBlockers;
+    [Tooltip("LayerMask für Wände / Level-Geometrie. Treffer auf dieser Maske kürzen die effektive Laser-Länge, damit der Laser nicht durch Wände geht.")]
+    [SerializeField] private LayerMask rayBlockerMask;
+
+    [Tooltip("Trigger-Interaction für Wand-/Blocker-Treffer. Für normale Level-Collider meistens Ignore verwenden.")]
+    [SerializeField] private QueryTriggerInteraction blockerRayTriggerInteraction = QueryTriggerInteraction.Ignore;
+
+    [Tooltip("Wenn aktiv, prüft die Mine zusätzlich Line-of-Sight vom Ray Origin zum nächsten Punkt auf dem Player-Bewegungssegment. Verhindert Auslösen hinter Wandkanten.")]
+    [SerializeField] private bool requireLineOfSightToMovementSegment = true;
+
+    [Tooltip("Halbe Dicke des Laser-Detektionssegments bei normaler Bewegung. Sollte nah an der visuellen Laserbreite bleiben, damit die Mine nicht unfair früh auslöst.")]
+    [Min(0.001f)]
+    [SerializeField] private float normalDetectionRadius = 0.04f;
+
+    [Tooltip("Halbe Dicke des Laser-Detektionssegments während Dash / starker Zeitverzerrung. Macht den Laser robust gegen sehr schnelle unscaled Bewegung.")]
+    [Min(0.001f)]
+    [SerializeField] private float dashDetectionRadius = 0.25f;
+
+    [Tooltip("Wenn aktiv, erzwingt der Player-State Dashing/SprintDashing den Dash Detection Radius.")]
+    [SerializeField] private bool useDashStateForDetectionRadius = true;
+
+    [Tooltip("Optionaler LineRenderer zur Ingame-Visualisierung des Laser-Segments. Wenn leer, wird ein LineRenderer auf diesem GameObject gesucht. Die Breite wird direkt am LineRenderer eingestellt.")]
+    [SerializeField] private LineRenderer rayLineRenderer;
 
     [Header("Mine - Trigger")]
     [Tooltip("Verzögerung zwischen Auslösung und Explosion (Sekunden)")]
@@ -118,6 +139,15 @@ public class ProxyMineNpc : NpcBase
     // Shader-Property-ID für die Hauptfarbe (gecacht für Performance)
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
+    private RaycastHit blockerRayHit;
+
+    private float currentEffectiveRayLength;
+    private float currentDetectionRadius;
+    private Vector3 currentLaserStart;
+    private Vector3 currentLaserEnd;
+    private Vector3 lastClosestPointOnLaser;
+    private Vector3 lastClosestPointOnPlayerSegment;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -127,6 +157,8 @@ public class ProxyMineNpc : NpcBase
     protected override void OnStart()
     {
         behaviorMode = BehaviorMode.Stationary;
+        CacheDetectionReferences();
+        SetupDetectionRayVisualization();
         SetupWarnSphere();
     }
 
@@ -135,10 +167,14 @@ public class ProxyMineNpc : NpcBase
         switch (mineState)
         {
             case MineState.Idle:
-                CheckForPlayer();
+                UpdateLaserSegmentCache();
+                CheckPlayerMovementAgainstLaser();
+                UpdateDetectionRayVisualization();
                 break;
 
             case MineState.Triggered:
+                UpdateDetectionRayVisualization();
+                SyncWarnSphereTransform();
                 UpdateFuseTimer();
                 UpdateWarnSphereColor();
                 break;
@@ -151,23 +187,258 @@ public class ProxyMineNpc : NpcBase
     #region Detection
     // ════════════════════════════════════════════════════════════════════════
 
-    private void CheckForPlayer()
+    private void CacheDetectionReferences()
     {
-        if (playerTransform == null) return;
-        if (DistanceToTarget > detectionRadius) return;
-        if (!HasLineOfSight()) return;
+        if (playerCore == null)
+        {
+            playerCore = FindFirstObjectByType<PlayerCore>();
+        }
+
+    }
+
+    private void SetupDetectionRayVisualization()
+    {
+        if (rayLineRenderer == null)
+        {
+            rayLineRenderer = GetComponent<LineRenderer>();
+        }
+
+        if (rayLineRenderer == null) return;
+
+        rayLineRenderer.useWorldSpace = true;
+        rayLineRenderer.positionCount = 2;
+        rayLineRenderer.enabled = true;
+        UpdateLaserSegmentCache();
+        UpdateDetectionRayVisualization();
+    }
+
+    private void UpdateLaserSegmentCache()
+    {
+        Transform originTransform = GetRayOriginTransform();
+        Vector3 origin = originTransform.position;
+        Vector3 direction = originTransform.up;
+
+        currentEffectiveRayLength = GetEffectiveRayLength(origin, direction);
+        currentDetectionRadius = GetCurrentDetectionRadius();
+        currentLaserStart = origin;
+        currentLaserEnd = origin + direction * currentEffectiveRayLength;
+    }
+
+    /// <summary>
+    /// Reliable high-speed detection: checks whether the player's movement segment
+    /// from PlayerCore.PreviousDetectionPosition to CurrentDetectionPosition crossed
+    /// the laser segment this frame. This does not depend on trigger or physics query timing.
+    /// </summary>
+    private void CheckPlayerMovementAgainstLaser()
+    {
+        if (mineState != MineState.Idle) return;
+
+        if (playerCore == null)
+        {
+            playerCore = FindFirstObjectByType<PlayerCore>();
+            if (playerCore == null) return;
+        }
+
+        if (currentEffectiveRayLength <= 0f || currentDetectionRadius <= 0f) return;
+
+        Vector3 playerPrevious = playerCore.PreviousDetectionPosition;
+        Vector3 playerCurrent = playerCore.CurrentDetectionPosition;
+
+        // Avoid repeatedly evaluating an old high-speed segment forever if the player
+        // is no longer moving. Age <= 1 supports both common script execution orders:
+        // mine before player movement and mine after player movement.
+        int segmentAge = Time.frameCount - playerCore.LastDetectionMoveFrame;
+        if (segmentAge > 1)
+        {
+            playerPrevious = playerCurrent;
+        }
+
+        float sqrDistance = SegmentSegmentSqrDistance(
+            currentLaserStart,
+            currentLaserEnd,
+            playerPrevious,
+            playerCurrent,
+            out lastClosestPointOnLaser,
+            out lastClosestPointOnPlayerSegment
+        );
+
+        float allowedDistance = currentDetectionRadius + playerCore.MovementDetectionRadius;
+        if (sqrDistance > allowedDistance * allowedDistance) return;
+
+        if (!HasLineOfSightToMovementSegment()) return;
 
         StartFuse();
     }
 
-    private bool HasLineOfSight()
+    private bool HasLineOfSightToMovementSegment()
     {
-        Vector3 origin = transform.position + raycastOffset;
-        Vector3 targetPos = playerTransform.position + Vector3.up * 0.5f;
-        Vector3 direction = targetPos - origin;
-        float distance = direction.magnitude;
+        if (!requireLineOfSightToMovementSegment) return true;
+        if (rayBlockerMask.value == 0) return true;
 
-        return !Physics.Raycast(origin, direction.normalized, distance, lineOfSightBlockers);
+        Vector3 toTarget = lastClosestPointOnPlayerSegment - currentLaserStart;
+        float distance = toTarget.magnitude;
+        if (distance <= 0.001f) return true;
+
+        Vector3 direction = toTarget / distance;
+        return !Physics.Raycast(
+            currentLaserStart,
+            direction,
+            distance,
+            rayBlockerMask,
+            blockerRayTriggerInteraction
+        );
+    }
+
+    /// <summary>
+    /// Ermittelt die sichtbare / gültige Laser-Länge. Blocker wie Wände schneiden den Laser ab.
+    /// </summary>
+    private float GetEffectiveRayLength(Vector3 origin, Vector3 direction)
+    {
+        float maxRayLength = GetExplosionRadius();
+
+        if (maxRayLength <= 0f) return 0f;
+
+        if (rayBlockerMask.value != 0 && Physics.Raycast(
+                origin,
+                direction,
+                out blockerRayHit,
+                maxRayLength,
+                rayBlockerMask,
+                blockerRayTriggerInteraction))
+        {
+            return Mathf.Max(0f, blockerRayHit.distance);
+        }
+
+        return maxRayLength;
+    }
+
+    /// <summary>
+    /// Gibt den aktuellen halben Radius des Laser-Detektionssegments zurück.
+    /// Normal: klein und visuell fair.
+    /// Dash: größer, um schnelle unscaled Bewegung zuverlässig zu erkennen.
+    /// </summary>
+    private float GetCurrentDetectionRadius()
+    {
+        float radius = Mathf.Max(0.001f, normalDetectionRadius);
+        float dashRadius = Mathf.Max(radius, dashDetectionRadius);
+
+        if (useDashStateForDetectionRadius && IsPlayerInFastMovementState())
+        {
+            radius = dashRadius;
+        }
+
+        return radius;
+    }
+
+    private bool IsPlayerInFastMovementState()
+    {
+        if (playerCore == null)
+        {
+            playerCore = FindFirstObjectByType<PlayerCore>();
+        }
+
+        if (playerCore == null) return false;
+
+        return playerCore.CurrentState == PlayerCore.PlayerState.Dashing ||
+               playerCore.CurrentState == PlayerCore.PlayerState.SprintDashing;
+    }
+
+    private Transform GetRayOriginTransform()
+    {
+        return rayOrigin != null ? rayOrigin : transform;
+    }
+
+    private Vector3 GetRayEndPosition()
+    {
+        UpdateLaserSegmentCache();
+        return currentLaserEnd;
+    }
+
+    private void UpdateDetectionRayVisualization()
+    {
+        if (rayLineRenderer == null) return;
+
+        rayLineRenderer.SetPosition(0, currentLaserStart);
+        rayLineRenderer.SetPosition(1, currentLaserEnd);
+    }
+
+    /// <summary>
+    /// Squared distance between two finite 3D segments.
+    /// Based on the standard closest-points formulation and handles degenerate segments.
+    /// </summary>
+    private static float SegmentSegmentSqrDistance(
+        Vector3 p1,
+        Vector3 q1,
+        Vector3 p2,
+        Vector3 q2,
+        out Vector3 closestPoint1,
+        out Vector3 closestPoint2)
+    {
+        const float epsilon = 0.000001f;
+
+        Vector3 d1 = q1 - p1; // Direction vector of segment S1
+        Vector3 d2 = q2 - p2; // Direction vector of segment S2
+        Vector3 r = p1 - p2;
+        float a = Vector3.Dot(d1, d1); // Squared length of S1
+        float e = Vector3.Dot(d2, d2); // Squared length of S2
+        float f = Vector3.Dot(d2, r);
+
+        float s;
+        float t;
+
+        if (a <= epsilon && e <= epsilon)
+        {
+            closestPoint1 = p1;
+            closestPoint2 = p2;
+            return (closestPoint1 - closestPoint2).sqrMagnitude;
+        }
+
+        if (a <= epsilon)
+        {
+            s = 0f;
+            t = Mathf.Clamp01(f / e);
+        }
+        else
+        {
+            float c = Vector3.Dot(d1, r);
+
+            if (e <= epsilon)
+            {
+                t = 0f;
+                s = Mathf.Clamp01(-c / a);
+            }
+            else
+            {
+                float b = Vector3.Dot(d1, d2);
+                float denom = a * e - b * b;
+
+                if (denom != 0f)
+                {
+                    s = Mathf.Clamp01((b * f - c * e) / denom);
+                }
+                else
+                {
+                    s = 0f;
+                }
+
+                t = (b * s + f) / e;
+
+                if (t < 0f)
+                {
+                    t = 0f;
+                    s = Mathf.Clamp01(-c / a);
+                }
+                else if (t > 1f)
+                {
+                    t = 1f;
+                    s = Mathf.Clamp01((b - c) / a);
+                }
+            }
+        }
+
+        closestPoint1 = p1 + d1 * s;
+        closestPoint2 = p2 + d2 * t;
+        return (closestPoint1 - closestPoint2).sqrMagnitude;
     }
 
     #endregion
@@ -187,13 +458,58 @@ public class ProxyMineNpc : NpcBase
         // Material-Instanz erstellen (verhindert, dass alle Minen dasselbe Material teilen)
         warnSphereMaterial = warnSphereRenderer.material;
 
-        // Größe an Explosionsradius anpassen (vom Prefab auslesen)
-        float explosionRadius = GetExplosionRadius();
-        float diameter = explosionRadius * 2f;
-        warnSphereRenderer.transform.localScale = Vector3.one * diameter;
+        // Warn-Sphere exakt auf die spätere Explosion legen und auf dieselbe Weltgröße setzen.
+        // Wichtig: localScale alleine wäre abhängig von Parent-Scale der Mine.
+        SyncWarnSphereTransform();
 
         // Zu Beginn unsichtbar
         warnSphereRenderer.enabled = false;
+    }
+
+    /// <summary>
+    /// Richtet die Warn-Sphere auf dieselbe Position und denselben Welt-Durchmesser
+    /// wie die ExplosionSphere aus. Dadurch bleibt sie unabhängig von Parent-Scale
+    /// oder lokalen Offsets im Prefab synchron zur tatsächlichen Explosion.
+    /// </summary>
+    private void SyncWarnSphereTransform()
+    {
+        if (warnSphereRenderer == null) return;
+
+        Transform warnTransform = warnSphereRenderer.transform;
+
+        float explosionRadius = GetExplosionRadius();
+        float diameter = explosionRadius * 2f;
+
+        // Die Explosion wird in Explode() bei transform.position gespawnt.
+        warnTransform.position = transform.position;
+        warnTransform.rotation = Quaternion.identity;
+
+        SetWorldScale(warnTransform, Vector3.one * diameter);
+    }
+
+    /// <summary>
+    /// Setzt die gewünschte Welt-Skalierung auch dann korrekt, wenn das Objekt
+    /// als Child unter einem skalierten Parent hängt.
+    /// </summary>
+    private static void SetWorldScale(Transform target, Vector3 worldScale)
+    {
+        if (target.parent == null)
+        {
+            target.localScale = worldScale;
+            return;
+        }
+
+        Vector3 parentScale = target.parent.lossyScale;
+        target.localScale = new Vector3(
+            DivideSafe(worldScale.x, parentScale.x),
+            DivideSafe(worldScale.y, parentScale.y),
+            DivideSafe(worldScale.z, parentScale.z)
+        );
+    }
+
+    private static float DivideSafe(float value, float divisor)
+    {
+        return Mathf.Approximately(divisor, 0f) ? value : value / divisor;
     }
 
     /// <summary>
@@ -213,6 +529,7 @@ public class ProxyMineNpc : NpcBase
     private void ShowWarnSphere()
     {
         if (warnSphereRenderer == null) return;
+        SyncWarnSphereTransform();
         warnSphereRenderer.enabled = true;
     }
 
@@ -279,6 +596,10 @@ public class ProxyMineNpc : NpcBase
         mineState = MineState.Exploded;
 
         HideWarnSphere();
+        if (rayLineRenderer != null)
+        {
+            rayLineRenderer.enabled = false;
+        }
 
         Vector3 spawnPos = transform.position;
 
@@ -463,31 +784,38 @@ public class ProxyMineNpc : NpcBase
 
     protected override void OnDrawGizmosSelected()
     {
-        // Detection Radius
-        Gizmos.color = mineState == MineState.Triggered
-            ? new Color(1f, 0f, 0f, 0.3f)
-            : new Color(1f, 1f, 0f, 0.2f);
-        Gizmos.DrawWireSphere(transform.position, detectionRadius);
-
         // Explosionsradius (zeigt synchronisierten Wert)
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.15f);
         Gizmos.DrawWireSphere(transform.position, GetExplosionRadius());
 
-        // Raycast Origin
+        // Laser-Segment: startet am Origin und läuft entlang lokaler Y+-Achse.
+        Transform originTransform = GetRayOriginTransform();
+        Vector3 rayStart = originTransform.position;
+        Vector3 direction = originTransform.up;
+        float length = Application.isPlaying && currentEffectiveRayLength > 0f
+            ? currentEffectiveRayLength
+            : GetExplosionRadius();
+        float radius = Application.isPlaying && currentDetectionRadius > 0f
+            ? currentDetectionRadius
+            : Mathf.Max(0.001f, normalDetectionRadius);
+        Vector3 rayEnd = rayStart + direction * length;
+
         Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(transform.position + raycastOffset, 0.1f);
+        Gizmos.DrawSphere(rayStart, 0.1f);
+        Gizmos.DrawLine(rayStart, rayEnd);
 
-        // LoS zum Spieler (Laufzeit)
-        if (Application.isPlaying && playerTransform != null)
-        {
-            Vector3 origin = transform.position + raycastOffset;
-            Vector3 target = playerTransform.position + Vector3.up * 0.5f;
-
-            bool hasLos = HasLineOfSight();
-            Gizmos.color = hasLos ? Color.green : Color.red;
-            Gizmos.DrawLine(origin, target);
-        }
+        // Grobe Visualisierung des Laser-Detektionsradius als Box.
+        Matrix4x4 oldMatrix = Gizmos.matrix;
+        Gizmos.matrix = Matrix4x4.TRS(
+            rayStart + direction * (length * 0.5f),
+            originTransform.rotation,
+            Vector3.one
+        );
+        Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
+        Gizmos.DrawWireCube(Vector3.zero, new Vector3(radius * 2f, length, radius * 2f));
+        Gizmos.matrix = oldMatrix;
     }
 
     #endregion
 }
+

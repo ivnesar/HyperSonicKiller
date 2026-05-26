@@ -321,7 +321,6 @@ GameObject:
   - component: {fileID: 172196604}
   - component: {fileID: 172196603}
   - component: {fileID: 172196602}
-  - component: {fileID: 172196601}
   m_Layer: 7
   m_Name: Cube (11)
   m_TagString: Untagged
@@ -344,18 +343,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &172196601
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 172196599}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &172196602
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -508,7 +495,6 @@ GameObject:
   - component: {fileID: 193230793}
   - component: {fileID: 193230792}
   - component: {fileID: 193230791}
-  - component: {fileID: 193230790}
   m_Layer: 7
   m_Name: Cube (07)
   m_TagString: Untagged
@@ -531,18 +517,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &193230790
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 193230788}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &193230791
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -844,7 +818,6 @@ GameObject:
   - component: {fileID: 295275997}
   - component: {fileID: 295275996}
   - component: {fileID: 295275995}
-  - component: {fileID: 295275994}
   m_Layer: 7
   m_Name: Cube (3)
   m_TagString: Untagged
@@ -867,18 +840,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &295275994
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 295275992}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &295275995
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1924,7 +1885,6 @@ GameObject:
   - component: {fileID: 561080633}
   - component: {fileID: 561080632}
   - component: {fileID: 561080631}
-  - component: {fileID: 561080630}
   m_Layer: 7
   m_Name: Cube (17)
   m_TagString: Untagged
@@ -1947,18 +1907,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &561080630
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 561080628}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &561080631
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3526,7 +3474,6 @@ GameObject:
   - component: {fileID: 959948498}
   - component: {fileID: 959948497}
   - component: {fileID: 959948496}
-  - component: {fileID: 959948495}
   m_Layer: 7
   m_Name: Cube (4)
   m_TagString: Untagged
@@ -3549,18 +3496,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &959948495
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 959948493}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &959948496
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4001,7 +3936,6 @@ GameObject:
   - component: {fileID: 1129564645}
   - component: {fileID: 1129564644}
   - component: {fileID: 1129564643}
-  - component: {fileID: 1129564642}
   m_Layer: 7
   m_Name: Cube (8)
   m_TagString: Untagged
@@ -4024,18 +3958,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1129564642
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1129564640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1129564643
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4424,7 +4346,6 @@ GameObject:
   - component: {fileID: 1174073573}
   - component: {fileID: 1174073572}
   - component: {fileID: 1174073571}
-  - component: {fileID: 1174073570}
   m_Layer: 7
   m_Name: Cube (08)
   m_TagString: Untagged
@@ -4447,18 +4368,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1174073570
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1174073568}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1174073571
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4906,7 +4815,6 @@ GameObject:
   - component: {fileID: 1305572280}
   - component: {fileID: 1305572279}
   - component: {fileID: 1305572278}
-  - component: {fileID: 1305572277}
   m_Layer: 7
   m_Name: Cube (06)
   m_TagString: Untagged
@@ -4929,18 +4837,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1305572277
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1305572275}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1305572278
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5529,7 +5425,6 @@ GameObject:
   - component: {fileID: 1460871271}
   - component: {fileID: 1460871270}
   - component: {fileID: 1460871269}
-  - component: {fileID: 1460871268}
   m_Layer: 7
   m_Name: Cube (9)
   m_TagString: Untagged
@@ -5552,18 +5447,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1460871268
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1460871266}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1460871269
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5901,7 +5784,6 @@ GameObject:
   - component: {fileID: 1606350622}
   - component: {fileID: 1606350621}
   - component: {fileID: 1606350620}
-  - component: {fileID: 1606350619}
   m_Layer: 7
   m_Name: Cube (10)
   m_TagString: Untagged
@@ -5924,18 +5806,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1606350619
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1606350617}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1606350620
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6088,7 +5958,6 @@ GameObject:
   - component: {fileID: 1632838709}
   - component: {fileID: 1632838708}
   - component: {fileID: 1632838707}
-  - component: {fileID: 1632838706}
   m_Layer: 7
   m_Name: Cube (12)
   m_TagString: Untagged
@@ -6111,18 +5980,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1632838706
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1632838704}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1632838707
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6625,7 +6482,6 @@ GameObject:
   - component: {fileID: 1748878907}
   - component: {fileID: 1748878906}
   - component: {fileID: 1748878905}
-  - component: {fileID: 1748878904}
   m_Layer: 7
   m_Name: Cube (2)
   m_TagString: Untagged
@@ -6648,18 +6504,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1748878904
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1748878902}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1748878905
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7120,7 +6964,6 @@ GameObject:
   - component: {fileID: 1805213903}
   - component: {fileID: 1805213902}
   - component: {fileID: 1805213901}
-  - component: {fileID: 1805213900}
   m_Layer: 7
   m_Name: Cube (14)
   m_TagString: Untagged
@@ -7143,18 +6986,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1805213900
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1805213898}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1805213901
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7431,7 +7262,6 @@ GameObject:
   - component: {fileID: 1999409538}
   - component: {fileID: 1999409537}
   - component: {fileID: 1999409536}
-  - component: {fileID: 1999409535}
   m_Layer: 7
   m_Name: Cube (5)
   m_TagString: Untagged
@@ -7454,18 +7284,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1999409535
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1999409533}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &1999409536
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7808,7 +7626,6 @@ GameObject:
   - component: {fileID: 2122298881}
   - component: {fileID: 2122298880}
   - component: {fileID: 2122298879}
-  - component: {fileID: 2122298878}
   m_Layer: 7
   m_Name: Cube (16)
   m_TagString: Untagged
@@ -7831,18 +7648,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1151633282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2122298878
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2122298876}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca3a2cb5ec624e34780ae62f4a5ab037, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickySurface
 --- !u!65 &2122298879
 BoxCollider:
   m_ObjectHideFlags: 0

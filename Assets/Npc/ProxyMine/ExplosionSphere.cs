@@ -112,9 +112,10 @@ public class ExplosionSphere : MonoBehaviour
 
     private void UpdateExpansion()
     {
-        if (timer >= expandDuration) return;
+        float progress = expandDuration <= 0f
+            ? 1f
+            : Mathf.Clamp01(timer / expandDuration);
 
-        float progress = timer / expandDuration;
         currentRadius = Mathf.Lerp(0f, maxRadius, progress);
 
         // Mesh-Visualisierung (Sphere-Mesh hat Durchmesser 1 bei Scale 1)
