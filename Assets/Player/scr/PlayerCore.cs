@@ -8,6 +8,7 @@ using System;
 /// 
 /// UPDATED: Adjusted for new dash-attack system where LMB = Dash with auto-attack.
 /// UPDATED: Added SprintDashing state and PlayerSprint subsystem.
+/// UPDATED: Actual HP damage while disarmed requests sword recall as soon as possible.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(PlayerInputHandler))]
@@ -257,11 +258,13 @@ public class PlayerCore : MonoBehaviour
             if (overflow > 0f)
             {
                 Health?.TakeDamage(overflow);
+                SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
             }
         }
         else
         {
             Health?.TakeDamage(damage);
+            SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
         }
 
         // Trigger hit direction nudge (Look handles state checks internally)
@@ -303,6 +306,7 @@ public class PlayerCore : MonoBehaviour
         TrackDamageSource(sourceName, damage, sourceTransform);
         
         Health?.TakeDamage(damage);
+        SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
         return true;
     }
 

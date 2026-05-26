@@ -461,8 +461,8 @@ GameObject:
   - component: {fileID: 4511031296643993828}
   - component: {fileID: 8462264894812746746}
   - component: {fileID: 6295242138573287136}
-  - component: {fileID: 4948156137820876829}
   - component: {fileID: 7005038953154893743}
+  - component: {fileID: 4948156137820876829}
   - component: {fileID: 6255646037874087239}
   - component: {fileID: 6872239883917322336}
   - component: {fileID: 7071042562543658868}
@@ -633,12 +633,6 @@ MonoBehaviour:
     m_Bits: 64
   enemyHitAngle: 50
   hitStopDuration: 0.1
-  disableSwordDash: 1
-  swordDashSpeed: 40
-  swordCatchDistance: 1.5
-  swordDashDamage: 50
-  swordDashRotationDuration: 0.12
-  swordDashMaxAngle: 9
 --- !u!114 &8462264894812746746
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -680,10 +674,24 @@ MonoBehaviour:
   enemyLayer:
     serializedVersion: 2
     m_Bits: 64
-  maxBlockHP: 300
+  maxBlockHP: 200
   blockRegenDelay: 1
-  blockRegenRate: 30
+  blockRegenRate: 60
   exhaustionDuration: 2
+--- !u!114 &7005038953154893743
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935032124739193074}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20989d60f05863548b7d9e4548385432, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  maxHP: 200
+  currentHP: 0
 --- !u!114 &4948156137820876829
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -702,7 +710,6 @@ MonoBehaviour:
   throwSpeed: 300
   returnSpeed: 1800
   catchDistance: 2
-  recallDelay: 0.1
   maxThrowDistance: 300
   throwLayerMask:
     serializedVersion: 2
@@ -719,20 +726,6 @@ MonoBehaviour:
   aimZoomInDuration: 0.2
   aimTimeScale: 0.1
   aimSlowMaxDuration: 2
---- !u!114 &7005038953154893743
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3935032124739193074}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 20989d60f05863548b7d9e4548385432, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
-  maxHP: 10
-  currentHP: 0
 --- !u!114 &6255646037874087239
 MonoBehaviour:
   m_ObjectHideFlags: 0

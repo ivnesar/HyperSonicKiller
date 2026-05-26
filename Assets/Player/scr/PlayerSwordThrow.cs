@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 
 /// <summary>
 /// Manages sword throwing mechanics for the player.
@@ -14,6 +15,7 @@ using System;
 ///   - Time slow managed via TimeManager "AimSlowMo" layer (same priority as DashSlowMo).
 ///   - Release key: sword is thrown, zoom/time/sensitivity reset immediately.
 /// UPDATED: Removed IsSprintBurstActive check — old sprint system removed.
+/// UPDATED: Taking HP damage while disarmed requests a sword recall as soon as possible.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerSwordThrow : MonoBehaviour
@@ -94,6 +96,10 @@ public class PlayerSwordThrow : MonoBehaviour
     private PlayerCore core;
     private ThrownSword activeSword;
     private bool hasSword = true;
+
+    // Set when the player takes HP damage while the sword is out but not yet recallable.
+    // If the sword is still flying, it will be recalled immediately after it sticks.
+    private bool recallWhenPossibleAfterHpDamage;
 
     // Aim zoom state
     private bool isAiming;
@@ -344,6 +350,7 @@ public class PlayerSwordThrow : MonoBehaviour
     private void ThrowSword()
     {
         hasSword = false;
+        recallWhenPossibleAfterHpDamage = false;
 
         // Hide held sword visual
         if (heldSwordVisual != null)
@@ -424,8 +431,33 @@ public class PlayerSwordThrow : MonoBehaviour
     #region Recall Logic
     // ════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Called by PlayerCore when the player takes actual HP damage while disarmed.
+    /// If the sword is stuck, recall starts immediately. If it is still flying,
+    /// recall is queued and starts as soon as the sword hits and sticks somewhere.
+    /// </summary>
+    public void RequestRecallBecausePlayerTookHpDamage()
+    {
+        if (hasSword) return;
+        if (activeSword == null) return;
+        if (activeSword.IsReturning) return;
+
+        if (activeSword.IsStuck)
+        {
+            recallWhenPossibleAfterHpDamage = false;
+            RecallSword();
+            return;
+        }
+
+        // Sword is still in flight. Normal manual recall is blocked during flight,
+        // so remember the request and recall immediately after the next valid stick.
+        recallWhenPossibleAfterHpDamage = true;
+    }
+
     private void RecallSword()
     {
+        recallWhenPossibleAfterHpDamage = false;
+
         if (activeSword == null)
         {
             // Sword was somehow destroyed, just restore state
@@ -491,6 +523,7 @@ public class PlayerSwordThrow : MonoBehaviour
         }
 
         activeSword = null;
+        recallWhenPossibleAfterHpDamage = false;
         RestoreSword();
 
         OnSwordCaught?.Invoke();
@@ -499,6 +532,29 @@ public class PlayerSwordThrow : MonoBehaviour
     private void HandleSwordHit(GameObject target)
     {
         OnSwordHitTarget?.Invoke(target);
+
+        if (recallWhenPossibleAfterHpDamage)
+        {
+            StartCoroutine(RecallAfterSwordHitProcessed());
+        }
+    }
+
+    /// <summary>
+    /// Waits until ThrownSword has finished its hit processing before recalling.
+    /// This preserves embedded-enemy removal damage/stun because ThrownSword sets
+    /// EmbeddedEnemy after firing OnHitTarget.
+    /// </summary>
+    private IEnumerator RecallAfterSwordHitProcessed()
+    {
+        yield return null;
+
+        if (!recallWhenPossibleAfterHpDamage) yield break;
+        if (activeSword == null) yield break;
+        if (activeSword.IsReturning) yield break;
+        if (!activeSword.IsStuck) yield break;
+
+        recallWhenPossibleAfterHpDamage = false;
+        RecallSword();
     }
 
     /// <summary>
@@ -512,9 +568,7 @@ public class PlayerSwordThrow : MonoBehaviour
 
         Debug.Log("[PlayerSwordThrow] Sword exceeded max throw distance - auto-recalling");
 
-        Transform returnTarget = throwOrigin != null ? throwOrigin : transform;
-        activeSword.Recall(returnTarget, catchDistance);
-        OnSwordRecalled?.Invoke();
+        RecallSword();
     }
 
 
@@ -549,6 +603,7 @@ public class PlayerSwordThrow : MonoBehaviour
             activeSword = null;
         }
 
+        recallWhenPossibleAfterHpDamage = false;
         RestoreSword();
     }
 
@@ -574,6 +629,7 @@ public class PlayerSwordThrow : MonoBehaviour
             activeSword = null;
         }
 
+        recallWhenPossibleAfterHpDamage = false;
         RestoreSword();
         OnSwordCaught?.Invoke();
         return true;
