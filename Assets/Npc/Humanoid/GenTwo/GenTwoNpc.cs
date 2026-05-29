@@ -122,6 +122,11 @@ public class GenTwoNpc : NpcBase
     // Wird in Awake() gecached. Pflicht-Komponente am GenTwo-Prefab.
     private CharacterController characterController;
 
+    // Während GenTwos Dash soll der Player die Flugbahn nicht physisch blockieren.
+    // Die Trefferlogik läuft weiterhin separat über TryHitPlayerAlongSegment().
+    private Collider[] playerDashIgnoredColliders;
+    private bool isIgnoringPlayerCollision;
+
     // Intercept data (calculated once at charge start, fixed for entire attack)
     private Vector3 interceptPoint;
     private Vector3 dashDirection;
@@ -265,6 +270,7 @@ public class GenTwoNpc : NpcBase
         if (playerTransform != null)
         {
             playerDash = playerTransform.GetComponent<PlayerDash>();
+            playerDashIgnoredColliders = playerTransform.GetComponentsInChildren<Collider>(true);
         }
 
         if (playerCore == null)
@@ -311,6 +317,13 @@ public class GenTwoNpc : NpcBase
     protected override void OnStart()
     {
         ChangeState(new GenTwoStates.Idle());
+    }
+
+    private void OnDisable()
+    {
+        // Safety: Falls GenTwo während des Dashs deaktiviert/zerstört wird,
+        // darf die ignorierte Player-Kollision nicht dauerhaft aktiv bleiben.
+        SetPlayerCollisionIgnoredDuringDash(false);
     }
 
     protected override void UpdateBehavior()
@@ -584,6 +597,8 @@ public class GenTwoNpc : NpcBase
     /// </summary>
     public void StartDash()
     {
+        SetPlayerCollisionIgnoredDuringDash(true);
+
         hasHitPlayer = false;
         hasReachedInterceptPoint = false;
         dashStartPosition = transform.position;
@@ -591,6 +606,46 @@ public class GenTwoNpc : NpcBase
         dashElapsedTime = 0f;
         postInterceptElapsedTime = 0f;
         lastSurfaceNormal = Vector3.up;
+    }
+
+    /// <summary>
+    /// Ends dash-specific collision overrides. Called by Dashing.Exit() and safety paths.
+    /// </summary>
+    public void EndDash()
+    {
+        SetPlayerCollisionIgnoredDuringDash(false);
+    }
+
+    /// <summary>
+    /// Temporarily lets GenTwo's CharacterController pass through the player during dash.
+    /// This does not affect the custom hit detection/damage logic.
+    /// </summary>
+    private void SetPlayerCollisionIgnoredDuringDash(bool ignored)
+    {
+        if (characterController == null)
+            return;
+
+        if (playerDashIgnoredColliders == null || playerDashIgnoredColliders.Length == 0)
+        {
+            if (playerTransform != null)
+                playerDashIgnoredColliders = playerTransform.GetComponentsInChildren<Collider>(true);
+        }
+
+        if (playerDashIgnoredColliders == null || playerDashIgnoredColliders.Length == 0)
+            return;
+
+        if (isIgnoringPlayerCollision == ignored)
+            return;
+
+        foreach (Collider playerCollider in playerDashIgnoredColliders)
+        {
+            if (playerCollider == null || playerCollider == characterController)
+                continue;
+
+            Physics.IgnoreCollision(characterController, playerCollider, ignored);
+        }
+
+        isIgnoringPlayerCollision = ignored;
     }
 
     /// <summary>
@@ -636,10 +691,17 @@ public class GenTwoNpc : NpcBase
                 MarkInterceptReached();
             }
 
-            bool touchedSurface = flags != CollisionFlags.None;
-            if (touchedSurface && TryResolveSurfaceNormal(beforePos, intendedMove, flags, out Vector3 normal))
+            // CharacterController.Move() can report CollisionFlags for ANY blocking collider
+            // (player/NPC/props/etc.). Only a confirmed hit against surfaceLayerMask is
+            // allowed to stop GenTwo's dash. This prevents player collisions from being
+            // interpreted as wall/floor impacts.
+            Vector3 resolvedSurfaceNormal = Vector3.up;
+            bool hitDashStoppingSurface = flags != CollisionFlags.None &&
+                                          TryResolveSurfaceNormal(beforePos, intendedMove, flags, out resolvedSurfaceNormal);
+
+            if (hitDashStoppingSurface)
             {
-                lastSurfaceNormal = normal;
+                lastSurfaceNormal = resolvedSurfaceNormal;
             }
 
             if (hasReachedInterceptPoint)
@@ -649,7 +711,7 @@ public class GenTwoNpc : NpcBase
                 // Wenn der Player seinen Dash nicht verlassen hat, wird er beim mathematischen Intercept getroffen.
                 TryApplyGuaranteedInterceptHit();
 
-                if (touchedSurface)
+                if (hitDashStoppingSurface)
                 {
                     StopDashOnSurface(lastSurfaceNormal);
                     return true;
@@ -763,11 +825,27 @@ public class GenTwoNpc : NpcBase
             ? Mathf.Max(0.05f, characterController.radius * 0.95f)
             : 0.25f;
 
+        float skinPadding = characterController != null
+            ? Mathf.Max(0.05f, characterController.skinWidth + 0.05f)
+            : 0.1f;
+
         // Side contacts are the most important for wall-sticking.
+        // IMPORTANT: CollisionFlags.Sides alone is not enough, because the blocking
+        // collider could be the player or another non-surface object. We only return
+        // true after a real hit against surfaceLayerMask.
         if ((flags & CollisionFlags.Sides) != 0)
         {
-            Vector3 sphereOrigin = beforeMovePosition + Vector3.up * Mathf.Max(0.1f, characterController.height * 0.5f);
-            float sphereDistance = intendedMove.magnitude + radius + 0.2f;
+            Vector3 sphereOrigin = GetCharacterControllerWorldCenter(beforeMovePosition);
+            float sphereDistance = intendedMove.magnitude + radius + skinPadding + 0.2f;
+
+            diagHasLastCast = true;
+            diagCastFromPos = sphereOrigin;
+            diagCastDirection = moveDir;
+            diagCastRadius = radius;
+            diagCastSucceeded = false;
+            diagCastHitPoint = Vector3.zero;
+            diagCastHitDistance = sphereDistance;
+            diagCastFailReason = "Side collision was not on surfaceLayerMask";
 
             if (Physics.SphereCast(
                     sphereOrigin,
@@ -779,40 +857,57 @@ public class GenTwoNpc : NpcBase
                     QueryTriggerInteraction.Ignore))
             {
                 normal = sideHit.normal;
-                diagHasLastCast = true;
-                diagCastFromPos = sphereOrigin;
-                diagCastDirection = moveDir;
-                diagCastRadius = radius;
                 diagCastSucceeded = true;
+                diagCastFailReason = "";
                 diagCastHitPoint = sideHit.point;
                 diagCastHitDistance = sideHit.distance;
                 return true;
             }
-
-            normal = -moveDir;
-            return true;
         }
 
         if ((flags & CollisionFlags.Below) != 0)
         {
-            Vector3 rayOrigin = transform.position + Vector3.up * 0.2f;
-            if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit groundHit, 1.0f, surfaceLayerMask, QueryTriggerInteraction.Ignore))
+            Vector3 center = GetCharacterControllerWorldCenter(transform.position);
+            float rayDistance = GetCharacterControllerHalfHeight() + skinPadding + 0.3f;
+
+            if (Physics.Raycast(center, Vector3.down, out RaycastHit groundHit, rayDistance, surfaceLayerMask, QueryTriggerInteraction.Ignore))
             {
                 normal = groundHit.normal;
                 return true;
             }
-
-            normal = Vector3.up;
-            return true;
         }
 
         if ((flags & CollisionFlags.Above) != 0)
         {
-            normal = Vector3.down;
-            return true;
+            Vector3 center = GetCharacterControllerWorldCenter(transform.position);
+            float rayDistance = GetCharacterControllerHalfHeight() + skinPadding + 0.3f;
+
+            if (Physics.Raycast(center, Vector3.up, out RaycastHit ceilingHit, rayDistance, surfaceLayerMask, QueryTriggerInteraction.Ignore))
+            {
+                normal = ceilingHit.normal;
+                return true;
+            }
         }
 
+        // A collision happened, but it was not confirmed as a dash-stopping surface.
+        // Do not stop the dash for player/NPC/other collider contacts.
         return false;
+    }
+
+    private Vector3 GetCharacterControllerWorldCenter(Vector3 basePosition)
+    {
+        if (characterController == null)
+            return basePosition;
+
+        return basePosition + transform.TransformVector(characterController.center);
+    }
+
+    private float GetCharacterControllerHalfHeight()
+    {
+        if (characterController == null)
+            return 0.5f;
+
+        return Mathf.Max(characterController.radius, characterController.height * 0.5f);
     }
 
     private void StopDashOnSurface(Vector3 surfaceNormal)
@@ -989,6 +1084,7 @@ public class GenTwoNpc : NpcBase
         pendingSwordRemovalDamage = 0;
 
         gentwoLaserPointer?.ClearInterceptMode();
+        EndDash();
 
         base.Die();
     }

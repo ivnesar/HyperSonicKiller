@@ -226,8 +226,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82de08a8af2fa7542b733d7ef5a2b4e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AntiDashZone
-  effectRadius: 4
-  duration: 5
+  effectRadius: 2
+  duration: 3
   dashCancelDelay: 0.1
   warnDuration: 0.5
   warnSphereRenderer: {fileID: 8848335857601831016}

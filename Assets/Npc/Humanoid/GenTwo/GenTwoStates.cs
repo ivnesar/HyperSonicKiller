@@ -151,6 +151,9 @@ namespace GenTwoStates
 
         public override void Exit(GenTwoNpc npc)
         {
+            // Physische Player-Kollision wiederherstellen, damit nur der Dash ghosted.
+            npc.EndDash();
+
             // Laser und Aim aufräumen
             npc.AnimManager?.PlayLanding();
             npc.IsLaserActive = false;

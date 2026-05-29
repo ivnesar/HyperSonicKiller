@@ -181,7 +181,7 @@ MonoBehaviour:
   playerArrivalTime: 1
   playerInterceptHeightOffset: 1.7
   selfInterceptHeightOffset: 1.7
-  chargeDuration: 1
+  chargeDuration: 0.5
   dashSpeed: 25
   playerHitRadius: 1.2
   collisionDamage: 999
@@ -189,8 +189,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8320
   raycastSegments: 4
-  maxDashRayDistance: 50
-  endPointWallStickOffset: 0.3
+  maxDashSegmentLength: 0.5
+  maxPostInterceptFlightTime: 1.5
   recoveryDuration: 1.5
   chargeSound: {fileID: 0}
   dashSound: {fileID: 0}
@@ -354,8 +354,8 @@ MonoBehaviour:
     m_Bits: 136
   earlyWidth: 0.01
   lockedWidth: 0.06
-  earlyColor: {r: 1, g: 1, b: 0, a: 0.5}
-  lockedColor: {r: 1, g: 0, b: 0, a: 1}
+  earlyColor: {r: 0.42232418, g: 0, b: 1, a: 0.5}
+  lockedColor: {r: 1, g: 0, b: 0.9190922, a: 1}
   colorWidthCurve:
     serializedVersion: 2
     m_Curve:
@@ -381,7 +381,6 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   impactSphere: {fileID: 3363251926924874602}
-  endPointSphere: {fileID: 6999772649837436103}
   laserMaterial: {fileID: 2100000, guid: e9f1aaa373bd9084489d17ec61ae9af4, type: 2}
   showDebug: 1
 --- !u!114 &6267239683382934993
@@ -570,16 +569,16 @@ MonoBehaviour:
   isStunned: 0
   distanceToTarget: 0
   canReachPlayer: 0
-  showForwardRaycast: 1
+  showForwardRaycast: 0
   solidLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   raycastDistance: 999
   hitPointSphereSize: 0.5
-  rayColor: {r: 0, g: 1, b: 1, a: 1}
+  rayColor: {r: 1, g: 0, b: 0.9635534, a: 1}
   hitPointColor: {r: 1, g: 0, b: 1, a: 1}
   noHitRayColor: {r: 1, g: 0, b: 0, a: 1}
-  showInterceptDebug: 1
+  showInterceptDebug: 0
   interceptRayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   genTwoDashRayColor: {r: 1, g: 0, b: 0, a: 1}
   interceptPointColor: {r: 1, g: 0.5, b: 0, a: 1}
