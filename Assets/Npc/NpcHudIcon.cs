@@ -57,6 +57,15 @@ public class NpcHudIcon : MonoBehaviour
              "position (mittig über der Box). +X = nach rechts, +Y = nach oben.")]
     [SerializeField] private Vector2 positionOffset = Vector2.zero;
 
+    [Header("Appearance")]
+    [Tooltip("Multiplikator auf die Icon-Größe NUR für diesen NPC. 1 = unverändert, " +
+             "2 = doppelt so groß. Wirkt zusätzlich zur globalen Icon-Größe im TrackingHUD.")]
+    [SerializeField, Range(0.1f, 5f)] private float sizeMultiplier = 1f;
+
+    [Tooltip("Einfärbung des Icons. Weiß = Originalfarben des Sprites (kein Tint). " +
+             "Andere Farben werden multiplikativ angewendet; der Alpha-Kanal steuert die Transparenz.")]
+    [SerializeField] private Color iconColor = Color.white;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -118,6 +127,12 @@ public class NpcHudIcon : MonoBehaviour
     /// vom TrackingHUD beim Zeichnen angewendet.
     /// </summary>
     public Vector2 PositionOffset => positionOffset;
+
+    /// <summary>Per-NPC Multiplikator auf die Icon-Größe (zusätzlich zur globalen Größe).</summary>
+    public float SizeMultiplier => sizeMultiplier;
+
+    /// <summary>Einfärbung des Icons (Weiß = kein Tint).</summary>
+    public Color IconColor => iconColor;
 
     #endregion
 }

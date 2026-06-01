@@ -287,6 +287,7 @@ GameObject:
   - component: {fileID: 8613194436617528756}
   - component: {fileID: 6244359631224800257}
   - component: {fileID: 208849931876197300}
+  - component: {fileID: 6256962810092538675}
   m_Layer: 5
   m_Name: UI_player
   m_TagString: Untagged
@@ -417,6 +418,38 @@ MonoBehaviour:
   criticalColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
   blockFullColor: {r: 0.3, g: 0.6, b: 0.9, a: 1}
   blockLowColor: {r: 0.9, g: 0.4, b: 0.1, a: 1}
+--- !u!114 &6256962810092538675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2474041767445127590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99d99f8a183e4474ba6b83cc1052a0f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TrackingHUD
+  trackingCamera: {fileID: 0}
+  hideDeadNpcs: 1
+  occluderMask:
+    serializedVersion: 2
+    m_Bits: 128
+  boxColor: {r: 1, g: 0, b: 0, a: 1}
+  boxLineThickness: 3
+  labelCorner: 3
+  labelBackgroundColor: {r: 1, g: 0, b: 0, a: 1}
+  labelTextColor: {r: 0, g: 0, b: 0, a: 1}
+  labelFontSize: 24
+  labelPadding: {x: 6, y: 2}
+  iconSize: 32
+  iconSizeMultiplier: 3
+  iconGap: 4
+  jitterInterval: 0.5
+  jitterStrength: 0.03
+  applyPaniniCorrection: 1
+  compensateCropToFit: 1
+  paniniStrengthMultiplier: 1
 --- !u!1 &2867140348659483343
 GameObject:
   m_ObjectHideFlags: 0

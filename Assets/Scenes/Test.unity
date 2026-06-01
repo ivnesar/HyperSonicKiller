@@ -1317,6 +1317,22 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 778874552}
     - target: {fileID: 7549256596684943371, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: iconColor.b
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7549256596684943371, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: iconColor.g
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7549256596684943371, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: iconColor.r
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7549256596684943371, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
+      propertyPath: sizeMultiplier
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7549256596684943371, guid: 1056327b9b7cc744ca3d3b223544aeb5, type: 3}
       propertyPath: positionOffset.y
       value: 9.81
       objectReference: {fileID: 0}
@@ -1964,7 +1980,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: dd67f8d5b3ab1f9478e76b36280fa1f8, type: 3}
       propertyPath: forwardAxis.z
@@ -2218,7 +2234,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: 3b83a5f3fc22228418377bcab101eb14, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6672770014842851993, guid: 3b83a5f3fc22228418377bcab101eb14, type: 3}
       propertyPath: behaviorMode
@@ -2725,7 +2741,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2472838132611520362, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5241556215887614238, guid: 82f113ea09e665d44942e5364d8ee6ed, type: 3}
       propertyPath: losCheckMask.m_Bits
@@ -3169,42 +3185,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 43c4abf52c3eee740bee940e39ba8231, type: 3}
---- !u!1 &1407194203 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 2474041767445127590, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
-  m_PrefabInstance: {fileID: 1690180317}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1407194209
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1407194203}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 99d99f8a183e4474ba6b83cc1052a0f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TrackingHUD
-  trackingCamera: {fileID: 498272277}
-  hideDeadNpcs: 1
-  occluderMask:
-    serializedVersion: 2
-    m_Bits: 128
-  boxColor: {r: 1, g: 0, b: 0, a: 1}
-  boxLineThickness: 3
-  labelCorner: 3
-  labelBackgroundColor: {r: 1, g: 0, b: 0, a: 1}
-  labelTextColor: {r: 0, g: 0, b: 0, a: 1}
-  labelFontSize: 24
-  labelPadding: {x: 6, y: 2}
-  iconSize: 32
-  iconGap: 4
-  jitterInterval: 0.5
-  jitterStrength: 0.03
-  applyPaniniCorrection: 1
-  compensateCropToFit: 1
-  paniniStrengthMultiplier: 1
 --- !u!4 &1424785360 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6386316311934283463, guid: 43c4abf52c3eee740bee940e39ba8231, type: 3}
@@ -8570,6 +8550,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: UI_player
       objectReference: {fileID: 0}
+    - target: {fileID: 6256962810092538675, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
+      propertyPath: trackingCamera
+      value: 
+      objectReference: {fileID: 498272277}
     - target: {fileID: 8020363540465241940, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
       propertyPath: m_Camera
       value: 
@@ -8577,10 +8561,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 2474041767445127590, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1407194209}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6af98e08579460940826fb96e8f13fdf, type: 3}
 --- !u!1001 &1690550702
 PrefabInstance:

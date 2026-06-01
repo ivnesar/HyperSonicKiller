@@ -117,6 +117,7 @@ GameObject:
   - component: {fileID: 1493484320626804606}
   - component: {fileID: 2492638760837142098}
   - component: {fileID: 5425367909498325779}
+  - component: {fileID: 97367702016944824}
   m_Layer: 6
   m_Name: Npc_Defender
   m_TagString: Enemy
@@ -208,6 +209,32 @@ MonoBehaviour:
   snapTarget: {fileID: 7946483325385896313}
   showDebugInfo: 1
   displayName: 
+  wiggleMaxRadius: 1.2
+  wiggleFrequency: 3
+  wiggleFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -2
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   approachDistance: 1.5
   reengageDistance: 3
   shieldHitReactionDuration: 0.5
@@ -461,6 +488,23 @@ MonoBehaviour:
   - {fileID: 1404632877103245759}
   fadeDuration: 0.1
   logDebug: 0
+--- !u!114 &97367702016944824
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
+  defaultIcon: {fileID: 21300000, guid: 820179ae8cd96ef459aa19c1b6451bf9, type: 3}
+  stateIcons: []
+  positionOffset: {x: 0, y: 0}
+  sizeMultiplier: 1
+  iconColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &9066947761607878306
 GameObject:
   m_ObjectHideFlags: 0

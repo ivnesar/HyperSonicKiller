@@ -14,7 +14,10 @@ using UnityEngine;
 /// 4. Dashing: Flies toward the intercept point. INVULNERABLE during dash.
 ///    Surface contacts BEFORE the intercept do not stop the dash; GenTwo keeps sliding.
 ///    After the intercept has been reached/passed, the next/current surface contact stops him.
-///    If the player is still in the main dash when the intercept is reached → lethal damage.
+///    If GenTwo gets stuck head-on against a wall (no forward progress), the dash is aborted
+///    after maxBlockedTime so he never pushes against a wall forever.
+///    Damage is only applied if the player is still dashing AND actually near the intercept
+///    point (interceptHitRadius) — a player who redirects/dodges their dash is NOT hit.
 ///    If the player cancelled their dash → GenTwo flies past harmlessly.
 /// 5. Recovery: Stuck to surface for a duration, then back to Idle.
 /// 
@@ -80,6 +83,11 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Radius for detecting collision with the player during dash")]
     [SerializeField] private float playerHitRadius = 1.2f;
 
+    [Tooltip("Radius um den vorberechneten Intercept-Punkt, in dem der 'garantierte' Treffer " +
+             "noch gilt. Ist der Spieler weiter weg (z.B. weil er seinen Dash umgelenkt hat), " +
+             "gibt es keinen Schaden — der Spieler kann also ausweichen.")]
+    [SerializeField] private float interceptHitRadius = 1.5f;
+
     [Tooltip("Damage dealt to player on collision (while player is dashing)")]
     [SerializeField] private int collisionDamage = 999;
 
@@ -96,6 +104,11 @@ public class GenTwoNpc : NpcBase
     [Tooltip("Maximale zusätzliche Flugzeit NACH dem Intercept, falls GenTwo keine Surface mehr berührt. " +
              "Failsafe gegen endloses Fliegen in unerwarteter Level-Geometrie.")]
     [SerializeField] private float maxPostInterceptFlightTime = 1.5f;
+
+    [Tooltip("Maximale Zeit (Sekunden), die GenTwo während des Dashes blockiert sein darf, bevor " +
+             "der Dash abgebrochen wird. Verhindert, dass GenTwo ewig gegen eine Wand drückt, wenn " +
+             "der Intercept-Punkt hinter der Wand liegt (dann wird der Intercept nie 'erreicht').")]
+    [SerializeField] private float maxBlockedTime = 0.15f;
     
 
     [Header("Recovery")]
@@ -144,6 +157,9 @@ public class GenTwoNpc : NpcBase
     private bool hasReachedInterceptPoint;
     private bool hasHitPlayer;
     private Vector3 lastSurfaceNormal;
+
+    // Bug 1: Zeit, die GenTwo aktuell ohne Vorwärtsfortschritt "festhängt".
+    private float dashBlockedTime;
 
     // Surface state (wall vs ground after landing)
     private bool isOnWall;
@@ -292,9 +308,11 @@ public class GenTwoNpc : NpcBase
         playerArrivalTime = Mathf.Max(0.05f, playerArrivalTime);
         dashSpeed = Mathf.Max(0.01f, dashSpeed);
         playerHitRadius = Mathf.Max(0.05f, playerHitRadius);
+        interceptHitRadius = Mathf.Max(0.05f, interceptHitRadius);
         raycastSegments = Mathf.Max(1, raycastSegments);
         maxDashSegmentLength = Mathf.Max(0.05f, maxDashSegmentLength);
         maxPostInterceptFlightTime = Mathf.Max(0f, maxPostInterceptFlightTime);
+        maxBlockedTime = Mathf.Max(0.02f, maxBlockedTime);
 
         if (chargeDuration >= playerArrivalTime)
         {
@@ -576,6 +594,7 @@ public class GenTwoNpc : NpcBase
         postInterceptElapsedTime = 0f;
         hasReachedInterceptPoint = false;
         hasHitPlayer = false;
+        dashBlockedTime = 0f;
         lastSurfaceNormal = Vector3.up;
 
         diagHasLastCast = false;
@@ -605,6 +624,7 @@ public class GenTwoNpc : NpcBase
         distanceToIntercept = Vector3.Distance(dashStartPosition, interceptPoint);
         dashElapsedTime = 0f;
         postInterceptElapsedTime = 0f;
+        dashBlockedTime = 0f;
         lastSurfaceNormal = Vector3.up;
     }
 
@@ -672,6 +692,9 @@ public class GenTwoNpc : NpcBase
         int segmentCount = Mathf.Max(1, Mathf.Max(raycastSegments, dynamicSegments));
         float segmentDistance = totalMoveDistance / segmentCount;
 
+        // Bug 1: Fortschritt VOR der Bewegung merken, um Festhängen zu erkennen (siehe unten).
+        float progressBeforeFrame = GetDashProgressDistance(transform.position);
+
         for (int i = 0; i < segmentCount; i++)
         {
             Vector3 beforePos = transform.position;
@@ -728,6 +751,27 @@ public class GenTwoNpc : NpcBase
             }
         }
 
+        // ── Bug 1: Stuck-Detection (unabhängig vom Intercept) ──
+        // Wenn GenTwo trotz vollem Bewegungsversuch kaum vorankommt, blockiert ihn etwas
+        // (typisch: frontal gegen eine Wand BEVOR der Intercept erreicht ist). In dem Fall
+        // wird der Intercept nie als "erreicht" markiert, also greifen die intercept-gebundenen
+        // Stop-Bedingungen oben nicht — GenTwo würde sonst ewig gegen die Wand drücken.
+        // Beim freien Gleiten ENTLANG einer Wand bleibt der Fortschritt > 0, daher löst das hier
+        // korrekterweise nicht aus.
+        float progressThisFrame = GetDashProgressDistance(transform.position) - progressBeforeFrame;
+        if (progressThisFrame < totalMoveDistance * 0.25f)
+            dashBlockedTime += deltaTime;
+        else
+            dashBlockedTime = 0f;
+
+        if (dashBlockedTime >= maxBlockedTime)
+        {
+            Debug.LogWarning($"[GenTwo] {name}: Dash blockiert seit {dashBlockedTime:F2}s — " +
+                             "Stop (steckt fest, Intercept unerreichbar).");
+            StopDashOnSurface(lastSurfaceNormal);
+            return true;
+        }
+
         return false;
     }
 
@@ -763,18 +807,26 @@ public class GenTwoNpc : NpcBase
 
     private void TryApplyGuaranteedInterceptHit()
     {
-        if (hasHitPlayer) return;
+        if (hasHitPlayer || playerTransform == null) return;
 
-        // Der mathematische Intercept bedeutet: Wenn der Spieler noch im Haupt-Dash ist,
-        // hat er nicht rechtzeitig reagiert. Dann trifft GenTwo garantiert.
-        if (IsPlayerInAttackDash)
-        {
-            ApplyPlayerDashCollisionDamage("mathematical intercept");
-        }
-        else
+        // Spieler hat den Dash verlassen → er hat reagiert, kein Treffer.
+        if (!IsPlayerInAttackDash)
         {
             hasHitPlayer = true;
             Debug.Log($"[GenTwo] {name}: Intercept point reached, but player left dash — no damage.");
+            return;
+        }
+
+        // Bug 2: Nur treffen, wenn der Spieler TATSÄCHLICH nah am vorberechneten Intercept-Punkt ist.
+        // Die Intercept-Mathematik nimmt eine gerade Spielerbahn mit konstanter Geschwindigkeit an.
+        // Lenkt der Spieler seinen Dash um oder weicht er aus, stimmt die Vorhersage nicht mehr —
+        // dann darf GenTwo NICHT trotzdem treffen (der Spieler soll ausweichen können).
+        // Kein hasHitPlayer setzen: kommt GenTwo später doch noch physisch nah vorbei, fängt ihn
+        // der Segment-Sweep in TryHitPlayerAlongSegment().
+        float distanceToPlayer = Vector3.Distance(playerTransform.position, interceptPoint);
+        if (distanceToPlayer <= interceptHitRadius)
+        {
+            ApplyPlayerDashCollisionDamage("mathematical intercept");
         }
     }
 

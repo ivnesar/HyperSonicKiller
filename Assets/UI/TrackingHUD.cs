@@ -87,6 +87,10 @@ public class TrackingHUD : MonoBehaviour
              "Entfernung). Das Icon wird mittig über der Box gezeichnet.")]
     [SerializeField] private float iconSize = 32f;
 
+    [Tooltip("Globaler Multiplikator auf die Icon-Größe. 1 = unverändert, " +
+             "2 = doppelt so groß. Wirkt auf alle NPC-Icons.")]
+    [SerializeField] private float iconSizeMultiplier = 1f;
+
     [Tooltip("Abstand in Pixeln zwischen Box, Icon und Label.")]
     [SerializeField] private float iconGap = 4f;
 
@@ -138,6 +142,8 @@ public class TrackingHUD : MonoBehaviour
         public string label;
         public Sprite icon;
         public Vector2 iconOffset;
+        public float iconScale;
+        public Color iconColor;
     }
     private readonly List<BoxData> boxesToDraw = new List<BoxData>(64);
 
@@ -231,13 +237,17 @@ public class TrackingHUD : MonoBehaviour
             var iconComp = npc.GetComponent<NpcHudIcon>();
             Sprite icon = iconComp != null ? iconComp.GetCurrentIcon() : null;
             Vector2 iconOffset = iconComp != null ? iconComp.PositionOffset : Vector2.zero;
+            float iconScale = iconComp != null ? iconComp.SizeMultiplier : 1f;
+            Color iconColor = iconComp != null ? iconComp.IconColor : Color.white;
 
             boxesToDraw.Add(new BoxData
             {
                 rect = screenRect,
                 label = npc.DisplayName,
                 icon = icon,
-                iconOffset = iconOffset
+                iconOffset = iconOffset,
+                iconScale = iconScale,
+                iconColor = iconColor
             });
         }
     }
@@ -251,7 +261,7 @@ public class TrackingHUD : MonoBehaviour
         foreach (var box in boxesToDraw)
         {
             DrawBox(box.rect);
-            DrawIcon(box.rect, box.icon, box.iconOffset);
+            DrawIcon(box.rect, box.icon, box.iconOffset, box.iconScale, box.iconColor);
             DrawLabel(box.rect, box.label);
         }
     }
@@ -526,14 +536,26 @@ public class TrackingHUD : MonoBehaviour
     /// Zeichnet das Icon mittig über der Box (feste Größe), plus optionalem
     /// per-Prefab Offset (+X rechts, +Y oben).
     /// </summary>
-    private void DrawIcon(Rect boxRect, Sprite icon, Vector2 offset)
+    /// <summary>
+    /// Zeichnet das Icon mittig über der Box, plus per-Prefab Offset (+X rechts,
+    /// +Y oben), Größen-Multiplikator und Einfärbung.
+    /// </summary>
+    private void DrawIcon(Rect boxRect, Sprite icon, Vector2 offset, float scale, Color color)
     {
         if (icon == null) return;
 
+        float size = iconSize * iconSizeMultiplier * scale;
+
         // GUI-Y wächst nach unten -> "über der Box" = kleineres y, "nach oben" = y verringern.
-        float x = boxRect.xMin + boxRect.width * 0.5f - iconSize * 0.5f + offset.x;
-        float y = boxRect.yMin - iconGap - iconSize - offset.y;
-        DrawSprite(new Rect(x, y, iconSize, iconSize), icon);
+        float x = boxRect.xMin + boxRect.width * 0.5f - size * 0.5f + offset.x;
+        float y = boxRect.yMin - iconGap - size - offset.y;
+
+        // GUI.color tintet das Icon (multiplikativ). Vorher sichern, danach
+        // zurücksetzen, damit Box und Label nicht eingefärbt werden.
+        Color prev = GUI.color;
+        GUI.color = color;
+        DrawSprite(new Rect(x, y, size, size), icon);
+        GUI.color = prev;
     }
 
     /// <summary>

@@ -74,7 +74,11 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     private bool isOnWall;
 
     private ClipTransition currentBaseClip;
-    private bool isPlayingOneShot;
+
+    // Bug 3: Referenz auf den aktuell laufenden One-Shot-State (null = kein One-Shot aktiv).
+    // Ersetzt das alte bool isPlayingOneShot. Dadurch können wir veraltete OnEnd-Callbacks
+    // erkennen und ignorieren, wenn inzwischen ein anderer Clip läuft.
+    private AnimancerState activeOneShot;
 
     #endregion
 
@@ -91,7 +95,33 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
         {
             Debug.LogError($"[GenTwoAnimationManager] No AnimancerComponent found on {gameObject.name}!");
             enabled = false;
+            return;
         }
+
+        ValidateClips();
+    }
+
+    /// <summary>
+    /// Bug 3: Meldet beim Start jeden nicht zugewiesenen Clip-Slot.
+    /// Häufigste Ursache für "Animation bleibt hängen": eine fehlende Ground- ODER
+    /// Wall-Variante. Da isOnWall über den ganzen Zyklus erhalten bleibt, wirkt der
+    /// Fehler dann scheinbar zufällig (nur nach einer Wand-Landung).
+    /// </summary>
+    private void ValidateClips()
+    {
+        void Check(ClipTransition c, string slot)
+        {
+            if (c == null || c.Clip == null)
+                Debug.LogWarning($"[GenTwoAnimationManager] Clip-Slot '{slot}' ist nicht zugewiesen " +
+                                 $"auf {gameObject.name}! Die zugehörige Animation wird nicht abgespielt.");
+        }
+
+        Check(idleGround, "idleGround");           Check(idleWall, "idleWall");
+        Check(chargeGround, "chargeGround");       Check(chargeWall, "chargeWall");
+        Check(startDashGround, "startDashGround"); Check(startDashWall, "startDashWall");
+        Check(dash, "dash");                       Check(dashAttack, "dashAttack");
+        Check(landingGround, "landingGround");     Check(landingWall, "landingWall");
+        Check(stunnedGround, "stunnedGround");     Check(stunnedWall, "stunnedWall");
     }
 
     private void Start()
@@ -203,9 +233,17 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
         // The landing clip should NOT auto-return to a base clip.
         ClipTransition landClip = isOnWall ? landingWall : landingGround;
 
-        if (landClip == null || landClip.Clip == null) return;
+        // Bug 3: activeOneShot löschen, damit kein nachhallender Dash-/DashAttack-Callback
+        // die Landing-Pose wieder überschreibt.
+        activeOneShot = null;
 
-        isPlayingOneShot = false;
+        if (landClip == null || landClip.Clip == null)
+        {
+            // Kein Landing-Clip → wenigstens nicht in der Dash-Pose hängen bleiben.
+            FallBackToBaseClip();
+            return;
+        }
+
         animancer.Play(landClip, 0f);
 
         // Don't set OnEnd — landing holds until PlayIdle is called.
@@ -214,7 +252,7 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     /// <summary>Play stunned loop (ground or wall variant).</summary>
     public void PlayStunned()
     {
-        isPlayingOneShot = false;
+        // SetBaseClip räumt activeOneShot jetzt selbst auf und spielt sofort ab.
         SetBaseClip(isOnWall ? stunnedWall : stunnedGround);
     }
 
@@ -230,33 +268,56 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
 
         currentBaseClip = clip;
 
-        if (!isPlayingOneShot)
-        {
-            animancer.Play(clip);
-        }
+        // Ein Base-Clip aus einem State-Wechsel (Idle/Charge/Stunned) soll SOFORT greifen.
+        // Ein evtl. noch laufender One-Shot wird verworfen — sonst konnte die alte Animation
+        // hängen bleiben, wenn isPlayingOneShot fälschlich true blieb (Bug 3).
+        activeOneShot = null;
+        animancer.Play(clip);
     }
 
     private void PlayOneShot(ClipTransition clip)
     {
-        if (clip == null || clip.Clip == null) return;
+        if (clip == null || clip.Clip == null)
+        {
+            // Kein One-Shot-Clip zugewiesen → direkt zum Base-Clip, statt die vorige
+            // Animation weiterlaufen zu lassen (Bug 3: fehlende Ground/Wall-Variante).
+            FallBackToBaseClip();
+            return;
+        }
 
-        isPlayingOneShot = true;
         AnimancerState state = animancer.Play(clip);
-        state.Events(this).OnEnd = OnOneShotEnded;
+        activeOneShot = state;
+        state.Events(this).OnEnd = () => OnOneShotEnded(state);
     }
 
     private void PlayOneShotInstant(ClipTransition clip)
     {
-        if (clip == null || clip.Clip == null) return;
+        if (clip == null || clip.Clip == null)
+        {
+            FallBackToBaseClip();
+            return;
+        }
 
-        isPlayingOneShot = true;
         AnimancerState state = animancer.Play(clip, 0f);
-        state.Events(this).OnEnd = OnOneShotEnded;
+        activeOneShot = state;
+        state.Events(this).OnEnd = () => OnOneShotEnded(state);
     }
 
-    private void OnOneShotEnded()
+    private void OnOneShotEnded(AnimancerState endedState)
     {
-        isPlayingOneShot = false;
+        // Veralteten Callback ignorieren: Läuft inzwischen ein anderer Clip (z.B. Landing
+        // oder ein neuer One-Shot), darf dieser Callback nichts mehr überschreiben (Bug 3).
+        if (endedState != activeOneShot) return;
+
+        FallBackToBaseClip();
+    }
+
+    /// <summary>
+    /// Beendet den One-Shot-Zustand und kehrt zum aktuellen Base-Clip zurück.
+    /// </summary>
+    private void FallBackToBaseClip()
+    {
+        activeOneShot = null;
 
         if (currentBaseClip != null && currentBaseClip.Clip != null)
         {
