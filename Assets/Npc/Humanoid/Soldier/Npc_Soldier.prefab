@@ -24,6 +24,7 @@ GameObject:
   - component: {fileID: 2300341250759812020}
   - component: {fileID: 6037814341563429023}
   - component: {fileID: 4216156634058605494}
+  - component: {fileID: 826267335230601596}
   m_Layer: 6
   m_Name: Npc_Soldier
   m_TagString: Enemy
@@ -528,6 +529,20 @@ MonoBehaviour:
   - {fileID: 6764424172546879382}
   fadeDuration: 0.1
   logDebug: 1
+--- !u!114 &826267335230601596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
+  defaultIcon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  stateIcons: []
 --- !u!1 &2487980154493581614
 GameObject:
   m_ObjectHideFlags: 0

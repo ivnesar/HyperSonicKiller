@@ -54,6 +54,7 @@ GameObject:
   - component: {fileID: 6037814341563429023}
   - component: {fileID: 1019041554508067350}
   - component: {fileID: 4221902022032833579}
+  - component: {fileID: 7549256596684943371}
   m_Layer: 6
   m_Name: Npc_GenTwo
   m_TagString: Enemy
@@ -586,6 +587,20 @@ MonoBehaviour:
   genTwoIsDashing: 0
   genTwoHasValidIntercept: 0
   genTwoPlayerInRange: 0
+--- !u!114 &7549256596684943371
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
+  defaultIcon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  stateIcons: []
 --- !u!1 &3363251926924874602
 GameObject:
   m_ObjectHideFlags: 0

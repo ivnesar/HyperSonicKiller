@@ -3,6 +3,15 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
+/// <summary>An welcher Ecke der Bounding Box der NPC-Name sitzt.</summary>
+public enum LabelCorner
+{
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // TRACKING HUD — Bounding-Box-Overlay für alle NPCs im Sichtfeld
 // ════════════════════════════════════════════════════════════════════════════
@@ -66,10 +75,20 @@ public class TrackingHUD : MonoBehaviour
     [SerializeField] private float boxLineThickness = 2f;
 
     [Header("Label Style")]
+    [Tooltip("An welcher Ecke der Bounding Box der Name sitzt.")]
+    [SerializeField] private LabelCorner labelCorner = LabelCorner.TopLeft;
     [SerializeField] private Color labelBackgroundColor = new Color(1f, 0.7f, 0f, 1f);
     [SerializeField] private Color labelTextColor = Color.black;
     [SerializeField] private int labelFontSize = 14;
     [SerializeField] private Vector2 labelPadding = new Vector2(6f, 2f);
+
+    [Header("Icon Style")]
+    [Tooltip("Kantenlänge des Icons in Pixeln (feste Größe, unabhängig von der " +
+             "Entfernung). Das Icon wird mittig über der Box gezeichnet.")]
+    [SerializeField] private float iconSize = 32f;
+
+    [Tooltip("Abstand in Pixeln zwischen Box, Icon und Label.")]
+    [SerializeField] private float iconGap = 4f;
 
     [Header("Tracking Jitter")]
     [Tooltip("Intervall in Sekunden (UNSCALED — unabhängig von Slow-Motion), in " +
@@ -117,6 +136,8 @@ public class TrackingHUD : MonoBehaviour
     {
         public Rect rect;
         public string label;
+        public Sprite icon;
+        public Vector2 iconOffset;
     }
     private readonly List<BoxData> boxesToDraw = new List<BoxData>(64);
 
@@ -206,7 +227,18 @@ public class TrackingHUD : MonoBehaviour
             screenRect.x += norm.x * screenRect.width * jitterStrength;
             screenRect.y += norm.y * screenRect.height * jitterStrength;
 
-            boxesToDraw.Add(new BoxData { rect = screenRect, label = npc.DisplayName });
+            // Icon des aktuellen States holen (Komponente ist optional pro NPC).
+            var iconComp = npc.GetComponent<NpcHudIcon>();
+            Sprite icon = iconComp != null ? iconComp.GetCurrentIcon() : null;
+            Vector2 iconOffset = iconComp != null ? iconComp.PositionOffset : Vector2.zero;
+
+            boxesToDraw.Add(new BoxData
+            {
+                rect = screenRect,
+                label = npc.DisplayName,
+                icon = icon,
+                iconOffset = iconOffset
+            });
         }
     }
 
@@ -219,6 +251,7 @@ public class TrackingHUD : MonoBehaviour
         foreach (var box in boxesToDraw)
         {
             DrawBox(box.rect);
+            DrawIcon(box.rect, box.icon, box.iconOffset);
             DrawLabel(box.rect, box.label);
         }
     }
@@ -489,6 +522,40 @@ public class TrackingHUD : MonoBehaviour
         GUI.DrawTexture(new Rect(r.xMax - t, r.yMin, t, r.height), boxLineTexture);
     }
 
+    /// <summary>
+    /// Zeichnet das Icon mittig über der Box (feste Größe), plus optionalem
+    /// per-Prefab Offset (+X rechts, +Y oben).
+    /// </summary>
+    private void DrawIcon(Rect boxRect, Sprite icon, Vector2 offset)
+    {
+        if (icon == null) return;
+
+        // GUI-Y wächst nach unten -> "über der Box" = kleineres y, "nach oben" = y verringern.
+        float x = boxRect.xMin + boxRect.width * 0.5f - iconSize * 0.5f + offset.x;
+        float y = boxRect.yMin - iconGap - iconSize - offset.y;
+        DrawSprite(new Rect(x, y, iconSize, iconSize), icon);
+    }
+
+    /// <summary>
+    /// Zeichnet ein Sprite ins Rechteck. Nutzt die Sprite-eigenen Texturkoordinaten,
+    /// damit auch Sprites aus einem Atlas korrekt (nur der eigene Ausschnitt) erscheinen.
+    /// Hinweis: Nicht-quadratische Sprites werden auf iconSize x iconSize gestreckt.
+    /// </summary>
+    private static void DrawSprite(Rect rect, Sprite sprite)
+    {
+        Texture tex = sprite.texture;
+        if (tex == null) return;
+
+        Rect tr = sprite.textureRect; // Pixelbereich des Sprites in der Textur
+        Rect texCoords = new Rect(
+            tr.x / tex.width,
+            tr.y / tex.height,
+            tr.width / tex.width,
+            tr.height / tex.height);
+
+        GUI.DrawTextureWithTexCoords(rect, tex, texCoords);
+    }
+
     private void DrawLabel(Rect boxRect, string text)
     {
         if (string.IsNullOrEmpty(text)) return;
@@ -496,7 +563,23 @@ public class TrackingHUD : MonoBehaviour
         Vector2 textSize = labelStyle.CalcSize(new GUIContent(text));
         float w = textSize.x + labelPadding.x * 2f;
         float h = textSize.y + labelPadding.y * 2f;
-        Rect labelRect = new Rect(boxRect.xMin, boxRect.yMin - h, w, h);
+
+        // Ecke wählen: Top -> über der Box, Bottom -> unter der Box;
+        // Left -> linksbündig (xMin), Right -> rechtsbündig (xMax - w).
+        float x, y;
+        switch (labelCorner)
+        {
+            case LabelCorner.TopRight:
+                x = boxRect.xMax - w; y = boxRect.yMin - h; break;
+            case LabelCorner.BottomLeft:
+                x = boxRect.xMin;     y = boxRect.yMax;     break;
+            case LabelCorner.BottomRight:
+                x = boxRect.xMax - w; y = boxRect.yMax;     break;
+            default: // TopLeft
+                x = boxRect.xMin;     y = boxRect.yMin - h; break;
+        }
+
+        Rect labelRect = new Rect(x, y, w, h);
 
         GUI.DrawTexture(labelRect, labelBackgroundTexture);
         GUI.Label(labelRect, text, labelStyle);
