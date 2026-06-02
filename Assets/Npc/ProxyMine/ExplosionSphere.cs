@@ -8,18 +8,32 @@ using System.Collections.Generic;
 // Prefab-Setup:
 //   - MeshFilter + MeshRenderer (Sphere-Mesh + Explosions-Material)
 //   - Dieses Script
-//   - Kein SphereCollider nötig (nutzt Physics.OverlapSphere)
+//   - KEIN Collider und KEINE LayerMask mehr nötig (siehe unten)
+//
+// Schadens-Erkennung (NEU: Distanz statt Physics):
+//   - Früher: Physics.OverlapSphere jeden Frame (abhängig von Collider-Layern,
+//     Trigger-Flags und vom Physics-Step → bei starker Slowmotion fehleranfällig).
+//   - Jetzt: Distanz-Vergleich vom Explosionszentrum zu jedem NPC.
+//   - NPCs kommen aus der NpcRegistry (jeder NpcBase trägt sich selbst ein/aus).
+//   - Der Spieler steht NICHT in der Registry und wird separat geprüft.
+//   - Vorteile: unabhängig von Time.timeScale, deterministisch, kein Collider-Setup,
+//     und keine Doppel-/Fehltreffer durch geteilte Eltern-Objekte (transform.root).
+//   - Hinweis: Gemessen wird zur Pivot-Position des NPCs (meist die Füße), nicht
+//     zur Collider-Hülle. Für den Prototyp ausreichend genau.
+//
+// Wachsende Welle:
+//   - currentRadius wächst über expandDuration von 0 auf maxRadius.
+//   - Jeden Frame werden alle noch nicht getroffenen Ziele innerhalb des
+//     AKTUELLEN Radius getroffen → die Welle erwischt auch Nachzügler.
+//   - Jedes Ziel wird nur einmal getroffen.
 //
 // Schaden:
-//   - Einheitlicher Schadenswert für Spieler und NPCs (explosionDamage)
-//   - Kann zur Laufzeit per SetDamage() überschrieben werden (z.B. von ProxyMineNpc)
-//   - Spieler: einmalig via PlayerCore.TakeDirectDamage (nicht blockbar)
-//   - NPCs/Minen: einmalig via IDamageable.TakeDamage
-//   - Ragdoll-NPCs erhalten Impact Force (Richtung: Explosion → NPC)
-//   - Jedes Ziel wird nur einmal getroffen
-//
-// Detection:
-//   - Physics.OverlapSphere jeden Frame (funktioniert auch mit Trigger-Collidern)
+//   - Einheitlicher Schadenswert für Spieler und NPCs (explosionDamage).
+//   - Kann zur Laufzeit per SetDamage() überschrieben werden (z.B. von ProxyMineNpc).
+//   - Spieler: einmalig via PlayerCore.TakeDirectDamage (nicht blockbar).
+//   - NPCs/Minen: einmalig via NpcBase.TakeDamage.
+//   - NPCs mit NpcImpactTracker erhalten zusätzlich einen Explosions-Impuls
+//     (Richtung: Explosion → NPC) für das Ragdoll.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -35,14 +49,8 @@ public class ExplosionSphere : MonoBehaviour
 
     [Tooltip("Zeit bis die Explosion ihre volle Größe erreicht")]
     [SerializeField] private float expandDuration = 0.3f;
-
-    [Header("Damage")]
-    [Tooltip("Schaden an Spieler und NPCs bei Berührung (einmalig pro Ziel)")]
-    [SerializeField] private float explosionDamage = 50f;
-
-    [Header("Detection")]
-    [Tooltip("Welche Layer von der Explosion getroffen werden")]
-    [SerializeField] private LayerMask damageableLayers = ~0;
+    
+    private float explosionDamage = 9999;
 
     [Header("Lifetime")]
     [Tooltip("Gesamte Lebensdauer des ExplosionGO (nach Spawn)")]
@@ -78,8 +86,21 @@ public class ExplosionSphere : MonoBehaviour
     private float timer;
     private float currentRadius;
 
-    // Jedes Ziel wird nur einmal getroffen (Root-GameObject als Key)
-    private HashSet<GameObject> damagedTargets = new HashSet<GameObject>();
+    // Festes Explosionszentrum (die Kugel bewegt sich nicht, sie skaliert nur).
+    private Vector3 center;
+
+    // Spieler-Referenz (einmalig gesucht, da der Spieler nicht in der Registry steht).
+    private PlayerCore player;
+    private bool playerDamaged;
+
+    // Bereits getroffene NPCs (jeder wird nur einmal beschädigt).
+    private readonly HashSet<NpcBase> damagedNpcs = new();
+
+    // Wiederverwendeter Puffer für die sichere Iteration über die Registry.
+    // Wir kopieren die NPC-Liste jeden Frame hier rein, weil TakeDamage einen NPC
+    // töten kann → das entfernt ihn aus der Registry → sonst würde die Iteration
+    // über die Original-Sammlung crashen ("Collection was modified").
+    private readonly List<NpcBase> npcBuffer = new();
 
     #endregion
 
@@ -94,6 +115,9 @@ public class ExplosionSphere : MonoBehaviour
 
     private void Start()
     {
+        center = transform.position;
+        player = FindFirstObjectByType<PlayerCore>();
+
         Destroy(gameObject, lifetime);
     }
 
@@ -101,13 +125,13 @@ public class ExplosionSphere : MonoBehaviour
     {
         timer += Time.deltaTime;
         UpdateExpansion();
-        CheckOverlap();
+        DealDamageInRadius();
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Expansion
+    #region Expansion (rein visuell)
     // ════════════════════════════════════════════════════════════════════════
 
     private void UpdateExpansion()
@@ -126,66 +150,60 @@ public class ExplosionSphere : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Overlap Detection & Damage
+    #region Damage (Distanz-basiert)
     // ════════════════════════════════════════════════════════════════════════
 
-    private void CheckOverlap()
+    private void DealDamageInRadius()
     {
         if (currentRadius <= 0f) return;
 
-        // QueryTriggerInteraction.Collide → erkennt auch Trigger-Collider
-        Collider[] hits = Physics.OverlapSphere(
-            transform.position,
-            currentRadius,
-            damageableLayers,
-            QueryTriggerInteraction.Collide
-        );
+        DamagePlayerIfInRadius();
+        DamageNpcsInRadius();
+    }
 
-        foreach (Collider hit in hits)
+    private void DamagePlayerIfInRadius()
+    {
+        if (playerDamaged) return;
+        if (player == null) return;
+
+        float distance = Vector3.Distance(center, player.transform.position);
+        if (distance > currentRadius) return;
+
+        playerDamaged = true;
+        player.TakeDirectDamage(explosionDamage, "Explosion");
+    }
+
+    private void DamageNpcsInRadius()
+    {
+        // Kopie ziehen (siehe Kommentar bei npcBuffer oben).
+        npcBuffer.Clear();
+        npcBuffer.AddRange(NpcRegistry.AliveNpcs);
+
+        foreach (NpcBase npc in npcBuffer)
         {
-            Debug.Log("[MINE EXPLOSION HIT] "+hit.gameObject.name);
-            ProcessHit(hit);
+            if (npc == null) continue;
+            if (damagedNpcs.Contains(npc)) continue;
+
+            float distance = Vector3.Distance(center, npc.transform.position);
+            if (distance > currentRadius) continue;
+
+            damagedNpcs.Add(npc);
+            ApplyDamageToNpc(npc);
         }
     }
 
-    private void ProcessHit(Collider hit)
+    private void ApplyDamageToNpc(NpcBase npc)
     {
-        // Root-GameObject bestimmen (verhindert Mehrfach-Treffer durch Child-Collider)
-        GameObject rootObject = hit.transform.root.gameObject;
+        Vector3 hitDirection = (npc.transform.position - center).normalized;
+        Vector3 hitPoint = npc.transform.position;
 
-        if (damagedTargets.Contains(rootObject)) return;
+        npc.TakeDamage(explosionDamage, hitPoint, hitDirection);
 
-        // ── Spieler ─────────────────────────────────────────────────────
-        PlayerCore player = hit.GetComponent<PlayerCore>();
-        if (player == null) player = hit.GetComponentInParent<PlayerCore>();
-
-        if (player != null)
+        // Ragdoll-Impuls registrieren (Richtung: Explosion → NPC), falls vorhanden.
+        NpcImpactTracker impactTracker = npc.GetComponent<NpcImpactTracker>();
+        if (impactTracker != null)
         {
-            damagedTargets.Add(rootObject);
-            player.TakeDirectDamage(explosionDamage, "Explosion");
-            return;
-        }
-
-        // ── IDamageable (NPCs, Minen, zerstörbare Objekte) ─────────────
-        IDamageable damageable = hit.GetComponent<IDamageable>();
-        if (damageable == null) damageable = hit.GetComponentInParent<IDamageable>();
-
-        if (damageable != null)
-        {
-            damagedTargets.Add(rootObject);
-
-            Vector3 hitDirection = (hit.transform.position - transform.position).normalized;
-            Vector3 hitPoint = hit.ClosestPoint(transform.position);
-            damageable.TakeDamage(explosionDamage, hitPoint, hitDirection);
-
-            // Impact registrieren (falls vorhanden)
-            NpcImpactTracker impactTracker = hit.GetComponent<NpcImpactTracker>();
-            if (impactTracker == null) impactTracker = hit.GetComponentInParent<NpcImpactTracker>();
-
-            if (impactTracker != null)
-            {
-                impactTracker.RegisterExplosionImpact(transform.position);
-            }
+            impactTracker.RegisterExplosionImpact(center);
         }
     }
 
