@@ -45,6 +45,11 @@ public class PlayerCore : MonoBehaviour
     [Min(0.01f)]
     [SerializeField] private float movementDetectionRadius = 0.35f;
 
+    [Header("Dash Recharge")]
+    [Tooltip("Layer, die als Boden für die Sticky-Surface-Pruefung beim Aufladen zaehlen. " +
+             "Im Inspector auf den Surface-Layer setzen, damit Trigger oder Deko die Pruefung nicht verfaelschen.")]
+    [SerializeField] private LayerMask groundStickyMask = ~0;
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -643,9 +648,13 @@ public class PlayerCore : MonoBehaviour
     /// </summary>
     private bool IsGroundSurfaceSticky()
     {
-        float checkDistance = Controller.height / 2f + 0.5f;
+        float checkDistance = Controller.height / 2f + 0.5f + Controller.skinWidth;
 
-        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, checkDistance))
+        // LayerMask + Trigger ignorieren, damit nur echte Boden-Collider zaehlen.
+        // Vorher konnte ein beliebiger Collider oder Trigger knapp unter dem Spieler
+        // die Pruefung verfaelschen, wodurch das Aufladen sporadisch fehlschlug.
+        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit,
+                            checkDistance, groundStickyMask, QueryTriggerInteraction.Ignore))
         {
             return hit.collider.GetComponentInParent<StickySurface>() != null;
         }

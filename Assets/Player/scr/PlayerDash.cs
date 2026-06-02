@@ -268,6 +268,40 @@ public class PlayerDash : MonoBehaviour
         return !IsFloorSurface(surfaceNormal);
     }
 
+    /// <summary>
+    /// Checks at the END of a dash whether the surface we actually landed on
+    /// is sticky. Uses a fresh probe against the real landing position instead
+    /// of trusting dashTargetCollider (the collider hit at dash START, which can
+    /// differ from where the player body ends up — that mismatch was the cause
+    /// of charges occasionally not recharging).
+    /// </summary>
+    private bool IsLandingOnStickySurface()
+    {
+        if (!dashHitSurface) return false;
+
+        // Primary check: fresh probe toward the surface we landed against.
+        // For a wall this points along -normal; for a floor it points downward.
+        Vector3 probeDirection = -stuckSurfaceNormal;
+        float probeDistance = wallStickOffset + 0.5f; // we end ~wallStickOffset off the surface
+
+        if (Physics.Raycast(transform.position, probeDirection, out RaycastHit hit,
+                            probeDistance, dashSurfaceLayer, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider.GetComponentInParent<StickySurface>() != null)
+                return true;
+        }
+
+        // Fallback: the collider we originally aimed at when the dash started.
+        // Covers cases where the body ends up slightly off the probe line
+        // (e.g. lateral camera/root offset on walls).
+        if (dashTargetCollider != null)
+        {
+            return dashTargetCollider.GetComponentInParent<StickySurface>() != null;
+        }
+
+        return false;
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -546,16 +580,12 @@ public class PlayerDash : MonoBehaviour
         // Kamera-Snap abbrechen wenn Dash endet
         core.Look?.CancelSnap();
 
-        //Check if the surface we landed on is sticky
-        bool isStickyLanding = hitSurface && dashTargetCollider != null 
-                               && dashTargetCollider.GetComponentInParent<StickySurface>() != null;
-        
-        // Debug.Log($"[Dash] sticky={isStickyLanding} " +
-        //           $"col={(dashTargetCollider ? dashTargetCollider.name : "null")} " +
-        //           $"hasSticky={(dashTargetCollider && dashTargetCollider.GetComponentInParent<StickySurface>())}");
-        
-        //bool isStickyLanding = IsLandingOnStickySurface();
-        
+        // Check if the surface we landed on is sticky.
+        // Determined freshly at landing (see IsLandingOnStickySurface) instead of
+        // from the collider remembered at dash start — that start collider could
+        // differ from where the body actually ends up, causing missed recharges.
+        bool isStickyLanding = IsLandingOnStickySurface();
+
         if (isStickyLanding && dashTargetIsWall && !core.Controller.isGrounded)
         {
             // Sticky wall — activate wall stick and recharge charges
@@ -577,22 +607,6 @@ public class PlayerDash : MonoBehaviour
         }
 
         OnDashCompleted?.Invoke(hitSurface, dashTargetIsWall, isStickyLanding);
-    }
-    
-    private bool IsLandingOnStickySurface()
-    {
-        if (!dashHitSurface) return false;
-
-        // Tasten in Richtung der Fläche (bei Wand entlang -Normal, bei Boden = nach unten).
-        Vector3 probeDir = -stuckSurfaceNormal;
-        float probeDist = wallStickOffset + 0.5f; // wir enden ~wallStickOffset von der Fläche entfernt
-
-        if (Physics.Raycast(transform.position, probeDir, out RaycastHit hit,
-                probeDist, dashSurfaceLayer, QueryTriggerInteraction.Ignore))
-        {
-            return hit.collider.GetComponentInParent<StickySurface>() != null;
-        }
-        return false;
     }
 
     private void CancelDash(float verticalForce)
@@ -831,11 +845,4 @@ public class PlayerDash : MonoBehaviour
     }
 
     #endregion
-    
-    /// <summary>
-    /// Prüft am Ende des Dashes, ob die Fläche, auf der wir gelandet sind,
-    /// klebrig ist. Nutzt eine frische Abfrage gegen die echte Landeposition,
-    /// statt sich auf den beim Dash-Start gemerkten Collider zu verlassen.
-    /// </summary>
-    
 }
