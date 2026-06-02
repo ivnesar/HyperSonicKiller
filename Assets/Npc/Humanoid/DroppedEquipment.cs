@@ -73,6 +73,12 @@ public class DroppedEquipment : MonoBehaviour
     public void Activate(Vector3 impactDirection)
     {
         if (isActivated) return;
+
+        // Laser ausschalten, falls die Waffe einen hat (z.B. AM16).
+        foreach (LaserRenderer laser in GetComponentsInChildren<LaserRenderer>())
+        {
+            laser.IsVisible = false;
+        }
         
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
