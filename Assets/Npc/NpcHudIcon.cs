@@ -12,13 +12,20 @@ using UnityEngine;
 // - So liegt die Icon-KONFIGURATION pro Prefab (designerfreundlich), während
 //   das RENDERING zentral im HUD bleibt.
 //
+// SICHTBARKEIT:
+// - Das Icon wird NUR gezeigt, solange der NPC gerade per NpcReveal (X-Ray)
+//   sichtbar gemacht wird (NpcReveal.IsRevealed == true).
+// - NPCs OHNE NpcReveal bekommen grundsätzlich kein Icon.
+// - Es wird NICHT gefadet: Sobald der Reveal endet, verschwindet das Icon
+//   schlagartig (gleiches Verhalten wie die Bounding Box).
+//
 // STATE-ABFRAGE:
 // - Der aktuelle State kommt aus NpcBase.GetStateID() (ein int, den jede NPC-
 //   State-Machine selbst vergibt). Die StateIDs sind pro NPC-Typ eigenständig —
 //   deshalb wird das Mapping hier am Prefab definiert, wo die IDs bekannt sind.
 //
 // PREFAB SETUP:
-// 1. Diese Komponente aufs NPC-Root legen (neben NpcBase).
+// 1. Diese Komponente aufs NPC-Root legen (neben NpcBase und NpcReveal).
 // 2. 'Default Icon' = Standard-Icon dieses NPC-Typs.
 // 3. Optional pro State einen Eintrag unter 'State Icons':
 //    - State ID  = Wert den GetStateID() in diesem State zurückgibt
@@ -54,7 +61,7 @@ public class NpcHudIcon : MonoBehaviour
 
     [Header("Position")]
     [Tooltip("Feinjustierung der Icon-Position in Pixeln, relativ zur Standard-" +
-             "position (mittig über der Box). +X = nach rechts, +Y = nach oben.")]
+             "position (im Zentrum der Box). +X = nach rechts, +Y = nach oben.")]
     [SerializeField] private Vector2 positionOffset = Vector2.zero;
 
     [Header("Appearance")]
@@ -73,6 +80,7 @@ public class NpcHudIcon : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private NpcBase npc;
+    private NpcReveal reveal;
     private Dictionary<int, Sprite> iconLookup;
 
     #endregion
@@ -89,6 +97,11 @@ public class NpcHudIcon : MonoBehaviour
         if (npc == null)
             Debug.LogWarning($"[NpcHudIcon] Kein NpcBase auf {name} gefunden — " +
                              "State-Icons funktionieren nicht.", this);
+
+        // NpcReveal entscheidet, OB das Icon überhaupt gezeigt wird.
+        // Kein NpcReveal -> dieser NPC bekommt grundsätzlich kein Icon.
+        reveal = GetComponent<NpcReveal>();
+        if (reveal == null) reveal = GetComponentInParent<NpcReveal>();
 
         // Lookup einmalig aufbauen (StateID -> Sprite)
         iconLookup = new Dictionary<int, Sprite>();
@@ -110,10 +123,15 @@ public class NpcHudIcon : MonoBehaviour
 
     /// <summary>
     /// Liefert das Icon für den aktuellen State, sonst das Default-Icon.
-    /// Kann null sein (dann zeichnet das HUD einfach kein Icon).
+    /// Gibt null zurück, wenn der NPC gerade NICHT ge-reveal-t ist oder gar kein
+    /// NpcReveal hat (dann zeichnet das HUD einfach kein Icon).
     /// </summary>
     public Sprite GetCurrentIcon()
     {
+        // Icon nur zeigen, solange der Reveal-Effekt aktiv ist.
+        if (reveal == null || !reveal.IsRevealed)
+            return null;
+
         if (npc != null && iconLookup != null &&
             iconLookup.TryGetValue(npc.GetStateID(), out var stateIcon))
         {

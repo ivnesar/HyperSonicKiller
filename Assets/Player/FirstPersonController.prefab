@@ -469,7 +469,6 @@ GameObject:
   - component: {fileID: 7859752730291968028}
   - component: {fileID: 3251378297847425365}
   - component: {fileID: 6742892932711821385}
-  - component: {fileID: 4144847731736527006}
   - component: {fileID: 9190051213164589030}
   m_Layer: 3
   m_Name: FirstPersonController
@@ -570,6 +569,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCore
   laserTarget: {fileID: 2661380836094038274}
+  movementDetectionRadius: 0.35
+  groundStickyMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   CurrentState: 0
 --- !u!114 &6516431572162398611
 MonoBehaviour:
@@ -615,7 +618,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
   maxDashCharges: 2
-  dashSpeed: 6
+  dashSpeed: 5
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2
@@ -655,7 +658,7 @@ MonoBehaviour:
   snapTransitionDuration: 0.05
   snapHoldDuration: 0.1
   nudgeRotationSpeed: 300
-  nudgeStrength: 0.6
+  nudgeStrength: 0.2
   nudgeMinAngle: 10
   nudgeDecayRate: 400
 --- !u!114 &6295242138573287136
@@ -677,7 +680,7 @@ MonoBehaviour:
   maxBlockHP: 200
   blockRegenDelay: 1
   blockRegenRate: 60
-  exhaustionDuration: 2
+  exhaustionDuration: 1.2
 --- !u!114 &7005038953154893743
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1042,24 +1045,6 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   logDebug: 0
---- !u!114 &4144847731736527006
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3935032124739193074}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f08790f4b7b50c748b2d81b609ca9f4a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GlassBreaker
-  glassLayer:
-    serializedVersion: 2
-    m_Bits: 16384
-  sweepRadius: 0.5
-  minSweepDistance: 0.01
-  calculateVelocityFromMovement: 1
 --- !u!114 &9190051213164589030
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1413,13 +1398,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TrackingHUD
   trackingCamera: {fileID: 8476516627239373863}
   hideDeadNpcs: 1
+  occluderMask:
+    serializedVersion: 2
+    m_Bits: 0
   boxColor: {r: 1, g: 0.7, b: 0, a: 1}
   boxLineThickness: 2
+  labelCorner: 0
   labelBackgroundColor: {r: 1, g: 0.7, b: 0, a: 1}
   labelTextColor: {r: 0, g: 0, b: 0, a: 1}
   labelFontSize: 14
   labelPadding: {x: 6, y: 2}
+  iconSize: 32
+  iconSizeMultiplier: 1
+  iconGap: 4
+  jitterInterval: 0.2
+  jitterStrength: 0.1
   applyPaniniCorrection: 1
+  compensateCropToFit: 1
   paniniStrengthMultiplier: 1
 --- !u!1 &7034769082513036069
 GameObject:

@@ -185,6 +185,7 @@ MonoBehaviour:
   chargeDuration: 0.5
   dashSpeed: 25
   playerHitRadius: 1.2
+  interceptHitRadius: 1.5
   collisionDamage: 999
   surfaceLayerMask:
     serializedVersion: 2
@@ -192,6 +193,7 @@ MonoBehaviour:
   raycastSegments: 4
   maxDashSegmentLength: 0.5
   maxPostInterceptFlightTime: 1.5
+  maxBlockedTime: 0.15
   recoveryDuration: 1.5
   chargeSound: {fileID: 0}
   dashSound: {fileID: 0}
@@ -602,7 +604,7 @@ MonoBehaviour:
   defaultIcon: {fileID: 21300000, guid: 6b9590ca3de96694ba0029d13198b679, type: 3}
   stateIcons: []
   positionOffset: {x: 0, y: 0}
-  sizeMultiplier: 1
+  sizeMultiplier: 0.8
   iconColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &3363251926924874602
 GameObject:

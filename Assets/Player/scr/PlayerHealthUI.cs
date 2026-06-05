@@ -32,6 +32,9 @@ public class PlayerHealthUI : MonoBehaviour
     [Header("Dash Blocked")]
     [SerializeField] private RawImage dashBlockedIcon;
 
+    [Header("Exhausted")]
+    [SerializeField] private RawImage exhaustedIcon;
+
     [Header("Game Over Panel")]
     [Tooltip("Eltern-GameObject des Game-Over-Panels (wird bei Tod aktiviert)")]
     [SerializeField] private GameObject gameOverPanel;
@@ -48,6 +51,16 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private Color criticalColor = new Color(0.9f, 0.2f, 0.2f);
     [SerializeField] private Color blockFullColor = new Color(0.3f, 0.6f, 0.9f);
     [SerializeField] private Color blockLowColor = new Color(0.9f, 0.4f, 0.1f);
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Runtime State
+    // ════════════════════════════════════════════════════════════════════════
+
+    // Aktueller Zustand der beiden Action-Icons (für die Prioritäts-Logik).
+    private bool isDashBlocked;
+    private bool isExhausted;
 
     #endregion
 
@@ -166,6 +179,12 @@ public class PlayerHealthUI : MonoBehaviour
         if (dashBlockedIcon != null)
             dashBlockedIcon.gameObject.SetActive(false);
 
+        if (exhaustedIcon != null)
+            exhaustedIcon.gameObject.SetActive(false);
+
+        isDashBlocked = false;
+        isExhausted = false;
+
         // Game Over Panel zu Beginn verstecken
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
@@ -230,8 +249,25 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void UpdateDashBlockedIcon(bool isBlocked)
     {
+        isDashBlocked = isBlocked;
+        RefreshActionIcons();
+    }
+
+    /// <summary>
+    /// Entscheidet, welches der beiden Action-Icons sichtbar ist.
+    /// Dash-Blocked hat Priorität: Sind beide Zustände gleichzeitig aktiv,
+    /// wird nur das Dash-Blocked-Icon gezeigt, damit sich die Icons nicht überlappen.
+    /// </summary>
+    private void RefreshActionIcons()
+    {
+        bool showDashBlocked = isDashBlocked;
+        bool showExhausted = isExhausted && !isDashBlocked;
+
         if (dashBlockedIcon != null)
-            dashBlockedIcon.gameObject.SetActive(isBlocked);
+            dashBlockedIcon.gameObject.SetActive(showDashBlocked);
+
+        if (exhaustedIcon != null)
+            exhaustedIcon.gameObject.SetActive(showExhausted);
     }
 
     private void UpdateCombatStatus(PlayerCombat.CombatState state)
@@ -276,11 +312,17 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void HandleExhausted()
     {
+        isExhausted = true;
+        RefreshActionIcons();
+
         UpdateStatus("<color=orange>EXHAUSTED!</color>");
     }
 
     private void HandleExhaustionRecovered()
     {
+        isExhausted = false;
+        RefreshActionIcons();
+
         UpdateStatus("Recovered");
         
         // Clear status after a moment

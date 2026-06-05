@@ -138,6 +138,7 @@ GameObject:
   - component: {fileID: 3847955758969704611}
   - component: {fileID: 1493484320626804606}
   - component: {fileID: 1920495543756704416}
+  - component: {fileID: 8347412599383348074}
   m_Layer: 6
   m_Name: Npc_Civilian
   m_TagString: Enemy
@@ -504,6 +505,23 @@ MonoBehaviour:
   - {fileID: 850465875645849597}
   fadeDuration: 0.1
   logDebug: 0
+--- !u!114 &8347412599383348074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2472838132611520362}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
+  defaultIcon: {fileID: 21300000, guid: 1f548076c51dc7d4c9f1b1910267652e, type: 3}
+  stateIcons: []
+  positionOffset: {x: 0, y: 0}
+  sizeMultiplier: 0.8
+  iconColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1001 &7099615387301495755
 PrefabInstance:
   m_ObjectHideFlags: 0

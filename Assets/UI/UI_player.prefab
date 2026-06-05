@@ -410,6 +410,7 @@ MonoBehaviour:
   statusText: {fileID: 8462687237371706051}
   dashChargesText: {fileID: 3354674549472681182}
   dashBlockedIcon: {fileID: 4529234736265840968}
+  exhaustedIcon: {fileID: 0}
   gameOverPanel: {fileID: 6073797966408818742}
   killedByText: {fileID: 5947125361537054128}
   deathDamageText: {fileID: 4203853690514591317}
@@ -436,11 +437,11 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   boxColor: {r: 1, g: 0, b: 0, a: 1}
-  boxLineThickness: 3
+  boxLineThickness: 2
   labelCorner: 3
   labelBackgroundColor: {r: 1, g: 0, b: 0, a: 1}
   labelTextColor: {r: 0, g: 0, b: 0, a: 1}
-  labelFontSize: 24
+  labelFontSize: 12
   labelPadding: {x: 6, y: 2}
   iconSize: 32
   iconSizeMultiplier: 3

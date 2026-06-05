@@ -498,7 +498,7 @@ MonoBehaviour:
   defaultIcon: {fileID: 21300000, guid: 1f548076c51dc7d4c9f1b1910267652e, type: 3}
   stateIcons: []
   positionOffset: {x: 0, y: 0}
-  sizeMultiplier: 1
+  sizeMultiplier: 0.8
   iconColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &4954609257925382764
 GameObject:

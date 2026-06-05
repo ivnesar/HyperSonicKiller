@@ -84,15 +84,12 @@ public class TrackingHUD : MonoBehaviour
 
     [Header("Icon Style")]
     [Tooltip("Kantenlänge des Icons in Pixeln (feste Größe, unabhängig von der " +
-             "Entfernung). Das Icon wird mittig über der Box gezeichnet.")]
+             "Entfernung). Das Icon wird im Zentrum der Box gezeichnet.")]
     [SerializeField] private float iconSize = 32f;
 
     [Tooltip("Globaler Multiplikator auf die Icon-Größe. 1 = unverändert, " +
              "2 = doppelt so groß. Wirkt auf alle NPC-Icons.")]
     [SerializeField] private float iconSizeMultiplier = 1f;
-
-    [Tooltip("Abstand in Pixeln zwischen Box, Icon und Label.")]
-    [SerializeField] private float iconGap = 4f;
 
     [Header("Tracking Jitter")]
     [Tooltip("Intervall in Sekunden (UNSCALED — unabhängig von Slow-Motion), in " +
@@ -546,9 +543,10 @@ public class TrackingHUD : MonoBehaviour
 
         float size = iconSize * iconSizeMultiplier * scale;
 
-        // GUI-Y wächst nach unten -> "über der Box" = kleineres y, "nach oben" = y verringern.
+        // Icon wird im ZENTRUM der Box platziert (horizontal + vertikal mittig).
+        // GUI-Y wächst nach unten -> "+offset.y = nach oben" heißt y verringern.
         float x = boxRect.xMin + boxRect.width * 0.5f - size * 0.5f + offset.x;
-        float y = boxRect.yMin - iconGap - size - offset.y;
+        float y = boxRect.yMin + boxRect.height * 0.5f - size * 0.5f - offset.y;
 
         // GUI.color tintet das Icon (multiplikativ). Vorher sichern, danach
         // zurücksetzen, damit Box und Label nicht eingefärbt werden.
