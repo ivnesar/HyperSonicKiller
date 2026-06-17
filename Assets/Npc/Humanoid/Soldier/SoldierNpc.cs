@@ -269,7 +269,7 @@ public class SoldierNpc : NpcBase
     private Vector3 CalculateFireDirection()
     {
         if (muzzlePoint != null)
-            return -muzzlePoint.forward;
+            return muzzlePoint.forward;
 
         // Fallback, falls kein muzzlePoint existiert
         Vector3 targetPoint = EffectiveTargetPosition + Vector3.up * 1f;

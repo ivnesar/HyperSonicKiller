@@ -59,9 +59,8 @@ void depthNormalsFrag(
 	outNormalWS = float4(NormalizeNormalPerPixel(i.normalWS), 0.0f);
 		
 #ifdef _WRITE_RENDERING_LAYERS
-	uint renderingLayers = GetMeshRenderingLayer();
-	outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+	outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
 #endif
-}
+    }
 
 #endif // RETRO_DEPTH_NORMALS_PASS_INCLUDED

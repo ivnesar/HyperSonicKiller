@@ -106,9 +106,8 @@ void DepthNormalOnlyFragment(
     outNormalWS = half4(normalWS, 0.0);
 
     #ifdef _WRITE_RENDERING_LAYERS
-        uint renderingLayers = GetMeshRenderingLayer();
-        outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
-    #endif
+        outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
+#endif
 }
 
 #endif

@@ -48,6 +48,7 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     [Header("Dash (Shared)")]
     [SerializeField] private ClipTransition dash;
     [SerializeField] private ClipTransition dashAttack;
+    [SerializeField] private ClipTransition postDash;
 
     // ── Landing ──────────────────────────────────────────────────────────
 
@@ -120,6 +121,10 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
         Check(chargeGround, "chargeGround");       Check(chargeWall, "chargeWall");
         Check(startDashGround, "startDashGround"); Check(startDashWall, "startDashWall");
         Check(dash, "dash");                       Check(dashAttack, "dashAttack");
+        if (postDash == null || postDash.Clip == null)
+            Debug.LogWarning($"[GenTwoAnimationManager] Clip-Slot 'postDash' ist nicht zugewiesen " +
+                             $"auf {gameObject.name}. Nach dem Attack-One-Shot wird vorübergehend " +
+                             $"'dash' als Fallback verwendet.");
         Check(landingGround, "landingGround");     Check(landingWall, "landingWall");
         Check(stunnedGround, "stunnedGround");     Check(stunnedWall, "stunnedWall");
     }
@@ -210,17 +215,21 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
     }
 
     /// <summary>
-    /// Play dash-attack one-shot (on player collision during dash).
-    /// Returns to dash loop when finished.
-    /// Called by GenTwoNpc.ProcessDashMovement().
+    /// Play dash-attack one-shot when the intercept point is reached.
+    /// Returns to the post-dash loop when finished.
+    /// Called by GenTwoNpc.MarkInterceptReached().
     /// </summary>
+    public void PlayInterceptAttack()
+    {
+        // After the attack one-shot, GenTwo should keep the post-dash pose/loop
+        // until the dash ends on a surface and PlayLanding() takes over.
+        currentBaseClip = GetPostDashClip();
+        PlayOneShotInstant(dashAttack);
+    }
+
     public void PlayDashAttack()
     {
-        if (dashAttack == null || dashAttack.Clip == null) return;
-
-        // Keep dash as base so we return to it
-        currentBaseClip = dash;
-        PlayOneShotInstant(dashAttack);
+        PlayInterceptAttack();
     }
 
     /// <summary>
@@ -273,6 +282,14 @@ public class GenTwoAnimationManager : MonoBehaviour, INpcAnimationHandler
         // hängen bleiben, wenn isPlayingOneShot fälschlich true blieb (Bug 3).
         activeOneShot = null;
         animancer.Play(clip);
+    }
+
+    private ClipTransition GetPostDashClip()
+    {
+        if (postDash != null && postDash.Clip != null)
+            return postDash;
+
+        return dash;
     }
 
     private void PlayOneShot(ClipTransition clip)

@@ -31,6 +31,7 @@ Material:
   - _RECEIVESHADOWSMODE_OFF
   - _SNAPMODE_VIEW
   - _USE_FLAT_SHADING
+  - _WRAPMODE_REPEAT
   m_InvalidKeywords:
   - _USE_FLAT_SHADING_ON
   - _USE_VERTEX_COLORS_OFF
@@ -77,6 +78,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -114,6 +119,7 @@ Material:
     - _ResolutionLimit: 64
     - _SnapMode: 2
     - _SnapsPerUnit: 24
+    - _WrapMode: 1
     m_Floats:
     - _AddPrecomputedVelocity: 0
     - _AffineTextureStrength: 0.2
@@ -138,6 +144,7 @@ Material:
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _Metallic: 0
+    - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0

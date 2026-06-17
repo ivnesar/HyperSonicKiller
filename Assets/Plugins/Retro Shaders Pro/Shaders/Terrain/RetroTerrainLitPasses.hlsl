@@ -6,6 +6,12 @@
 
 #define EPSILON 1e-06
 
+#ifdef _USE_STOCHASTIC_TEXTURING
+    #define TERRAIN_SAMPLE stochasticTexturing
+#else
+    #define TERRAIN_SAMPLE SAMPLE_TEXTURE2D_LOD
+#endif
+
 struct Attributes
 {
     float4 positionOS : POSITION;
@@ -70,6 +76,32 @@ inline float2x2 invert(float2x2 m)
     }
 
     return (1.0f / det) * float2x2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
+}
+
+// Take a 2D seed value and output a random 2D vector.
+inline float2 hash2D2D(float2 s)
+{
+    return frac(sin(fmod(float2(dot(s, float2(127.1, 311.7)), dot(s, float2(269.5, 183.3))), 3.14159)) * 43758.5453);
+}
+
+// Based on https://www.reddit.com/r/Unity3D/comments/dhr5g2/i_made_a_stochastic_texture_sampling_shader/
+float4 stochasticTexturing(texture2D tex, sampler samplerState, float2 uv, int lod)
+{
+    float4x3 BW_vx;
+
+    float2 skewUV = mul(float2x2(1.0f, 0.0f, -0.57735027f, 1.15470054f), uv * 3.464f);
+
+    float2 vxID = float2(floor(skewUV));
+    float3 barycentric = float3(frac(skewUV), 0);
+    barycentric.z = 1.0 - barycentric.x - barycentric.y;
+
+    BW_vx = ((barycentric.z > 0) ?
+        float4x3(float3(vxID, 0), float3(vxID + float2(0, 1), 0), float3(vxID + float2(1, 0), 0), barycentric.zyx) :
+        float4x3(float3(vxID + float2(1, 1), 0), float3(vxID + float2(1, 0), 0), float3(vxID + float2(0, 1), 0), float3(-barycentric.z, 1.0 - barycentric.y, 1.0 - barycentric.x)));
+    
+    return  mul(SAMPLE_TEXTURE2D_LOD(tex, samplerState, uv + hash2D2D(BW_vx[0].xy), lod), BW_vx[3].x) +
+            mul(SAMPLE_TEXTURE2D_LOD(tex, samplerState, uv + hash2D2D(BW_vx[1].xy), lod), BW_vx[3].y) +
+            mul(SAMPLE_TEXTURE2D_LOD(tex, samplerState, uv + hash2D2D(BW_vx[2].xy), lod), BW_vx[3].z);
 }
 
 void InitializeInputData(Varyings IN, half3 normalTS, int targetResolution, int actualResolution, out InputData inputData)
@@ -171,10 +203,10 @@ void NormalMapMix(float4 uvSplat01, float4 uvSplat23, inout half4 splatControl, 
 		int normal3Resolution = (int)log2(_Normal3_TexelSize.zw);
 
         half3 nrm = half(0.0);
-        nrm += splatControl.r * UnpackNormalScale(SAMPLE_TEXTURE2D_LOD(_Normal0, sampler_PointRepeat, uvSplat01.xy, normal0Resolution - targetResolution), _NormalScale0);
-        nrm += splatControl.g * UnpackNormalScale(SAMPLE_TEXTURE2D_LOD(_Normal1, sampler_PointRepeat, uvSplat01.zw, normal1Resolution - targetResolution), _NormalScale1);
-        nrm += splatControl.b * UnpackNormalScale(SAMPLE_TEXTURE2D_LOD(_Normal2, sampler_PointRepeat, uvSplat23.xy, normal2Resolution - targetResolution), _NormalScale2);
-        nrm += splatControl.a * UnpackNormalScale(SAMPLE_TEXTURE2D_LOD(_Normal3, sampler_PointRepeat, uvSplat23.zw, normal3Resolution - targetResolution), _NormalScale3);
+        nrm += splatControl.r * UnpackNormalScale(TERRAIN_SAMPLE(_Normal0, sampler_PointRepeat, uvSplat01.xy, normal0Resolution - targetResolution), _NormalScale0);
+        nrm += splatControl.g * UnpackNormalScale(TERRAIN_SAMPLE(_Normal1, sampler_PointRepeat, uvSplat01.zw, normal1Resolution - targetResolution), _NormalScale1);
+        nrm += splatControl.b * UnpackNormalScale(TERRAIN_SAMPLE(_Normal2, sampler_PointRepeat, uvSplat23.xy, normal2Resolution - targetResolution), _NormalScale2);
+        nrm += splatControl.a * UnpackNormalScale(TERRAIN_SAMPLE(_Normal3, sampler_PointRepeat, uvSplat23.zw, normal3Resolution - targetResolution), _NormalScale3);
 
         // avoid risk of NaN when normalizing.
         #if HAS_HALF
@@ -291,20 +323,20 @@ void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, float4 
     int splat3LOD = int(log2(_Splat3_TexelSize.z)) - targetResolution;
     
 #if defined(_FILTERMODE_BILINEAR)
-    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_LinearRepeat, uvSplat01.xy, splat0LOD);
-    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_LinearRepeat, uvSplat01.zw, splat1LOD);
-    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_LinearRepeat, uvSplat23.xy, splat2LOD);
-    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_LinearRepeat, uvSplat23.zw, splat3LOD);
+    diffAlbedo[0] = TERRAIN_SAMPLE(_Splat0, sampler_LinearRepeat, uvSplat01.xy, splat0LOD);
+    diffAlbedo[1] = TERRAIN_SAMPLE(_Splat1, sampler_LinearRepeat, uvSplat01.zw, splat1LOD);
+    diffAlbedo[2] = TERRAIN_SAMPLE(_Splat2, sampler_LinearRepeat, uvSplat23.xy, splat2LOD);
+    diffAlbedo[3] = TERRAIN_SAMPLE(_Splat3, sampler_LinearRepeat, uvSplat23.zw, splat3LOD);
 #elif defined(_FILTERMODE_N64)
     diffAlbedo[0] = SampleSplatmapN64(_Splat0, _Splat0_TexelSize, uvSplat01.xy, splat0LOD);
     diffAlbedo[1] = SampleSplatmapN64(_Splat1, _Splat1_TexelSize, uvSplat01.zw, splat1LOD);
     diffAlbedo[2] = SampleSplatmapN64(_Splat2, _Splat2_TexelSize, uvSplat23.xy, splat2LOD);
     diffAlbedo[3] = SampleSplatmapN64(_Splat3, _Splat3_TexelSize, uvSplat23.zw, splat3LOD);
 #else
-    diffAlbedo[0] = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_PointRepeat, uvSplat01.xy, splat0LOD);
-    diffAlbedo[1] = SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_PointRepeat, uvSplat01.zw, splat1LOD);
-    diffAlbedo[2] = SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_PointRepeat, uvSplat23.xy, splat2LOD);
-    diffAlbedo[3] = SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_PointRepeat, uvSplat23.zw, splat3LOD);
+    diffAlbedo[0] = TERRAIN_SAMPLE(_Splat0, sampler_PointRepeat, uvSplat01.xy, splat0LOD);
+    diffAlbedo[1] = TERRAIN_SAMPLE(_Splat1, sampler_PointRepeat, uvSplat01.zw, splat1LOD);
+    diffAlbedo[2] = TERRAIN_SAMPLE(_Splat2, sampler_PointRepeat, uvSplat23.xy, splat2LOD);
+    diffAlbedo[3] = TERRAIN_SAMPLE(_Splat3, sampler_PointRepeat, uvSplat23.zw, splat3LOD);
 #endif
 
 #ifndef _DITHERMODE_OFF
@@ -503,6 +535,15 @@ void SetupTerrainDebugTextureData(inout InputData inputData, float2 uv)
         inputData.streamInfo = TERRAIN_STREAM_INFO;
     #endif
 }
+
+// Why must Unity be like this lmao.
+#if UNITY_VERSION < 60020000
+float EncodeMeshRenderingLayer()
+{
+    uint renderingLayers = GetMeshRenderingLayer();
+    return EncodeMeshRenderingLayer(renderingLayers);
+}
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 //                  Vertex and Fragment functions                            //
@@ -756,8 +797,7 @@ void SplatmapFragment(
     outColor = half4(color.rgb, 1.0h);
 
 #ifdef _WRITE_RENDERING_LAYERS
-    uint renderingLayers = GetMeshRenderingLayer();
-    outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+    outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
 #endif
 }
 

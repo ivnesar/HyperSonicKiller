@@ -5,7 +5,7 @@ using UnityEngine.Rendering.Universal;
 
 namespace RetroShadersPro.URP
 {
-    [System.Serializable, VolumeComponentMenu("Retro Shaders Pro/CRT")]
+    [System.Serializable, VolumeComponentMenu("Retro Shaders Pro/CRT"), DisplayInfo(name = "CRT")]
     public class CRTSettings : VolumeComponent, IPostProcessComponent
     {
         public BoolParameter showInSceneView = new BoolParameter(true);

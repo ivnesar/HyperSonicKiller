@@ -3149,7 +3149,7 @@
     "m_CastShadows": true,
     "m_ReceiveShadows": true,
     "m_SupportsLODCrossFade": false,
-    "m_CustomEditorGUI": "RetroShadersPro.URP.RetroOutlineShaderGUI",
+    "m_CustomEditorGUI": "RetroShadersPro.URP.Editor.RetroOutlineShaderGUI",
     "m_SupportVFX": false
 }
 

@@ -366,5 +366,5 @@ Shader "Retro Shaders Pro/CRT (Mesh)"
         }
     }
 
-    CustomEditor "RetroShadersPro.URP.CRTMeshShaderGUI"
+    CustomEditor "RetroShadersPro.URP.Editor.CRTMeshShaderGUI"
 }

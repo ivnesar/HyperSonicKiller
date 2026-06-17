@@ -60,6 +60,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
 		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
 		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
+    	[Toggle] _USE_STOCHASTIC_TEXTURING("Use Stochastic Texturing", Float) = 0
     }
 
     SubShader
@@ -134,6 +135,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
 			#pragma shader_feature_local _USE_SPECULAR_LIGHT
 			#pragma shader_feature_local_fragment _USE_REFLECTION_CUBEMAP
 			#pragma shader_feature_local _RECEIVESHADOWSMODE_ON _RECEIVESHADOWSMODE_OFF
+            #pragma shader_feature_local_fragment _USE_STOCHASTIC_TEXTURING
 
             #include "RetroTerrainLitInput.hlsl"
             #include "RetroTerrainLitPasses.hlsl"
@@ -299,7 +301,7 @@ Shader "Retro Shaders Pro/Terrain/Lit"
     Dependency "BaseMapShader" = "Hidden/Retro Shaders Pro/Terrain/Lit (Base Pass)"
     Dependency "BaseMapGenShader" = "Hidden/Retro Shaders Pro/Terrain/Lit (Basemap Gen)"
 
-    CustomEditor "RetroShadersPro.URP.RetroTerrainLitShaderGUI"
+    CustomEditor "RetroShadersPro.URP.Editor.RetroTerrainLitShaderGUI"
 
     Fallback "Hidden/Universal Render Pipeline/FallbackError"
 }

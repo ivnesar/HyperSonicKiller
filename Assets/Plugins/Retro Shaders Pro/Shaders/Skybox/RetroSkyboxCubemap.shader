@@ -253,5 +253,5 @@ Shader "Retro Shaders Pro/Skybox/Retro Skybox"
         }
     }
 
-	CustomEditor "RetroShadersPro.URP.RetroSkyboxShaderGUI"
+	CustomEditor "RetroShadersPro.URP.Editor.RetroSkyboxShaderGUI"
 }

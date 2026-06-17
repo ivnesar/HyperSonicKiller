@@ -9,6 +9,9 @@
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);
 
+TEXTURE2D(_NormalMap);
+SAMPLER(sampler_NormalMap);
+
 #ifdef _USE_REFLECTION_CUBEMAP
 TEXTURECUBE(_ReflectionCubemap);
 SAMPLER(sampler_ReflectionCubemap);
@@ -19,6 +22,8 @@ float4 _BaseColor;
 float4 _BaseMap_TexelSize;
 float4 _BaseMap_ST;
 float4 _BaseMap_MipInfo;
+float4 _NormalMap_TexelSize;
+float _NormalStrength;
 int _ResolutionLimit;
 int _SnapsPerUnit;
 int _ColorBitDepth;
@@ -107,5 +112,14 @@ half3 SampleEmission(float2 uv, half3 emissionColor, TEXTURE2D_PARAM(emissionMap
 	return SAMPLE_TEXTURE2D(emissionMap, sampler_emissionMap, uv).rgb * emissionColor;
 #endif
 }
+
+// Why must Unity be like this lmao.
+#if UNITY_VERSION < 60020000
+float EncodeMeshRenderingLayer()
+{
+    uint renderingLayers = GetMeshRenderingLayer();
+    return EncodeMeshRenderingLayer(renderingLayers);
+}
+#endif
 
 #endif // RETRO_INPUT_SURFACE_INCLUDED

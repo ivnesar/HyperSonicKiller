@@ -4,6 +4,8 @@ Shader "Retro Shaders Pro/Retro Lit"
     {
 		[MainColor] [HDR] _BaseColor("Base Color", Color) = (1, 1, 1, 1)
 		[MainTexture] _BaseMap("Base Texture", 2D) = "white" {}
+    	[NoScaleOffset] [Normal] _NormalMap("Normal Texture", 2D) = "bump" {}
+    	_NormalStrength("Normal Strength", Range(0.0, 2.0)) = 1.0
 		_ResolutionLimit("Resolution Limit (Power of 2)", Integer) = 64
 		_SnapsPerUnit("Snapping Points per Meter", Integer) = 64
 		_ColorBitDepth("Bit Depth", Integer) = 64
@@ -16,8 +18,9 @@ Shader "Retro Shaders Pro/Retro Lit"
 		_CubemapRotation("Cubemap Rotation", Range(0.0, 360.0)) = 0
 
 		[KeywordEnum(Lit, TexelLit, VertexLit, Unlit)] _LightMode("Lighting Mode", Integer) = 1
-		[KeywordEnum(Bilinear, Point, N64)] _FilterMode("Filtering Mode", Integer) = 1
-		[KeywordEnum(Screen, Texture, Off)] _DitherMode("Dithering Mode", Integer) = 0
+		[KeywordEnum(Bilinear, Point, N64)] _FilterMode("Filter Mode", Integer) = 1
+    	[KeywordEnum(Clamp, Repeat)] _WrapMode("Wrap Mode", Integer) = 1
+		[KeywordEnum(Screen, Texture, Off)] _DitherMode("Dither Mode", Integer) = 0
 		[KeywordEnum(Object, World, View, Off)] _SnapMode("Snapping Mode", Integer) = 2
 		[KeywordEnum(On, Off)] _ReceiveShadowsMode("Receive Shadows Mode", Integer) = 0
 
@@ -122,6 +125,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 
 			#pragma shader_feature_local _LIGHTMODE_LIT _LIGHTMODE_TEXELLIT _LIGHTMODE_VERTEXLIT _LIGHTMODE_UNLIT
 			#pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+            #pragma shader_feature_local_fragment _WRAPMODE_CLAMP _WRAPMODE_REPEAT
 			#pragma shader_feature_local_fragment _DITHERMODE_SCREEN _DITHERMODE_TEXTURE _DITHERMODE_OFF
 			#pragma shader_feature_local_vertex _SNAPMODE_OBJECT _SNAPMODE_WORLD _SNAPMODE_VIEW _SNAPMODE_OFF
 			#pragma shader_feature_local_fragment _ALPHATEST_ON
@@ -250,6 +254,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float4 positionOS : POSITION;
 				float4 color : COLOR;
 				float3 normalOS : NORMAL;
+            	float4 tangentOS : TANGENT;
                 float2 uv : TEXCOORD0;
 				float2 staticLightmapUV : TEXCOORD1;
 				float2 dynamicLightmapUV : TEXCOORD2;
@@ -267,13 +272,14 @@ Shader "Retro Shaders Pro/Retro Lit"
 #else
 				float3 normalWS : TEXCOORD2;
 #endif
-				float3 positionWS : TEXCOORD3;
-				DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 4);
-				float2 dynamicLightmapUV : TEXCOORD5;
-				float4 positionSS : TEXCOORD6;
+            	float4 tangentWS : TEXCOORD3;
+				float3 positionWS : TEXCOORD4;
+				DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
+				float2 dynamicLightmapUV : TEXCOORD6;
+				float4 positionSS : TEXCOORD7;
 #ifdef _LIGHTMODE_VERTEXLIT
-				float3 diffuseLightColor : TEXCOORD7;
-				float3 specularLightColor : TEXCOORD8;
+				float3 diffuseLightColor : TEXCOORD8;
+				float3 specularLightColor : TEXCOORD9;
 #endif
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
@@ -305,6 +311,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				o.affineUVAndFog.xyz = float3(TRANSFORM_TEX(v.uv, _BaseMap) * o.positionCS.w, o.positionCS.w);
 				o.affineUVAndFog.w = ComputeFogFactor(o.positionCS.z);
 				o.normalWS = TransformObjectToWorldNormal(v.normalOS);
+				o.tangentWS = float4(TransformObjectToWorldDir(v.tangentOS.xyz), v.tangentOS.w);
 				o.positionWS = TransformObjectToWorld(v.positionOS.xyz);
 				OUTPUT_SH(o.normalWS, o.vertexSH);
 				OUTPUT_LIGHTMAP_UV(v.staticLightmapUV, unity_LightmapST, o.staticLightmapUV);
@@ -329,6 +336,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				return o;
 			}
 
+            // Invert a 2x2 matrix.
 			inline float2x2 invert(float2x2 m)
 			{
 				float det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
@@ -339,6 +347,43 @@ Shader "Retro Shaders Pro/Retro Lit"
 				}
 
 				return (1.0f / det) * float2x2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
+			}
+            
+            // Calculate N64 3-point bilinear filtering.
+            inline float4 n64Sample(TEXTURE2D_PARAM(tex, sampler_tex), float4 texelSize, float2 uv, int lod)
+			{
+				float modifier = pow(2.0f, lod);
+				float4 targetTexelSize = float4(texelSize.xy * modifier, texelSize.zw / modifier);
+
+				// With thanks to: https://www.emutalk.net/threads/emulating-nintendo-64-3-sample-bilinear-filtering-using-shaders.54215/
+				float2 uvA = float2(targetTexelSize.x, 0.0f);
+				float2 uvB = float2(0.0f, targetTexelSize.y);
+				float2 uvC = float2(targetTexelSize.x, targetTexelSize.y);
+				float2 uvHalf = uvC * 0.5f;
+				float2 uvCenter = uv - uvHalf;
+
+				float4 colorMain = SAMPLE_TEXTURE2D_LOD(tex, sampler_tex, uvCenter, lod);
+				float4 colorA = SAMPLE_TEXTURE2D_LOD(tex, sampler_tex, uvCenter + uvA, lod);
+				float4 colorB = SAMPLE_TEXTURE2D_LOD(tex, sampler_tex, uvCenter + uvB, lod);
+				float4 colorC = SAMPLE_TEXTURE2D_LOD(tex, sampler_tex, uvCenter + uvC, lod);
+
+				float interpX = modf(uvCenter.x * targetTexelSize.z, targetTexelSize.z);
+				float interpY = modf(uvCenter.y * targetTexelSize.w, targetTexelSize.w);
+
+				if(uvCenter.x < 0.0f)
+				{
+					interpX = 1.0f - (interpX * -1.0f);
+				}
+
+				if(uvCenter.y < 0.0f)
+				{
+					interpY = 1.0f - (interpY * -1.0f);
+				}
+
+				float4 color = (colorMain + interpX * (colorA - colorMain) + interpY * (colorB - colorMain)) * (1.0f - step(1.0f, interpX + interpY));
+				color += (colorC + (1.0f - interpX) * (colorB - colorC) + (1.0f - interpY) * (colorA - colorC)) * step(1.0f, interpX + interpY);
+			
+				return color;
 			}
 
 			void frag(
@@ -359,46 +404,27 @@ Shader "Retro Shaders Pro/Retro Lit"
 
 				// Apply affine texture mapping.
 				float2 uv = lerp(i.uv, i.affineUVAndFog.xy / i.affineUVAndFog.z, _AffineTextureStrength);
-
+				
 #if defined(_FILTERMODE_BILINEAR)
-				float4 baseColor = _BaseColor * SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_LinearRepeat, uv, lod);
-#elif defined(_FILTERMODE_N64)
-				// Calculate N64 3-point bilinear filtering.
-
-				float modifier = pow(2.0f, lod);
-				float4 targetTexelSize = float4(_BaseMap_TexelSize.xy * modifier, _BaseMap_TexelSize.zw / modifier);
-
-				// With thanks to: https://www.emutalk.net/threads/emulating-nintendo-64-3-sample-bilinear-filtering-using-shaders.54215/
-				float2 uvA = float2(targetTexelSize.x, 0.0f);
-				float2 uvB = float2(0.0f, targetTexelSize.y);
-				float2 uvC = float2(targetTexelSize.x, targetTexelSize.y);
-				float2 uvHalf = uvC * 0.5f;
-				float2 uvCenter = uv - uvHalf;
-
-				float4 baseColorMain = SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_PointRepeat, uvCenter, lod);
-				float4 baseColorA = SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_PointRepeat, uvCenter + uvA, lod);
-				float4 baseColorB = SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_PointRepeat, uvCenter + uvB, lod);
-				float4 baseColorC = SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_PointRepeat, uvCenter + uvC, lod);
-
-				float interpX = modf(uvCenter.x * targetTexelSize.z, targetTexelSize.z);
-				float interpY = modf(uvCenter.y * targetTexelSize.w, targetTexelSize.w);
-
-				if(uvCenter.x < 0.0f)
-				{
-					interpX = 1.0f - (interpX * -1.0f);
-				}
-
-				if(uvCenter.y < 0.0f)
-				{
-					interpY = 1.0f - (interpY * -1.0f);
-				}
-
-				float4 baseColor = (baseColorMain + interpX * (baseColorA - baseColorMain) + interpY * (baseColorB - baseColorMain)) * (1.0f - step(1.0f, interpX + interpY));
-				baseColor += (baseColorC + (1.0f - interpX) * (baseColorB - baseColorC) + (1.0f - interpY) * (baseColorA - baseColorC)) * step(1.0f, interpX + interpY);
-
-				baseColor *= _BaseColor;
+	#if defined(_WRAPMODE_CLAMP)
+				SamplerState baseSampler = sampler_LinearClamp;
+	#else
+				SamplerState baseSampler = sampler_LinearRepeat;
+	#endif
 #else
-				float4 baseColor = _BaseColor * SAMPLE_TEXTURE2D_LOD(_BaseMap, sampler_PointRepeat, uv, lod);
+	#if defined(_WRAPMODE_CLAMP)
+				SamplerState baseSampler = sampler_PointClamp;
+	#else
+				SamplerState baseSampler = sampler_PointRepeat;
+	#endif
+#endif
+				
+#if defined(_FILTERMODE_N64)
+				float4 baseColor = n64Sample(TEXTURE2D_ARGS(_BaseMap, baseSampler), _BaseMap_TexelSize, uv, lod) * _BaseColor;
+				float3 normalTS = UnpackNormalScale(n64Sample(TEXTURE2D_ARGS(_NormalMap, baseSampler), _NormalMap_TexelSize, uv, lod), _NormalStrength);
+#else
+				float4 baseColor = _BaseColor * SAMPLE_TEXTURE2D_LOD(_BaseMap, baseSampler, uv, lod);
+				float3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D_LOD(_NormalMap, baseSampler, uv, lod), _NormalStrength);
 #endif
 
 #if _USE_VERTEX_COLORS
@@ -464,7 +490,14 @@ Shader "Retro Shaders Pro/Retro Lit"
 				float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
 				float4 shadowMask = SAMPLE_SHADOWMASK(i.dynamicLightmapUV);
 
-				float3 normalWS = normalize(i.normalWS);
+				// Apply normal map settings to world-space normal vector.
+				float3 normalWS = NormalizeNormalPerPixel(i.normalWS);
+				
+				float3 binormalWS = cross(normalWS, i.tangentWS.xyz) * i.tangentWS.w * unity_WorldTransformParams.w;
+                normalWS = normalize(
+                    normalTS.x * i.tangentWS.xyz +
+                    normalTS.y * binormalWS +
+                    normalTS.z * normalWS);
 
 				float3 viewWS = GetWorldSpaceNormalizeViewDir(positionWS);
 
@@ -522,8 +555,7 @@ Shader "Retro Shaders Pro/Retro Lit"
 				outColor = float4(finalColor, baseColor.a);
 
 #ifdef _WRITE_RENDERING_LAYERS
-				uint renderingLayers = GetMeshRenderingLayer();
-				outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+				outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
 #endif
 			}
             ENDHLSL
@@ -645,5 +677,5 @@ Shader "Retro Shaders Pro/Retro Lit"
 		}
     }
 
-	CustomEditor "RetroShadersPro.URP.RetroLitShaderGUI"
+	CustomEditor "RetroShadersPro.URP.Editor.RetroLitShaderGUI"
 }

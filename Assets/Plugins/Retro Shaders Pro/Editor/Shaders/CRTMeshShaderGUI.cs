@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.Rendering;
 
-namespace RetroShadersPro.URP
+namespace RetroShadersPro.URP.Editor
 {
     internal class CRTMeshShaderGUI : ShaderGUI
     {

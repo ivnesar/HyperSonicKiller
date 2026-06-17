@@ -56,7 +56,7 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Add Pass)"
 		[ToggleOff] _USE_VERTEX_COLORS("Use Vertex Colors", Float) = 0
 		[Toggle] _USE_SPECULAR_LIGHT("Use Specular Lighting", Float) = 0
 		[Toggle] _USE_REFLECTION_CUBEMAP("Use Reflection Cubemap", Float) = 0
-
+    	[Toggle] _USE_STOCHASTIC_TEXTURING("Use Stochastic Texturing", Float) = 0
     }
 
     HLSLINCLUDE
@@ -122,8 +122,17 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Add Pass)"
             #pragma shader_feature_local _TERRAIN_INSTANCED_PERPIXEL_NORMAL
             #define TERRAIN_SPLAT_ADDPASS
 
-            #pragma shader_feature_local _USE_POINT_FILTER_ON
-            #pragma shader_feature_local _USE_DITHERING
+            #pragma shader_feature_local _LIGHTMODE_LIT _LIGHTMODE_TEXELLIT _LIGHTMODE_VERTEXLIT _LIGHTMODE_UNLIT
+			#pragma shader_feature_local_fragment _FILTERMODE_BILINEAR _FILTERMODE_POINT _FILTERMODE_N64
+			#pragma shader_feature_local_fragment _DITHERMODE_SCREEN _DITHERMODE_TEXTURE _DITHERMODE_OFF
+			#pragma shader_feature_local_vertex _SNAPMODE_OBJECT _SNAPMODE_WORLD _SNAPMODE_VIEW _SNAPMODE_OFF
+			#pragma shader_feature_local_fragment _ALPHATEST_ON
+			#pragma shader_feature_local _USE_AMBIENT_OVERRIDE
+			#pragma shader_feature_local_fragment _USE_VERTEX_COLORS
+			#pragma shader_feature_local _USE_SPECULAR_LIGHT
+			#pragma shader_feature_local_fragment _USE_REFLECTION_CUBEMAP
+			#pragma shader_feature_local _RECEIVESHADOWSMODE_ON _RECEIVESHADOWSMODE_OFF
+            #pragma shader_feature_local_fragment _USE_STOCHASTIC_TEXTURING
 
 			#include "RetroTerrainLitInput.hlsl"
 			#include "RetroTerrainLitPasses.hlsl"

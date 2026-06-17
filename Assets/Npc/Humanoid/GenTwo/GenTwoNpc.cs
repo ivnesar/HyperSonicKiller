@@ -28,7 +28,7 @@ using UnityEngine;
 /// ANIMANCER:
 /// - States call typed methods on AnimManager (e.g. AnimManager.PlayCharge()).
 /// - DetermineWallOrGround() uses AnimManager.SetOnWall().
-/// - ProcessDashMovement() uses AnimManager.PlayDashAttack().
+/// - MarkInterceptReached() uses AnimManager.PlayInterceptAttack().
 /// - UpdateAnimator() overridden: GenTwo has no NavMesh movement blending.
 /// - playerCore is inherited from NpcBase (not locally declared).
 /// </summary>
@@ -156,6 +156,7 @@ public class GenTwoNpc : NpcBase
     private float postInterceptElapsedTime;
     private bool hasReachedInterceptPoint;
     private bool hasHitPlayer;
+    private bool hasPlayedInterceptAttack;
     private Vector3 lastSurfaceNormal;
 
     // Bug 1: Zeit, die GenTwo aktuell ohne Vorwärtsfortschritt "festhängt".
@@ -594,6 +595,7 @@ public class GenTwoNpc : NpcBase
         postInterceptElapsedTime = 0f;
         hasReachedInterceptPoint = false;
         hasHitPlayer = false;
+        hasPlayedInterceptAttack = false;
         dashBlockedTime = 0f;
         lastSurfaceNormal = Vector3.up;
 
@@ -625,6 +627,7 @@ public class GenTwoNpc : NpcBase
         dashElapsedTime = 0f;
         postInterceptElapsedTime = 0f;
         dashBlockedTime = 0f;
+        hasPlayedInterceptAttack = false;
         lastSurfaceNormal = Vector3.up;
     }
 
@@ -786,9 +789,18 @@ public class GenTwoNpc : NpcBase
 
         hasReachedInterceptPoint = true;
         postInterceptElapsedTime = 0f;
+        PlayInterceptAttackAnimation();
 
         Debug.Log($"[GenTwo] {name}: Intercept point reached/passed after " +
                   $"{dashElapsedTime:F3}s dash flight.");
+    }
+
+    private void PlayInterceptAttackAnimation()
+    {
+        if (hasPlayedInterceptAttack) return;
+
+        hasPlayedInterceptAttack = true;
+        AnimManager?.PlayInterceptAttack();
     }
 
     private void TryHitPlayerAlongSegment(Vector3 segmentStart, Vector3 segmentEnd)
@@ -835,7 +847,6 @@ public class GenTwoNpc : NpcBase
         if (hasHitPlayer) return;
 
         hasHitPlayer = true;
-        AnimManager?.PlayDashAttack();
 
         if (IsPlayerInAttackDash)
         {
