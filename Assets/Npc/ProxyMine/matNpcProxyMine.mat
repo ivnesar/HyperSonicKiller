@@ -137,7 +137,7 @@ Material:
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Alpha_Clip_Threshold: 0.5
-    - _AmbientLight: 0.6
+    - _AmbientLight: 0.3
     - _Ambient_Light: 0.02
     - _Blend: 0
     - _BlendModePreserveSpecular: 1

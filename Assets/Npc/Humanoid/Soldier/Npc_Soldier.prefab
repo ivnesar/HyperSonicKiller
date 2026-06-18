@@ -355,9 +355,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
   fullBodyRagdollPrefab: {fileID: 3229780606104859937, guid: dbfa40c8088877943a3058ceecc65403, type: 3}
   slicedPairs:
-  - label: diagonal
-    upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
-    lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
+  - label: diag
+    upperHalfPrefab: {fileID: 8106018104724975397, guid: ba519b2e396d4fd4c851af960378ed56, type: 3}
+    lowerHalfPrefab: {fileID: 756801527115150651, guid: 2b8b40b43d3850249b357e5182d73112, type: 3}
+  - label: hori
+    upperHalfPrefab: {fileID: 2619594577033169535, guid: 51cdd34ee4cccfe4c90f8af1fdd9fb10, type: 3}
+    lowerHalfPrefab: {fileID: 5210207847108716938, guid: ac9e4c35deecaf843879f092e6a62efa, type: 3}
+  - label: vert
+    upperHalfPrefab: {fileID: 9188728196506661460, guid: f133d868ec7804949863274d31c63c0f, type: 3}
+    lowerHalfPrefab: {fileID: 3178578495624853245, guid: 2999e0302bbd9b34cbb6db25db7d74df, type: 3}
   droppableEquipment:
   - label: AM16
     equipmentObject: {fileID: 1049070415414982707}

@@ -52,7 +52,8 @@ public class RagdollCopier : EditorWindow
         EditorGUILayout.HelpBox(
             "Kopiert Ragdoll-Komponenten (Rigidbody, Collider, Joints) vom Source " +
             "auf das Target. Die Zuordnung erfolgt über übereinstimmende Bone-Namen.\n" +
-            "Funktioniert direkt mit Prefab-Assets aus dem Project-Fenster.\n\n" +
+            "Funktioniert direkt mit normalen Prefab-Assets aus dem Project-Fenster.\n" +
+            "Importierte FBX/Model-Prefabs müssen vorher als Prefab-Variante angelegt werden.\n\n" +
             "Es werden nur Komponenten kopiert – keine neuen GameObjects erstellt.\n" +
             "Bones die im Target nicht existieren werden übersprungen.",
             MessageType.Info);
@@ -163,7 +164,16 @@ public class RagdollCopier : EditorWindow
     /// </summary>
     private bool IsPrefabAsset(GameObject obj)
     {
-        return PrefabUtility.IsPartOfPrefabAsset(obj) && !PrefabUtility.IsPartOfPrefabInstance(obj);
+        return EditorUtility.IsPersistent(obj) && PrefabUtility.IsPartOfPrefabAsset(obj);
+    }
+
+    /// <summary>
+    /// Importierte Model-/FBX-Prefabs sind nicht direkt bearbeitbar.
+    /// Für Ragdoll-Änderungen muss eine normale Prefab-Variante verwendet werden.
+    /// </summary>
+    private bool IsImportedModelPrefabAsset(GameObject obj)
+    {
+        return IsPrefabAsset(obj) && PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.Model;
     }
 
     #region Bone Matching
@@ -243,6 +253,13 @@ public class RagdollCopier : EditorWindow
 
         if (!dryRun && targetIsPrefabAsset)
         {
+            if (IsImportedModelPrefabAsset(target))
+            {
+                Log("FEHLER: Das Target ist ein importiertes Model-/FBX-Prefab. Unity erlaubt dort keine direkten Hierarchie- oder Komponentenänderungen.");
+                Log("  Erstelle zuerst ein normales Prefab oder eine Prefab-Variante von diesem Modell und verwende diese als Target.");
+                return;
+            }
+
             targetAssetPath = AssetDatabase.GetAssetPath(target);
             targetRoot = PrefabUtility.LoadPrefabContents(targetAssetPath);
             Log($"  Prefab-Asset geöffnet: {targetAssetPath}");
@@ -404,7 +421,15 @@ public class RagdollCopier : EditorWindow
                 if (!targetIsPrefabAsset)
                     Undo.RegisterCreatedObjectUndo(newChild, "Foot Collider erstellen");
 
-                newChild.transform.SetParent(targetParent);
+                if (EditorUtility.IsPersistent(targetParent.gameObject))
+                {
+                    Object.DestroyImmediate(newChild);
+                    Log($"  FEHLER: Target-Bone '{targetParent.name}' liegt in einem nicht-bearbeitbaren Prefab-Asset.");
+                    Log("  Öffne/verwende eine Scene-Instanz, ein normales Prefab oder eine Prefab-Variante als Target.");
+                    return;
+                }
+
+                newChild.transform.SetParent(targetParent, false);
                 newChild.transform.localPosition = srcTransform.localPosition;
                 newChild.transform.localRotation = srcTransform.localRotation;
                 newChild.transform.localScale = srcTransform.localScale;
@@ -703,6 +728,13 @@ public class RagdollCopier : EditorWindow
 
         if (targetIsPrefabAsset)
         {
+            if (IsImportedModelPrefabAsset(target))
+            {
+                Log("FEHLER: Das Target ist ein importiertes Model-/FBX-Prefab. Entfernen ist dort nicht direkt möglich.");
+                Log("  Verwende stattdessen eine Scene-Instanz, ein normales Prefab oder eine Prefab-Variante.");
+                return;
+            }
+
             targetAssetPath = AssetDatabase.GetAssetPath(target);
             targetRoot = PrefabUtility.LoadPrefabContents(targetAssetPath);
         }

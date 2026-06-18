@@ -277,12 +277,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
   fullBodyRagdollPrefab: {fileID: 3229780606104859937, guid: dbfa40c8088877943a3058ceecc65403, type: 3}
   slicedPairs:
-  - label: diagonal
-    upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
-    lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
+  - label: diag
+    upperHalfPrefab: {fileID: 4309607228549420556, guid: fed3271209be6084aad8f9fa8a3b3209, type: 3}
+    lowerHalfPrefab: {fileID: 5807705107593688481, guid: 357b3f8dd2b93594da0df2cf5d966a74, type: 3}
+  - label: hori
+    upperHalfPrefab: {fileID: 5625726952240669465, guid: 0b930d0960468764b8de954b61e8a0d4, type: 3}
+    lowerHalfPrefab: {fileID: 6663050668142222983, guid: 3809fd3d088cb834283f706c1e7c5763, type: 3}
   droppableEquipment:
   - label: riotShield
-    equipmentObject: {fileID: 0}
+    equipmentObject: {fileID: 7715376254690686527}
   showDebugInfo: 0
 --- !u!114 &4221902022032833579
 MonoBehaviour:
@@ -608,6 +611,11 @@ Transform:
 --- !u!1 &3608963747165733659 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2185685584404401780, guid: 0c3077ac474507f439f685ff57245bcd, type: 3}
+  m_PrefabInstance: {fileID: 3188689399765159279}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &7715376254690686527 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5139176507999796048, guid: 0c3077ac474507f439f685ff57245bcd, type: 3}
   m_PrefabInstance: {fileID: 3188689399765159279}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &3414902699648702996

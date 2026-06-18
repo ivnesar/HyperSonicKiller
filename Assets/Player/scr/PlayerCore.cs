@@ -478,6 +478,25 @@ public class PlayerCore : MonoBehaviour
         SetState(newState);
     }
 
+    /// <summary>
+    /// Resolves the player state after an attack dash was cancelled.
+    /// A dash can be cancelled while the CharacterController is already touching
+    /// the floor. In that case we must enter Normal immediately so the existing
+    /// ground recharge check can run; otherwise PlayerMovement may never fire a
+    /// fresh landing event because it already considered the player grounded.
+    /// </summary>
+    public void ResolveStateAfterDashCancel()
+    {
+        if (HasGroundContact())
+        {
+            SetState(PlayerState.Normal);
+        }
+        else
+        {
+            SetState(PlayerState.Airborne);
+        }
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -660,6 +679,28 @@ public class PlayerCore : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Returns true when the CharacterController is grounded, with a short raycast
+    /// fallback for frames where isGrounded has not caught up yet after manual
+    /// dash movement.
+    /// </summary>
+    private bool HasGroundContact()
+    {
+        if (Controller == null || !Controller.enabled)
+        {
+            return false;
+        }
+
+        if (Controller.isGrounded)
+        {
+            return true;
+        }
+
+        float checkDistance = Controller.skinWidth + 0.15f;
+        return Physics.Raycast(transform.position, Vector3.down, checkDistance,
+                               groundStickyMask, QueryTriggerInteraction.Ignore);
     }
 
     #endregion

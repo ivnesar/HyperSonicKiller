@@ -572,7 +572,7 @@ MonoBehaviour:
   movementDetectionRadius: 0.35
   groundStickyMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 128
   CurrentState: 0
 --- !u!114 &6516431572162398611
 MonoBehaviour:
@@ -1108,7 +1108,7 @@ Transform:
   m_GameObject: {fileID: 4252055413702551478}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: 0}
+  m_LocalPosition: {x: 0, y: 1.8, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1410,7 +1410,6 @@ MonoBehaviour:
   labelPadding: {x: 6, y: 2}
   iconSize: 32
   iconSizeMultiplier: 1
-  iconGap: 4
   jitterInterval: 0.2
   jitterStrength: 0.1
   applyPaniniCorrection: 1

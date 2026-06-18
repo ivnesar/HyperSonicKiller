@@ -408,12 +408,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
   fullBodyRagdollPrefab: {fileID: 3229780606104859937, guid: dbfa40c8088877943a3058ceecc65403, type: 3}
   slicedPairs:
-  - label: diagonal
-    upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
-    lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
+  - label: diag
+    upperHalfPrefab: {fileID: 6637822515475316916, guid: bd9495c3d80029143b27cc5ba81c30cc, type: 3}
+    lowerHalfPrefab: {fileID: 2970274590636961567, guid: fc92f3384957bfd49b9c2b6791e77720, type: 3}
+  - label: vert
+    upperHalfPrefab: {fileID: 6945159928723344331, guid: b2edba469e1b4d349868a6417e82a6ee, type: 3}
+    lowerHalfPrefab: {fileID: 2789606749960560340, guid: ab19ed836faaccd439f546f747d48902, type: 3}
+  - label: hori
+    upperHalfPrefab: {fileID: 3177672063660639477, guid: 4c4a6bd0498003848a1a64833baca42f, type: 3}
+    lowerHalfPrefab: {fileID: 1162430429020847913, guid: d4c7c0bc38b0aaa44a56c50479016ee7, type: 3}
   droppableEquipment:
   - label: MGL
-    equipmentObject: {fileID: 0}
+    equipmentObject: {fileID: 5859390518512783550}
   showDebugInfo: 0
 --- !u!114 &4221902022032833579
 MonoBehaviour:
@@ -1012,6 +1018,11 @@ Transform:
 --- !u!4 &5150717436602024050 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4591460051954465093, guid: ac95ddd07062453438a9cfbade9d17e7, type: 3}
+  m_PrefabInstance: {fileID: 8701837041068374327}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &5859390518512783550 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2995911963957553545, guid: ac95ddd07062453438a9cfbade9d17e7, type: 3}
   m_PrefabInstance: {fileID: 8701837041068374327}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &6115409234794431483 stripped

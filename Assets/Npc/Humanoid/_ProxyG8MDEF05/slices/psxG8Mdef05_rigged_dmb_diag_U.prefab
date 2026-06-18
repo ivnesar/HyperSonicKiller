@@ -15531,7 +15531,7 @@ MonoBehaviour:
   decalDepth: 0.5
   surfaceLayers:
     serializedVersion: 2
-    m_Bits: 8320
+    m_Bits: 128
   spawnInterval: 0.3
   maxDecalsPerRagdoll: 10
   spawnDuration: 5

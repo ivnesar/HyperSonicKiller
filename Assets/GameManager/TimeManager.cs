@@ -45,25 +45,80 @@ public class TimeManager : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private static TimeManager instance;
+    private static bool isApplicationQuitting;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        instance = null;
+        isApplicationQuitting = false;
+    }
 
     public static TimeManager Instance
     {
         get
         {
-            if (instance == null)
-            {
-                // Versuche existierendes Objekt zu finden
-                instance = FindFirstObjectByType<TimeManager>();
+            if (TryGetInstance(out TimeManager manager))
+                return manager;
 
-                if (instance == null)
-                {
-                    // Lazy init: erstelle neues GameObject
-                    var go = new GameObject("[TimeManager]");
-                    instance = go.AddComponent<TimeManager>();
-                }
-            }
+            if (isApplicationQuitting)
+                return null;
+
+            // Lazy init: erstelle neues GameObject nur im normalen Runtime-Betrieb.
+            var go = new GameObject("[TimeManager]");
+            instance = go.AddComponent<TimeManager>();
 
             return instance;
+        }
+    }
+
+    public static bool TryGetInstance(out TimeManager manager)
+    {
+        manager = instance;
+        if (manager != null)
+            return true;
+
+        if (isApplicationQuitting)
+            return false;
+
+        // Versuche existierendes Objekt zu finden, ohne bei Fehlschlag eines zu erstellen.
+        manager = FindFirstObjectByType<TimeManager>();
+        if (manager != null)
+        {
+            instance = manager;
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsShuttingDown => isApplicationQuitting;
+
+    public static bool HasInstance
+    {
+        get
+        {
+            if (instance != null)
+                return true;
+
+            if (isApplicationQuitting)
+                return false;
+
+            instance = FindFirstObjectByType<TimeManager>();
+            return instance != null;
+        }
+    }
+
+    public static float SafeGameDeltaTime
+    {
+        get
+        {
+            if (TryGetInstance(out TimeManager manager))
+            {
+                return manager.GameDeltaTime;
+            }
+
+            return 0f;
         }
     }
 
@@ -198,6 +253,8 @@ public class TimeManager : MonoBehaviour
 
     private void Awake()
     {
+        isApplicationQuitting = false;
+
         // Singleton-Schutz
         if (instance != null && instance != this)
         {
@@ -225,6 +282,11 @@ public class TimeManager : MonoBehaviour
             Time.timeScale = 1f;
             instance = null;
         }
+    }
+
+    private void OnApplicationQuit()
+    {
+        isApplicationQuitting = true;
     }
 
     #endregion

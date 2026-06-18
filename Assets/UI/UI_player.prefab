@@ -437,7 +437,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   boxColor: {r: 1, g: 0, b: 0, a: 1}
-  boxLineThickness: 2
+  boxLineThickness: 1
   labelCorner: 3
   labelBackgroundColor: {r: 1, g: 0, b: 0, a: 1}
   labelTextColor: {r: 0, g: 0, b: 0, a: 1}
@@ -445,7 +445,6 @@ MonoBehaviour:
   labelPadding: {x: 6, y: 2}
   iconSize: 32
   iconSizeMultiplier: 3
-  iconGap: 4
   jitterInterval: 0.5
   jitterStrength: 0.03
   applyPaniniCorrection: 1

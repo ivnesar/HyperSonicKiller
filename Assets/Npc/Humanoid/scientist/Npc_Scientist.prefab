@@ -292,9 +292,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
   fullBodyRagdollPrefab: {fileID: 3229780606104859937, guid: dbfa40c8088877943a3058ceecc65403, type: 3}
   slicedPairs:
-  - label: diagonal
-    upperHalfPrefab: {fileID: 5834914216485675222, guid: bd9dbfe8fefba554d8f3683ca42a1939, type: 3}
-    lowerHalfPrefab: {fileID: 5393138045400583623, guid: c16125843b5ff0d49b23f59631f022f4, type: 3}
+  - label: diag
+    upperHalfPrefab: {fileID: 4741338224954485935, guid: f55893d4bebfc1f44a64e35dc3216485, type: 3}
+    lowerHalfPrefab: {fileID: 8403707909239378660, guid: 725be973c8d55a5428959208ab959685, type: 3}
+  - label: hori
+    upperHalfPrefab: {fileID: 4171722672521741049, guid: e64e7aef2a779134aa1462029e8631e1, type: 3}
+    lowerHalfPrefab: {fileID: 6567196642469914627, guid: d93c18ec68a9a0244bd64227abf0c9b5, type: 3}
   droppableEquipment: []
   showDebugInfo: 0
 --- !u!114 &4221902022032833579

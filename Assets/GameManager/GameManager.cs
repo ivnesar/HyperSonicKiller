@@ -104,7 +104,7 @@ public class GameManager : MonoBehaviour
     private PlayerCore player;
 
     public bool IsPlayerDead => player != null && player.IsDead;
-    public bool IsPaused => TimeManager.Instance.IsPaused;
+    public bool IsPaused => TimeManager.TryGetInstance(out TimeManager timeManager) && timeManager.IsPaused;
 
     #endregion
 
@@ -261,7 +261,7 @@ public class GameManager : MonoBehaviour
     {
         if (IsPaused) return;
 
-        TimeManager.Instance.Pause();
+        TimeManager.Instance?.Pause();
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -275,7 +275,8 @@ public class GameManager : MonoBehaviour
     {
         if (!IsPaused) return;
 
-        TimeManager.Instance.Unpause();
+        if (TimeManager.TryGetInstance(out TimeManager timeManager))
+            timeManager.Unpause();
 
         // Only lock cursor if player is alive
         if (player == null || !player.IsDead)
@@ -319,7 +320,7 @@ public class GameManager : MonoBehaviour
         ResetCursorState();
 
         // Reset all time layers (in case scene loaded while paused/slow-mo)
-        TimeManager.Instance.ClearAllLayers();
+        TimeManager.Instance?.ClearAllLayers();
     }
 
     #endregion
@@ -426,7 +427,8 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Running pre-reload cleanup...");
 
         // Reset all time layers
-        TimeManager.Instance.ClearAllLayers();
+        if (TimeManager.TryGetInstance(out TimeManager timeManager))
+            timeManager.ClearAllLayers();
 
         // Reset cursor (will be set properly on scene load)
         Cursor.lockState = CursorLockMode.None;
