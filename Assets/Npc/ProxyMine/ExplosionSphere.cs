@@ -16,10 +16,14 @@ using System.Collections.Generic;
 //   - Jetzt: Distanz-Vergleich vom Explosionszentrum zu jedem NPC.
 //   - NPCs kommen aus der NpcRegistry (jeder NpcBase trägt sich selbst ein/aus).
 //   - Der Spieler steht NICHT in der Registry und wird separat geprüft.
+//   - Spieler-Erkennung ist swept: Es wird die komplette Bewegung von
+//     PreviousDetectionPosition → CurrentDetectionPosition geprüft, nicht nur
+//     die Endposition des Frames. Dadurch tunnelt der Spieler nicht durch
+//     die wachsende Explosionskugel.
 //   - Vorteile: unabhängig von Time.timeScale, deterministisch, kein Collider-Setup,
 //     und keine Doppel-/Fehltreffer durch geteilte Eltern-Objekte (transform.root).
-//   - Hinweis: Gemessen wird zur Pivot-Position des NPCs (meist die Füße), nicht
-//     zur Collider-Hülle. Für den Prototyp ausreichend genau.
+//   - Hinweis: NPCs werden weiter zur Pivot-Position geprüft. Für den Prototyp
+//     ausreichend genau.
 //
 // Wachsende Welle:
 //   - currentRadius wächst über expandDuration von 0 auf maxRadius.
@@ -55,6 +59,22 @@ public class ExplosionSphere : MonoBehaviour
     [Header("Lifetime")]
     [Tooltip("Gesamte Lebensdauer des ExplosionGO (nach Spawn)")]
     [SerializeField] private float lifetime = 1f;
+
+    [Header("High-Speed Player Detection")]
+    [Tooltip("Wenn aktiv, wird der Spieler entlang seines kompletten Bewegungssegments geprüft. Verhindert Tunneling bei extrem hoher Geschwindigkeit.")]
+    [SerializeField] private bool useSweptPlayerDetection = true;
+
+    [Tooltip("Fallback-Radius für den Spieler, falls PlayerCore keinen sinnvollen MovementDetectionRadius liefert.")]
+    [Min(0f)]
+    [SerializeField] private float fallbackPlayerDetectionRadius = 0.35f;
+
+    [Tooltip("Wie alt das Player-Bewegungssegment maximal sein darf. 1 unterstützt übliche Script Execution Orders. Ältere Segmente werden zur aktuellen Position kollabiert.")]
+    [Min(0)]
+    [SerializeField] private int maxPlayerSegmentAgeFrames = 1;
+
+    [Tooltip("Maximale gültige Länge des Player-Bewegungssegments. Verhindert falsche Treffer nach Teleport/Respawn. 0 = keine Begrenzung.")]
+    [Min(0f)]
+    [SerializeField] private float maxValidPlayerSegmentLength = 40f;
 
     #endregion
 
@@ -166,11 +186,66 @@ public class ExplosionSphere : MonoBehaviour
         if (playerDamaged) return;
         if (player == null) return;
 
-        float distance = Vector3.Distance(center, player.transform.position);
-        if (distance > currentRadius) return;
+        float playerRadius = GetPlayerDetectionRadius();
+        float allowedRadius = currentRadius + playerRadius;
+
+        if (useSweptPlayerDetection && TryGetValidPlayerMovementSegment(out Vector3 playerPrevious, out Vector3 playerCurrent))
+        {
+            float sqrDistance = PointSegmentSqrDistance(center, playerPrevious, playerCurrent, out _);
+            if (sqrDistance > allowedRadius * allowedRadius) return;
+        }
+        else
+        {
+            float sqrDistance = (center - GetFallbackPlayerPosition()).sqrMagnitude;
+            if (sqrDistance > allowedRadius * allowedRadius) return;
+        }
 
         playerDamaged = true;
         player.TakeDirectDamage(explosionDamage, "Explosion");
+    }
+
+    private bool TryGetValidPlayerMovementSegment(out Vector3 previous, out Vector3 current)
+    {
+        previous = GetFallbackPlayerPosition();
+        current = previous;
+
+        if (player == null) return false;
+
+        previous = player.PreviousDetectionPosition;
+        current = player.CurrentDetectionPosition;
+
+        // Wenn das Segment zu alt ist, nicht noch einmal den alten Dash-Pfad auswerten.
+        int segmentAge = Time.frameCount - player.LastDetectionMoveFrame;
+        if (segmentAge > maxPlayerSegmentAgeFrames)
+        {
+            previous = current;
+        }
+
+        // Nach Teleport/Respawn kann das Segment extrem lang sein. Dann nur die
+        // aktuelle Position prüfen, damit keine Mine/Explosion quer durch den Level trifft.
+        if (maxValidPlayerSegmentLength > 0f)
+        {
+            float maxSqrLength = maxValidPlayerSegmentLength * maxValidPlayerSegmentLength;
+            if ((current - previous).sqrMagnitude > maxSqrLength)
+            {
+                previous = current;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private float GetPlayerDetectionRadius()
+    {
+        if (player == null) return Mathf.Max(0f, fallbackPlayerDetectionRadius);
+
+        return Mathf.Max(fallbackPlayerDetectionRadius, player.MovementDetectionRadius);
+    }
+
+    private Vector3 GetFallbackPlayerPosition()
+    {
+        return player != null ? player.transform.position : center;
     }
 
     private void DamageNpcsInRadius()
@@ -190,6 +265,28 @@ public class ExplosionSphere : MonoBehaviour
             damagedNpcs.Add(npc);
             ApplyDamageToNpc(npc);
         }
+    }
+
+    private static float PointSegmentSqrDistance(
+        Vector3 point,
+        Vector3 segmentStart,
+        Vector3 segmentEnd,
+        out Vector3 closestPoint)
+    {
+        Vector3 segment = segmentEnd - segmentStart;
+        float sqrLength = segment.sqrMagnitude;
+
+        if (sqrLength <= 0.000001f)
+        {
+            closestPoint = segmentStart;
+            return (point - closestPoint).sqrMagnitude;
+        }
+
+        float t = Vector3.Dot(point - segmentStart, segment) / sqrLength;
+        t = Mathf.Clamp01(t);
+
+        closestPoint = segmentStart + segment * t;
+        return (point - closestPoint).sqrMagnitude;
     }
 
     private void ApplyDamageToNpc(NpcBase npc)

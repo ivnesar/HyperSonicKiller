@@ -80,6 +80,18 @@ public class ProxyMineNpc : NpcBase
     [Tooltip("Wenn aktiv, erzwingt der Player-State Dashing/SprintDashing den Dash Detection Radius.")]
     [SerializeField] private bool useDashStateForDetectionRadius = true;
 
+    [Tooltip("Wenn der Spieler sich innerhalb eines Frames mindestens so weit bewegt, wird ebenfalls der Dash Detection Radius verwendet - unabhängig vom Player-State.")]
+    [Min(0f)]
+    [SerializeField] private float fastMovementFrameDistance = 2.5f;
+
+    [Tooltip("Wie alt das Player-Bewegungssegment maximal sein darf. 1 unterstützt übliche Script Execution Orders. Ältere Segmente werden zur aktuellen Position kollabiert.")]
+    [Min(0)]
+    [SerializeField] private int maxPlayerSegmentAgeFrames = 1;
+
+    [Tooltip("Maximale gültige Länge des Player-Bewegungssegments. Verhindert falsche Laser-Auslösung nach Teleport/Respawn. 0 = keine Begrenzung.")]
+    [Min(0f)]
+    [SerializeField] private float maxValidPlayerSegmentLength = 40f;
+
     [Tooltip("Optionaler LineRenderer zur Ingame-Visualisierung des Laser-Segments. Wenn leer, wird ein LineRenderer auf diesem GameObject gesucht. Die Breite wird direkt am LineRenderer eingestellt.")]
     [SerializeField] private LineRenderer rayLineRenderer;
 
@@ -241,16 +253,9 @@ public class ProxyMineNpc : NpcBase
 
         if (currentEffectiveRayLength <= 0f || currentDetectionRadius <= 0f) return;
 
-        Vector3 playerPrevious = playerCore.PreviousDetectionPosition;
-        Vector3 playerCurrent = playerCore.CurrentDetectionPosition;
-
-        // Avoid repeatedly evaluating an old high-speed segment forever if the player
-        // is no longer moving. Age <= 1 supports both common script execution orders:
-        // mine before player movement and mine after player movement.
-        int segmentAge = Time.frameCount - playerCore.LastDetectionMoveFrame;
-        if (segmentAge > 1)
+        if (!TryGetValidPlayerMovementSegment(out Vector3 playerPrevious, out Vector3 playerCurrent))
         {
-            playerPrevious = playerCurrent;
+            return;
         }
 
         float sqrDistance = SegmentSegmentSqrDistance(
@@ -322,12 +327,70 @@ public class ProxyMineNpc : NpcBase
         float radius = Mathf.Max(0.001f, normalDetectionRadius);
         float dashRadius = Mathf.Max(radius, dashDetectionRadius);
 
-        if (useDashStateForDetectionRadius && IsPlayerInFastMovementState())
+        if ((useDashStateForDetectionRadius && IsPlayerInFastMovementState()) || IsPlayerMovingFastThisFrame())
         {
             radius = dashRadius;
         }
 
         return radius;
+    }
+
+    private bool TryGetValidPlayerMovementSegment(out Vector3 previous, out Vector3 current)
+    {
+        previous = Vector3.zero;
+        current = Vector3.zero;
+
+        if (playerCore == null) return false;
+
+        previous = playerCore.PreviousDetectionPosition;
+        current = playerCore.CurrentDetectionPosition;
+
+        // Avoid repeatedly evaluating an old high-speed segment forever if the player
+        // is no longer moving. Age <= maxPlayerSegmentAgeFrames supports common script
+        // execution orders: mine before player movement and mine after player movement.
+        int segmentAge = Time.frameCount - playerCore.LastDetectionMoveFrame;
+        if (segmentAge > maxPlayerSegmentAgeFrames)
+        {
+            previous = current;
+        }
+
+        // Teleport/Respawn/Scene reset can create a huge artificial segment.
+        // Do not let that trigger lasers through the level.
+        if (maxValidPlayerSegmentLength > 0f)
+        {
+            float maxSqrLength = maxValidPlayerSegmentLength * maxValidPlayerSegmentLength;
+            if ((current - previous).sqrMagnitude > maxSqrLength)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsPlayerMovingFastThisFrame()
+    {
+        if (fastMovementFrameDistance <= 0f) return false;
+
+        float frameDistance = GetPlayerMovementFrameDistance();
+        return frameDistance >= fastMovementFrameDistance;
+    }
+
+    private float GetPlayerMovementFrameDistance()
+    {
+        if (playerCore == null)
+        {
+            playerCore = FindFirstObjectByType<PlayerCore>();
+        }
+
+        if (playerCore == null) return 0f;
+
+        if (!TryGetValidPlayerMovementSegment(out Vector3 previous, out Vector3 current))
+        {
+            return 0f;
+        }
+
+        return Vector3.Distance(previous, current);
     }
 
     private bool IsPlayerInFastMovementState()
