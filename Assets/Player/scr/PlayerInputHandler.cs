@@ -6,7 +6,7 @@ using UnityEngine;
 /// Abstracts raw Unity input into action-based queries.
 /// Easy to extend for rebinding or input system migration.
 /// 
-/// UPDATED: Attack (LMB) is now Dash - player dashes with left mouse button.
+/// UPDATED: Attack (LMB) is now Dash. Hold LMB to aim with zoom + slow-mo, release to dash.
 /// UPDATED: Old Q dash removed - dash is now only on LMB.
 /// </summary>
 public class PlayerInputHandler : MonoBehaviour
@@ -81,7 +81,7 @@ public class PlayerInputHandler : MonoBehaviour
             { "Jump",       new KeyBinding { Key = KeyCode.Space } },
             { "Sprint",     new KeyBinding { Key = KeyCode.LeftShift } },
             
-            { "Dash",       new KeyBinding { Key = KeyCode.Mouse0 } }, //KeyCode.Mouse0
+            { "Dash",       new KeyBinding { Key = KeyCode.Mouse0 } }, // LMB: hold to aim, release to dash
             { "DashDown",   new KeyBinding { Key = KeyCode.LeftControl } },
             
             { "ThrowSword", new KeyBinding { Key = KeyCode.Mouse1 } }, //KeyCode.Mouse1

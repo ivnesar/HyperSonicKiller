@@ -6,7 +6,7 @@ using System.Collections.Generic;
 /// Handles dash mechanics: Attack Dash and wall-stick.
 /// 
 /// NEW SYSTEM:
-/// - Attack Dash (LMB): Player dashes to a surface, automatically attacking NPCs in the path
+/// - Attack Dash (LMB): hold to aim with delayed zoom + slow-mo, release to dash to a surface, automatically attacking NPCs in the path
 /// - Dash auto-pickup: if a stuck sword is close enough, it is instantly picked up before the normal attack dash starts
 /// - Wall Stick: Cling to walls after dashing
 /// 
@@ -69,6 +69,24 @@ public class PlayerDash : MonoBehaviour
     [Header("Time Slow During Dash")]
     [SerializeField] private float dashTimeScale = 0.1f;
 
+    [Header("Dash Aim (Hold LMB)")]
+    [SerializeField] private string dashActionName = "Dash";
+
+    [Tooltip("Delay before dash aim zoom + slow-mo start. Prevents quick LMB clicks from briefly zooming.")]
+    [SerializeField] private float dashAimStartDelay = 0.15f;
+
+    [Tooltip("Zoom multiplier while holding dash aim (e.g. 3 = 3x zoom, FOV divided by 3)")]
+    [SerializeField] private float dashAimZoomFactor = 3f;
+
+    [Tooltip("Time in unscaled seconds to reach full dash aim zoom")]
+    [SerializeField] private float dashAimZoomInDuration = 0.2f;
+
+    [Tooltip("Time slow target while holding dash aim (matches RMB aim and dash slow-mo by default)")]
+    [SerializeField] private float dashAimTimeScale = 0.1f;
+
+    [Tooltip("Max duration of dash aim time slow in unscaled seconds. 0 = stays active until LMB release.")]
+    [SerializeField] private float dashAimSlowMaxDuration = 0f;
+
     [Header("Dash Cancel Forces")]
     [SerializeField] private float dashCancelUpwardForce = 10f;
     [SerializeField] private float dashCancelDownwardForce = 15f;
@@ -111,6 +129,19 @@ public class PlayerDash : MonoBehaviour
     private PlayerCore core;
     private PlayerSwordThrow swordThrow;
     private PlayerCombat combat;
+    private PlayerDashFOV dashFOV;
+    private PlayerLook look;
+
+    // Dash aim state (hold LMB, release to dash)
+    private bool isDashAiming;
+    private bool dashAimEffectsActive;
+    private float dashAimTimer;
+    private float dashAimEffectTimer;
+    private float dashAimSlowTimer;
+    private bool dashAimSlowExpired;
+    private float dashAimBaseSensitivity;
+
+    private const string DashAimSlowMoLayerName = "DashAimSlowMo";
 
     // Dash charges
     private int currentCharges;
@@ -163,6 +194,7 @@ public class PlayerDash : MonoBehaviour
     public bool IsStuck => core.CurrentState == PlayerCore.PlayerState.StuckToSurface;
     public Vector3 StuckSurfaceNormal => stuckSurfaceNormal;
     public bool IsWallStickActive => isWallStickActive;
+    public bool IsDashAiming => isDashAiming;
     
     /// <summary>Current dash speed (for external systems like GenTwo intercept calculation).</summary>
     public float DashSpeed => dashSpeed;
@@ -214,12 +246,23 @@ public class PlayerDash : MonoBehaviour
         core = GetComponent<PlayerCore>();
         swordThrow = GetComponent<PlayerSwordThrow>();
         combat = GetComponent<PlayerCombat>();
+        dashFOV = GetComponent<PlayerDashFOV>();
+        look = GetComponent<PlayerLook>();
         currentCharges = maxDashCharges;
     }
 
     private void Update()
     {
-        if (core.IsDead) return;
+        if (core.IsDead)
+        {
+            StopDashAim();
+            return;
+        }
+
+        if (isDashAiming && !CanUseDashAim())
+        {
+            StopDashAim();
+        }
 
         switch (core.CurrentState)
         {
@@ -310,15 +353,155 @@ public class PlayerDash : MonoBehaviour
 
     private void HandleDashInput()
     {
-        if (dashDisabled) return;
-        if (!core.CanDash) return;
+        bool isHolding = core.Input.GetAction(dashActionName);
+        bool justPressed = core.Input.GetActionDown(dashActionName);
+        bool justReleased = core.Input.GetActionUp(dashActionName);
 
-        if (core.Input.GetActionDown("Dash") && currentCharges > 0)
+        // ── Start dash aim ─────────────────────────────────────────────
+        if (justPressed && CanUseDashAim())
         {
-            // If a thrown sword is stuck close to the player, pick it up instantly before
-            // the normal attack dash starts. RMB recall still uses visible return flight.
-            swordThrow?.TryInstantPickupForDash();
-            TryStartAttackDash();
+            StartDashAim();
+            return;
+        }
+
+        // ── While holding LMB: keep zoom + slow-mo active ──────────────
+        if (isDashAiming && isHolding)
+        {
+            UpdateDashAim();
+            return;
+        }
+
+        // ── Release LMB: stop aim effects, then start the dash ─────────
+        if (isDashAiming && justReleased)
+        {
+            StopDashAim();
+
+            if (CanUseDashAim())
+            {
+                // If a thrown sword is stuck close to the player, pick it up instantly before
+                // the normal attack dash starts. RMB recall still uses visible return flight.
+                swordThrow?.TryInstantPickupForDash();
+                TryStartAttackDash();
+            }
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
+    #region Dash Aim Zoom & Time Slow
+    // ════════════════════════════════════════════════════════════════════════
+
+    private bool CanUseDashAim()
+    {
+        if (dashDisabled) return false;
+        if (!core.CanDash) return false;
+        if (currentCharges <= 0) return false;
+
+        return true;
+    }
+
+    private void StartDashAim()
+    {
+        isDashAiming = true;
+        dashAimEffectsActive = false;
+        dashAimTimer = 0f;
+        dashAimEffectTimer = 0f;
+        dashAimSlowTimer = 0f;
+        dashAimSlowExpired = false;
+
+        // LMB dash aim takes priority over RMB sword aim to avoid conflicting
+        // FOV/sensitivity overrides when both mouse buttons are held.
+        swordThrow?.CancelAim();
+
+        if (look != null)
+        {
+            dashAimBaseSensitivity = look.GetSensitivity();
+        }
+    }
+
+    private void UpdateDashAim()
+    {
+        float unscaledDeltaTime = Time.unscaledDeltaTime;
+        dashAimTimer += unscaledDeltaTime;
+
+        // Wait a short moment before applying aim effects. This keeps quick
+        // click-dashes responsive without showing a tiny zoom flash.
+        if (!dashAimEffectsActive)
+        {
+            float startDelay = Mathf.Max(0f, dashAimStartDelay);
+
+            if (dashAimTimer < startDelay)
+            {
+                return;
+            }
+
+            dashAimEffectsActive = true;
+            dashAimEffectTimer = 0f;
+            dashAimSlowTimer = 0f;
+            dashAimSlowExpired = false;
+
+            TimeManager.Instance.SetLayer(
+                DashAimSlowMoLayerName,
+                dashAimTimeScale,
+                TimeManager.PRIORITY_SLOW_MO,
+                blocksGameTime: false
+            );
+        }
+
+        dashAimEffectTimer += unscaledDeltaTime;
+        dashAimSlowTimer += unscaledDeltaTime;
+
+        float targetZoom = Mathf.Max(1f, dashAimZoomFactor);
+        float zoomProgress = dashAimZoomInDuration <= 0f
+            ? 1f
+            : Mathf.Clamp01(dashAimEffectTimer / dashAimZoomInDuration);
+        float currentZoom = Mathf.Lerp(1f, targetZoom, zoomProgress);
+
+        if (dashFOV != null)
+        {
+            float zoomedFOV = dashFOV.NormalFOV / currentZoom;
+            dashFOV.SetFOVOverride(zoomedFOV);
+        }
+
+        if (look != null)
+        {
+            look.SetSensitivity(dashAimBaseSensitivity / currentZoom);
+        }
+
+        if (!dashAimSlowExpired && dashAimSlowMaxDuration > 0f && dashAimSlowTimer >= dashAimSlowMaxDuration)
+        {
+            dashAimSlowExpired = true;
+            TimeManager.Instance.RemoveLayer(DashAimSlowMoLayerName);
+        }
+    }
+
+    private void StopDashAim()
+    {
+        if (!isDashAiming) return;
+
+        bool hadActiveEffects = dashAimEffectsActive;
+
+        isDashAiming = false;
+        dashAimEffectsActive = false;
+        dashAimTimer = 0f;
+        dashAimEffectTimer = 0f;
+        dashAimSlowTimer = 0f;
+        dashAimSlowExpired = false;
+
+        if (hadActiveEffects)
+        {
+            TimeManager.Instance.RemoveLayer(DashAimSlowMoLayerName);
+
+            if (dashFOV != null)
+            {
+                dashFOV.ClearFOVOverride();
+            }
+
+            if (look != null)
+            {
+                look.SetSensitivity(dashAimBaseSensitivity);
+            }
         }
     }
 
@@ -764,10 +947,17 @@ public class PlayerDash : MonoBehaviour
         {
             OnDashBlockedChanged?.Invoke(dashDisabled);
         }
+
+        if (dashDisabled)
+        {
+            StopDashAim();
+        }
     }
 
     public void ForceCancelDash()
     {
+        StopDashAim();
+
         if (IsDashing)
         {
             CancelDash(-5f);
@@ -787,6 +977,8 @@ public class PlayerDash : MonoBehaviour
 
     private void OnDisable()
     {
+        StopDashAim();
+
         if (isWallStickActive && core != null && core.Controller != null)
         {
             core.Controller.enabled = true;
