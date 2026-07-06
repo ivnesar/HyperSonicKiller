@@ -1,12 +1,13 @@
 using Animancer;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Drives the first-person arm animations using Animancer.
 /// Replaces the old Animator-based system with direct clip playback.
 /// Sits on the Player GameObject, reads state from PlayerCore subsystems.
 /// 
-/// Subscribes to events for one-shot animations (Attack, Block, SwordThrow, SwordRecover)
+/// Subscribes to events for one-shot animations (Attack, DamageReaction, SwordThrow, SwordRecover)
 /// and polls state each frame for continuous clips (Idle, Walk, Dash, Sprint, etc.).
 /// 
 /// One-shots REPLACE the base animation for their duration, then return to
@@ -31,6 +32,7 @@ using UnityEngine;
 /// ─────────────────────────────────────────────────────────────────────
 /// 
 /// UPDATED: Added sprintDash and sprint base clip slots for new sprint system.
+/// UPDATED: Block reactions are now HP damage reactions.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerArmAnimator : MonoBehaviour
@@ -65,9 +67,10 @@ public class PlayerArmAnimator : MonoBehaviour
     [Tooltip("Multiple attack clips for variety. Randomly picked, won't repeat.")]
     [SerializeField] private ClipTransition[] attackVariants;
 
-    [Header("Block Variants (One-Shot)")]
-    [Tooltip("Multiple block reaction clips for variety. Randomly picked, won't repeat.")]
-    [SerializeField] private ClipTransition[] blockVariants;
+    [Header("Damage Reaction Variants (One-Shot)")]
+    [Tooltip("Multiple HP damage reaction clips for variety. Randomly picked, won't repeat.")]
+    [FormerlySerializedAs("blockVariants")]
+    [SerializeField] private ClipTransition[] damageReactionVariants;
 
     [Header("Sword Actions (One-Shot)")]
     [SerializeField] private ClipTransition swordThrow;
@@ -102,7 +105,7 @@ public class PlayerArmAnimator : MonoBehaviour
 
     // Track last variant to avoid repeats
     private int lastAttackVariant = -1;
-    private int lastBlockVariant = -1;
+    private int lastDamageReactionVariant = -1;
 
     // True while a one-shot is playing (prevents base clip override)
     private bool isPlayingOneShot;
@@ -229,9 +232,13 @@ public class PlayerArmAnimator : MonoBehaviour
         if (core.Combat != null)
         {
             core.Combat.OnAttack += HandleAttack;
-            core.Combat.OnBlockedHit += HandleBlockedHit;
             core.Combat.OnExhausted += HandleExhausted;
             core.Combat.OnExhaustionRecovered += HandleExhaustionRecovered;
+        }
+
+        if (core.Health != null)
+        {
+            core.Health.OnDamageTaken += HandleDamageTaken;
         }
 
         if (core.SwordThrow != null)
@@ -248,9 +255,13 @@ public class PlayerArmAnimator : MonoBehaviour
         if (core.Combat != null)
         {
             core.Combat.OnAttack -= HandleAttack;
-            core.Combat.OnBlockedHit -= HandleBlockedHit;
             core.Combat.OnExhausted -= HandleExhausted;
             core.Combat.OnExhaustionRecovered -= HandleExhaustionRecovered;
+        }
+
+        if (core.Health != null)
+        {
+            core.Health.OnDamageTaken -= HandleDamageTaken;
         }
 
         if (core.SwordThrow != null)
@@ -342,15 +353,13 @@ public class PlayerArmAnimator : MonoBehaviour
         PlayOneShotVariantInstant(attackVariants, ref lastAttackVariant);
     }
 
-    private void HandleBlockedHit()
+    private void HandleDamageTaken(float damageAmount)
     {
-        // Wenn dieser Block den Spieler exhausted hat (BlockHP nun bei 0),
-        // \u00fcberspringen wir die Block-Variant. Der OnExhausted-Event feuert
-        // direkt im Anschluss und startet stattdessen die Exhaust-Enter-Animation.
-        if (core.Combat != null && core.Combat.CurrentBlockHP <= 0f)
-            return;
+        // Bei tödlichem Schaden übernimmt sofort die Dead-Base-Animation.
+        if (core == null || core.IsDead) return;
+        if (core.Health != null && core.Health.CurrentHP <= 0f) return;
 
-        PlayOneShotVariantInstant(blockVariants, ref lastBlockVariant);
+        PlayOneShotVariantInstant(damageReactionVariants, ref lastDamageReactionVariant);
     }
 
     private void HandleExhausted()
@@ -409,7 +418,7 @@ public class PlayerArmAnimator : MonoBehaviour
     /// <summary>
     /// Plays a one-shot clip INSTANTLY — no fade, no blending.
     /// The previous animation is immediately replaced on the same frame.
-    /// Used for Attack and Block where snappy feedback matters.
+    /// Used for Attack and DamageReaction where snappy feedback matters.
     /// </summary>
     private void PlayOneShotInstant(ClipTransition clip)
     {
@@ -437,7 +446,7 @@ public class PlayerArmAnimator : MonoBehaviour
 
     /// <summary>
     /// Picks a random variant (avoiding repeats) and plays it INSTANTLY.
-    /// Used for Attack and Block variants.
+    /// Used for Attack and DamageReaction variants.
     /// </summary>
     private void PlayOneShotVariantInstant(ClipTransition[] variants, ref int lastVariant)
     {

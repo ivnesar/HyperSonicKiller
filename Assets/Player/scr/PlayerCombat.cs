@@ -2,14 +2,10 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Handles combat state and automatic blocking.
-/// 
-/// UPDATED: Manual melee attack removed - attacks are now automatic during dash.
-/// Block is passive - player automatically blocks incoming damage as long as BlockHP > 0.
-/// UPDATED: Stunned state replaced with Exhausted state:
-///   - Exhausted allows movement and dashing (without damage)
-///   - Exhausted prevents throwing sword and attacking
-///   - Triggered when BlockHP reaches 0 (bullets, shield reflection, etc.)
+/// Handles player combat state.
+/// Manual melee attacks are removed; attacks are automatic during dash.
+/// Block HP has been removed. HP is now the only defensive resource.
+/// Exhausted still exists, but is only triggered by special cases via ForceExhaust().
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerCombat : MonoBehaviour
@@ -22,7 +18,7 @@ public class PlayerCombat : MonoBehaviour
     {
         Idle,
         Attacking,      // Triggered by dash
-        Exhausted,      // BlockHP = 0: can move/dash, but can't attack/throw
+        Exhausted,      // Special-case state: can move/dash, but can't attack/throw
         Disarmed        // Sword is thrown
     }
 
@@ -34,35 +30,22 @@ public class PlayerCombat : MonoBehaviour
 
     public event Action<CombatState> OnCombatStateChanged;
     public event Action OnAttack;                           // Fired during dash attack
-    public event Action OnBlockedHit;                       // Fired when a hit is blocked
     public event Action OnExhausted;                        // Fired when entering Exhausted state
     public event Action OnExhaustionRecovered;              // Fired when Exhausted ends
-    public event Action<float, float> OnBlockHPChanged;     // (current, max)
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Inspector - Attack Settings (for reference/tuning)
+    #region Inspector Settings
     // ════════════════════════════════════════════════════════════════════════
 
     [Header("Melee Attack (Auto during Dash)")]
-    [Tooltip("These values are now in PlayerDash - kept here for reference")]
+    [Tooltip("These values are now in PlayerDash - kept here for reference.")]
     [SerializeField] private int meleeDamageReference = 50;
     [SerializeField] private LayerMask enemyLayer;
 
-    #endregion
-
-    // ════════════════════════════════════════════════════════════════════════
-    #region Inspector - Block Settings
-    // ════════════════════════════════════════════════════════════════════════
-
-    [Header("Passive Block / Shield")]
-    [SerializeField] private float maxBlockHP = 100f;
-    [SerializeField] private float blockRegenDelay = 1f;
-    [SerializeField] private float blockRegenRate = 30f;
-    
     [Header("Exhaustion Settings")]
-    [Tooltip("Duration of exhaustion when BlockHP reaches 0")]
+    [Tooltip("Duration of special-case exhaustion in seconds.")]
     [SerializeField] private float exhaustionDuration = 1f;
 
     #endregion
@@ -75,13 +58,8 @@ public class PlayerCombat : MonoBehaviour
     private PlayerSwordThrow swordThrow;
     private PlayerDash dash;
 
-    // Combat state
     private CombatState currentState = CombatState.Idle;
-    private float lastDamageTime;
     private float exhaustionEndTime;
-
-    // Block HP
-    private float currentBlockHP;
 
     #endregion
 
@@ -90,40 +68,27 @@ public class PlayerCombat : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     public CombatState CurrentState => currentState;
-    
-    /// <summary>
-    /// Returns true if the player can currently auto-block.
-    /// </summary>
-    public bool CanAutoBlock => currentBlockHP > 0 && 
-                                currentState != CombatState.Exhausted && 
-                                currentState != CombatState.Disarmed &&
-                                HasSword;
-    
-    /// <summary>
-    /// For PlayerCore compatibility - returns true if player would block the next hit.
-    /// </summary>
-    public bool IsBlocking => CanAutoBlock;
-    
+
     /// <summary>
     /// Returns true if player is currently exhausted (can't attack/throw).
     /// </summary>
     public bool IsExhausted => currentState == CombatState.Exhausted;
-    
+
     /// <summary>
     /// Returns true if player's sword is thrown.
     /// </summary>
     public bool IsDisarmed => currentState == CombatState.Disarmed;
-    
+
     /// <summary>
     /// Returns true if player has their sword.
     /// </summary>
     public bool HasSword => swordThrow == null || swordThrow.HasSword;
-    
+
     /// <summary>
     /// Returns true if player can currently deal damage during dash.
     /// False when Exhausted or Disarmed.
     /// </summary>
-    public bool CanDealDashDamage => currentState != CombatState.Exhausted && 
+    public bool CanDealDashDamage => currentState != CombatState.Exhausted &&
                                      currentState != CombatState.Disarmed;
 
     /// <summary>
@@ -132,16 +97,12 @@ public class PlayerCombat : MonoBehaviour
     /// </summary>
     public bool CanThrowSword => currentState == CombatState.Idle && HasSword;
 
-    public float CurrentBlockHP => currentBlockHP;
-    public float MaxBlockHP => maxBlockHP;
-    public float BlockHPPercent => currentBlockHP / maxBlockHP;
     public float ExhaustionDuration => exhaustionDuration;
 
     /// <summary>
-    /// Verbleibende Zeit im Exhausted-State (in Sekunden).
-    /// Gibt 0 zur\u00fcck wenn der Spieler nicht exhausted ist.
-    /// Wird z.B. vom PlayerArmAnimator genutzt, um die Exit-Animation
-    /// rechtzeitig vor Recovery zu starten.
+    /// Remaining time in Exhausted state, in seconds.
+    /// Returns 0 when the player is not exhausted.
+    /// Used by PlayerArmAnimator to time the exit animation.
     /// </summary>
     public float RemainingExhaustionTime =>
         currentState == CombatState.Exhausted
@@ -159,19 +120,16 @@ public class PlayerCombat : MonoBehaviour
         core = GetComponent<PlayerCore>();
         swordThrow = GetComponent<PlayerSwordThrow>();
         dash = GetComponent<PlayerDash>();
-        currentBlockHP = maxBlockHP;
     }
 
     private void Start()
     {
-        // Subscribe to sword throw events
         if (swordThrow != null)
         {
             swordThrow.OnSwordThrown += HandleSwordThrown;
             swordThrow.OnSwordCaught += HandleSwordCaught;
         }
-        
-        // Subscribe to dash attack events
+
         if (dash != null)
         {
             dash.OnEnemyHitDuringDash += HandleDashAttackHit;
@@ -187,7 +145,7 @@ public class PlayerCombat : MonoBehaviour
             swordThrow.OnSwordThrown -= HandleSwordThrown;
             swordThrow.OnSwordCaught -= HandleSwordCaught;
         }
-        
+
         if (dash != null)
         {
             dash.OnEnemyHitDuringDash -= HandleDashAttackHit;
@@ -200,7 +158,6 @@ public class PlayerCombat : MonoBehaviour
     {
         if (core.IsDead) return;
 
-        HandleBlockRegeneration();
         HandleExhaustionRecovery();
     }
 
@@ -212,77 +169,51 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleDashStarted()
     {
-        // Set attacking state when dash begins (only if not exhausted)
+        // Set attacking state when dash begins (only if not exhausted/disarmed).
         if (currentState == CombatState.Idle)
         {
             SetState(CombatState.Attacking);
         }
-        // Note: If Exhausted, player can still dash but won't enter Attacking state
     }
 
     private void HandleDashCompleted(bool hitSurface, bool hitWall, bool isStickyLanding)
     {
-        // Return to idle after dash completes (if was attacking)
+        // Return to idle after dash completes (if was attacking).
         if (currentState == CombatState.Attacking)
         {
             SetState(CombatState.Idle);
         }
-        // If Exhausted, stay Exhausted (will recover via timer)
+
+        // If Exhausted, stay Exhausted until the timer recovers.
+        // If Disarmed, stay Disarmed until the sword returns.
     }
 
     private void HandleDashAttackHit(IEnemy enemy)
     {
-        // Fire attack event for each hit (for sound/visual effects)
+        // Fire attack event for each hit (for sound/visual effects).
         OnAttack?.Invoke();
     }
 
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
-    #region Automatic Block Logic
+    #region Exhaustion Logic
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Called by PlayerCore when player takes damage.
-    /// Automatically blocks if possible, returns remaining damage that wasn't blocked.
+    /// Triggers the Exhausted state. This is only called by special cases.
+    /// HP reaching 0 is handled by PlayerHealth and causes death instead.
     /// </summary>
-    public float TakeBlockDamage(float damage)
+    private void TriggerExhaustion(float duration)
     {
-        if (!CanAutoBlock) return damage;
+        if (core.IsDead) return;
 
-        lastDamageTime = Time.time;
-
-        float absorbed = Mathf.Min(damage, currentBlockHP);
-        float overflow = damage - absorbed;
-
-        currentBlockHP -= absorbed;
-        OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
-        OnBlockedHit?.Invoke();
-        
-
-        if (currentBlockHP <= 0)
-        {
-            TriggerExhaustion();
-            return overflow;
-        }
-
-        return 0f;
-    }
-
-    /// <summary>
-    /// Triggers the Exhausted state. Called when BlockHP reaches 0.
-    /// </summary>
-    private void TriggerExhaustion()
-    {
-        currentBlockHP = 0;
-        exhaustionEndTime = Time.time + exhaustionDuration;
+        exhaustionEndTime = Time.time + Mathf.Max(0f, duration);
         SetState(CombatState.Exhausted);
         OnExhausted?.Invoke();
 
-        // Note: Unlike old Stunned state, dash remains ENABLED during Exhaustion
-        // Player can still move and dash, just can't deal damage
-
-        Debug.Log($"[PlayerCombat] Exhausted! Recovery in {exhaustionDuration}s");
+        // Player can still move and dash, but can't deal damage or throw.
+        Debug.Log($"[PlayerCombat] Exhausted! Recovery in {duration}s");
     }
 
     /// <summary>
@@ -294,29 +225,11 @@ public class PlayerCombat : MonoBehaviour
 
         if (Time.time >= exhaustionEndTime)
         {
-            // Instantly restore BlockHP to full
-            currentBlockHP = maxBlockHP;
-            OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
-
-            SetState(CombatState.Idle);
+            SetState(HasSword ? CombatState.Idle : CombatState.Disarmed);
             OnExhaustionRecovered?.Invoke();
 
-            Debug.Log("[PlayerCombat] Exhaustion recovered! BlockHP restored.");
+            Debug.Log("[PlayerCombat] Exhaustion recovered.");
         }
-    }
-
-    /// <summary>
-    /// Handles gradual BlockHP regeneration when in Idle state.
-    /// </summary>
-    private void HandleBlockRegeneration()
-    {
-        // Only regenerate in Idle state
-        if (currentState != CombatState.Idle) return;
-        if (currentBlockHP >= maxBlockHP) return;
-        if (Time.time < lastDamageTime + blockRegenDelay) return;
-
-        currentBlockHP = Mathf.MoveTowards(currentBlockHP, maxBlockHP, blockRegenRate * Time.deltaTime);
-        OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
     }
 
     #endregion
@@ -327,6 +240,9 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleSwordThrown()
     {
+        // Exhausted has priority over Disarmed for animation/gameplay lockout.
+        if (currentState == CombatState.Exhausted) return;
+
         SetState(CombatState.Disarmed);
     }
 
@@ -363,40 +279,25 @@ public class PlayerCombat : MonoBehaviour
     /// </summary>
     public void ResetCombat()
     {
-        currentBlockHP = maxBlockHP;
-        OnBlockHPChanged?.Invoke(currentBlockHP, maxBlockHP);
-
         swordThrow?.ResetState();
-
         SetState(CombatState.Idle);
     }
 
     /// <summary>
     /// Force the player into Exhausted state.
-    /// Called by DefenderShield when thrown sword is deflected.
+    /// Called by special cases, e.g. DefenderShield when a thrown sword is deflected.
     /// </summary>
     public void ForceExhaust()
     {
-        // Can be called from any state except Dead
-        if (core.IsDead) return;
-        
-        TriggerExhaustion();
+        ForceExhaust(exhaustionDuration);
     }
 
     /// <summary>
     /// Force the player into Exhausted state with custom duration.
     /// </summary>
-    /// <param name="duration">Custom exhaustion duration</param>
     public void ForceExhaust(float duration)
     {
-        if (core.IsDead) return;
-        
-        currentBlockHP = 0;
-        exhaustionEndTime = Time.time + duration;
-        SetState(CombatState.Exhausted);
-        OnExhausted?.Invoke();
-
-        Debug.Log($"[PlayerCombat] Force exhausted for {duration}s");
+        TriggerExhaustion(duration);
     }
 
     #endregion

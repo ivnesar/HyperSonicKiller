@@ -3,8 +3,8 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Simple UI display for player health and combat status.
-/// Subscribes to events from the new player system.
+/// UI display for player HP and combat status.
+/// HP is the only defensive resource. Dash-blocked and Exhausted remain status icons.
 /// </summary>
 public class PlayerHealthUI : MonoBehaviour
 {
@@ -19,11 +19,6 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private Slider healthSlider;
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private Image healthFill;
-
-    [Header("Block/Shield UI")]
-    [SerializeField] private Slider blockSlider;
-    [SerializeField] private TextMeshProUGUI blockText;
-    [SerializeField] private Image blockFill;
 
     [Header("Status UI")]
     [SerializeField] private TextMeshProUGUI statusText;
@@ -49,8 +44,6 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private Color healthyColor = new Color(0.2f, 0.8f, 0.2f);
     [SerializeField] private Color damagedColor = new Color(0.9f, 0.7f, 0.1f);
     [SerializeField] private Color criticalColor = new Color(0.9f, 0.2f, 0.2f);
-    [SerializeField] private Color blockFullColor = new Color(0.3f, 0.6f, 0.9f);
-    [SerializeField] private Color blockLowColor = new Color(0.9f, 0.4f, 0.1f);
 
     #endregion
 
@@ -70,7 +63,7 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void Start()
     {
-        // Auto-find player if not assigned
+        // Auto-find player if not assigned.
         if (player == null)
         {
             player = FindFirstObjectByType<PlayerCore>();
@@ -103,12 +96,10 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Health != null)
         {
             player.Health.OnHealthChanged += UpdateHealthDisplay;
-            player.Health.OnDeath += HandleDeath;
         }
 
         if (player.Combat != null)
         {
-            player.Combat.OnBlockHPChanged += UpdateBlockDisplay;
             player.Combat.OnExhausted += HandleExhausted;
             player.Combat.OnExhaustionRecovered += HandleExhaustionRecovered;
             player.Combat.OnCombatStateChanged += UpdateCombatStatus;
@@ -131,12 +122,10 @@ public class PlayerHealthUI : MonoBehaviour
         if (player.Health != null)
         {
             player.Health.OnHealthChanged -= UpdateHealthDisplay;
-            player.Health.OnDeath -= HandleDeath;
         }
 
         if (player.Combat != null)
         {
-            player.Combat.OnBlockHPChanged -= UpdateBlockDisplay;
             player.Combat.OnExhausted -= HandleExhausted;
             player.Combat.OnExhaustionRecovered -= HandleExhaustionRecovered;
             player.Combat.OnCombatStateChanged -= UpdateCombatStatus;
@@ -160,15 +149,9 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void InitializeUI()
     {
-        // Set initial values
         if (player.Health != null)
         {
             UpdateHealthDisplay(player.Health.CurrentHP, player.Health.MaxHP);
-        }
-
-        if (player.Combat != null)
-        {
-            UpdateBlockDisplay(player.Combat.CurrentBlockHP, player.Combat.MaxBlockHP);
         }
 
         if (player.Dash != null)
@@ -185,7 +168,7 @@ public class PlayerHealthUI : MonoBehaviour
         isDashBlocked = false;
         isExhausted = false;
 
-        // Game Over Panel zu Beginn verstecken
+        // Game Over Panel zu Beginn verstecken.
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
 
@@ -194,7 +177,7 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void UpdateHealthDisplay(float current, float max)
     {
-        float percent = current / max;
+        float percent = max > 0f ? current / max : 0f;
 
         if (healthSlider != null)
         {
@@ -215,27 +198,6 @@ public class PlayerHealthUI : MonoBehaviour
                 healthFill.color = damagedColor;
             else
                 healthFill.color = criticalColor;
-        }
-    }
-
-    private void UpdateBlockDisplay(float current, float max)
-    {
-        float percent = current / max;
-
-        if (blockSlider != null)
-        {
-            blockSlider.maxValue = max;
-            blockSlider.value = current;
-        }
-
-        if (blockText != null)
-        {
-            blockText.text = $"Block: {Mathf.CeilToInt(current)}";
-        }
-
-        if (blockFill != null)
-        {
-            blockFill.color = Color.Lerp(blockLowColor, blockFullColor, percent);
         }
     }
 
@@ -305,6 +267,7 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void HandleRevive()
     {
+        CancelInvoke(nameof(ClearStatus));
         UpdateStatus("");
         HideGameOverPanel();
         InitializeUI();
@@ -312,6 +275,7 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void HandleExhausted()
     {
+        CancelInvoke(nameof(ClearStatus));
         isExhausted = true;
         RefreshActionIcons();
 
@@ -324,8 +288,8 @@ public class PlayerHealthUI : MonoBehaviour
         RefreshActionIcons();
 
         UpdateStatus("Recovered");
-        
-        // Clear status after a moment
+
+        // Clear status after a moment.
         Invoke(nameof(ClearStatus), 1f);
     }
 
@@ -351,7 +315,7 @@ public class PlayerHealthUI : MonoBehaviour
         if (gameOverPanel != null)
             gameOverPanel.SetActive(true);
 
-        // Killer-Info aus PlayerCore lesen
+        // Killer-Info aus PlayerCore lesen.
         string killerName = player.LastDamageSourceName;
         float killerDamage = player.LastDamageAmount;
 
@@ -364,7 +328,7 @@ public class PlayerHealthUI : MonoBehaviour
 
         if (deathDamageText != null)
         {
-            deathDamageText.text = killerDamage > 0
+            deathDamageText.text = killerDamage > 0f
                 ? $"{Mathf.CeilToInt(killerDamage)} damage"
                 : "";
         }

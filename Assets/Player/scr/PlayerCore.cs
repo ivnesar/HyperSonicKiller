@@ -8,7 +8,8 @@ using System;
 /// 
 /// UPDATED: Adjusted for new dash-attack system where LMB = Dash with auto-attack.
 /// UPDATED: Added SprintDashing state and PlayerSprint subsystem.
-/// UPDATED: Actual HP damage while disarmed requests sword recall as soon as possible.
+/// UPDATED: Block removed. HP is now the only defensive resource and handles regeneration.
+/// UPDATED: Actual HP damage requests sword recall as soon as possible.
 /// UPDATED: Stores player movement detection segment for reliable high-speed laser/mine checks.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
@@ -233,7 +234,7 @@ public class PlayerCore : MonoBehaviour
 
     /// <summary>
     /// Main entry point for dealing damage to the player.
-    /// Routes to Combat (if blocking) or Health (if not).
+    /// Damage goes directly to HP. Block HP has been removed.
     /// Returns false if damage was ignored (e.g., player is invulnerable).
     /// 
     /// NOTE: Player is NOT invulnerable during attack dash - only during sword dash.
@@ -274,24 +275,13 @@ public class PlayerCore : MonoBehaviour
         // Only invulnerable during sword dash
         if (IsInvulnerable) return false;
 
-        // Track damage source (even if blocked — the last hit that connects matters)
+        // Track damage source — the last hit that connects matters
         TrackDamageSource(sourceName, damage, sourceTransform);
 
-        // Combat handles block logic, Health handles actual HP
-        if (Combat != null && Combat.IsBlocking)
+        // HP is the only defensive resource. Exhausted is handled separately by special cases.
+        bool hpWasDamaged = Health != null && Health.TakeDamage(damage);
+        if (hpWasDamaged)
         {
-            float overflow = Combat.TakeBlockDamage(damage);
-            
-            // Überschüssiger Schaden geht an die HP weiter
-            if (overflow > 0f)
-            {
-                Health?.TakeDamage(overflow);
-                SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
-            }
-        }
-        else
-        {
-            Health?.TakeDamage(damage);
             SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
         }
 
@@ -305,7 +295,7 @@ public class PlayerCore : MonoBehaviour
     }
 
     /// <summary>
-    /// Direct damage that bypasses blocking (e.g., environmental hazards).
+    /// Direct damage for environmental hazards or other non-directional sources.
     /// Still respects invulnerability.
     /// </summary>
     public bool TakeDirectDamage(float damage)
@@ -333,8 +323,11 @@ public class PlayerCore : MonoBehaviour
 
         TrackDamageSource(sourceName, damage, sourceTransform);
         
-        Health?.TakeDamage(damage);
-        SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
+        bool hpWasDamaged = Health != null && Health.TakeDamage(damage);
+        if (hpWasDamaged)
+        {
+            SwordThrow?.RequestRecallBecausePlayerTookHpDamage();
+        }
         return true;
     }
 
@@ -651,9 +644,10 @@ public class PlayerCore : MonoBehaviour
     public bool CanAttack => false;
     
     /// <summary>
-    /// Returns true if player can block incoming damage.
+    /// Block has been removed. Kept for backwards compatibility with older scene scripts.
     /// </summary>
-    public bool CanBlock => CurrentState != PlayerState.Dead;  // Can still block during attack dash
+    [Obsolete("Block has been removed. HP is the only defensive resource.")]
+    public bool CanBlock => false;
 
     #endregion
 

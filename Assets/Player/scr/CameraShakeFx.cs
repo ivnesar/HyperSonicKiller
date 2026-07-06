@@ -1,7 +1,8 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// Random camera shake effect for damage and block feedback.
+/// Random camera shake effect for damage and special combat feedback.
 /// Sits on the Cam_shakeFx GameObject in the camera hierarchy.
 /// Subscribes to PlayerHealth and PlayerCombat events automatically.
 /// 
@@ -22,10 +23,16 @@ public class CameraShakeFx : MonoBehaviour
     [SerializeField] private float damageShakeDuration = 0.2f;
     [SerializeField] private float damageRotationIntensity = 3f;
 
-    [Header("Block Shake")]
-    [SerializeField] private float blockShakeIntensity = 0.06f;
-    [SerializeField] private float blockShakeDuration = 0.1f;
-    [SerializeField] private float blockRotationIntensity = 1f;
+    [Header("Exhaustion Shake")]
+    [Tooltip("Camera shake used when the player enters Exhausted through a special case.")]
+    [FormerlySerializedAs("blockShakeIntensity")]
+    [SerializeField] private float exhaustionShakeIntensity = 0.06f;
+
+    [FormerlySerializedAs("blockShakeDuration")]
+    [SerializeField] private float exhaustionShakeDuration = 0.1f;
+
+    [FormerlySerializedAs("blockRotationIntensity")]
+    [SerializeField] private float exhaustionRotationIntensity = 1f;
 
     #endregion
 
@@ -111,7 +118,7 @@ public class CameraShakeFx : MonoBehaviour
             player.Health.OnDamageTaken += HandleDamageTaken;
 
         if (player.Combat != null)
-            player.Combat.OnBlockedHit += HandleBlockedHit;
+            player.Combat.OnExhausted += HandleExhausted;
     }
 
     private void UnsubscribeFromEvents()
@@ -122,7 +129,7 @@ public class CameraShakeFx : MonoBehaviour
             player.Health.OnDamageTaken -= HandleDamageTaken;
 
         if (player.Combat != null)
-            player.Combat.OnBlockedHit -= HandleBlockedHit;
+            player.Combat.OnExhausted -= HandleExhausted;
     }
 
     #endregion
@@ -136,9 +143,9 @@ public class CameraShakeFx : MonoBehaviour
         Shake(damageShakeIntensity, damageShakeDuration, damageRotationIntensity);
     }
 
-    private void HandleBlockedHit()
+    private void HandleExhausted()
     {
-        Shake(blockShakeIntensity, blockShakeDuration, blockRotationIntensity);
+        Shake(exhaustionShakeIntensity, exhaustionShakeDuration, exhaustionRotationIntensity);
     }
 
     #endregion

@@ -2,9 +2,9 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Simple health system for BASE HP only.
-/// Block/Shield HP is handled by PlayerCombat.
-/// This keeps health management clean and focused.
+/// Single defensive resource for the player.
+/// HP takes all incoming damage, regenerates after a short delay,
+/// and reaching 0 HP triggers game over.
 /// </summary>
 [RequireComponent(typeof(PlayerCore))]
 public class PlayerHealth : MonoBehaviour
@@ -15,8 +15,8 @@ public class PlayerHealth : MonoBehaviour
 
     public event Action OnDeath;
     public event Action<float, float> OnHealthChanged;  // (current, max)
-    public event Action<float> OnDamageTaken;           // damage amount
-    public event Action<float> OnHealed;                // heal amount
+    public event Action<float> OnDamageTaken;           // actual damage amount
+    public event Action<float> OnHealed;                // actual heal amount
 
     #endregion
 
@@ -26,6 +26,13 @@ public class PlayerHealth : MonoBehaviour
 
     [Header("Health Settings")]
     [SerializeField] private float maxHP = 100f;
+
+    [Header("HP Regeneration")]
+    [Tooltip("Seconds after taking damage before HP starts regenerating.")]
+    [SerializeField] private float hpRegenDelay = 1f;
+
+    [Tooltip("HP regenerated per second after the delay.")]
+    [SerializeField] private float hpRegenRate = 30f;
 
     [Header("Debug (Read Only)")]
     [SerializeField] private float currentHP;
@@ -37,6 +44,7 @@ public class PlayerHealth : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     private PlayerCore core;
+    private float lastDamageTime = -Mathf.Infinity;
 
     #endregion
 
@@ -46,8 +54,10 @@ public class PlayerHealth : MonoBehaviour
 
     public float CurrentHP => currentHP;
     public float MaxHP => maxHP;
-    public float HPPercent => currentHP / maxHP;
-    
+    public float HPPercent => maxHP > 0f ? currentHP / maxHP : 0f;
+    public float HPRegenDelay => hpRegenDelay;
+    public float HPRegenRate => hpRegenRate;
+
     /// <summary>
     /// Delegates to PlayerCore.IsDead to avoid duplicate state tracking.
     /// </summary>
@@ -65,6 +75,11 @@ public class PlayerHealth : MonoBehaviour
         currentHP = maxHP;
     }
 
+    private void Update()
+    {
+        HandleHPRegeneration();
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -72,22 +87,29 @@ public class PlayerHealth : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Apply damage to base HP.
-    /// Called by PlayerCore after block check.
+    /// Apply damage directly to HP.
+    /// Returns true when HP was actually reduced.
     /// </summary>
-    public void TakeDamage(float damage)
+    public bool TakeDamage(float damage)
     {
-        if (IsDead || damage <= 0) return;
+        if (IsDead || damage <= 0f || currentHP <= 0f) return false;
 
-        currentHP -= damage;
-        OnDamageTaken?.Invoke(damage);
+        float previousHP = currentHP;
+        currentHP = Mathf.Max(0f, currentHP - damage);
+        lastDamageTime = Time.time;
+
+        float actualDamage = previousHP - currentHP;
+        if (actualDamage <= 0f) return false;
+
+        OnDamageTaken?.Invoke(actualDamage);
         OnHealthChanged?.Invoke(currentHP, maxHP);
 
-        if (currentHP <= 0)
+        if (currentHP <= 0f)
         {
-            currentHP = 0;
             Die();
         }
+
+        return true;
     }
 
     /// <summary>
@@ -95,13 +117,13 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public void Heal(float amount)
     {
-        if (IsDead || amount <= 0) return;
+        if (IsDead || amount <= 0f) return;
 
         float previousHP = currentHP;
         currentHP = Mathf.Min(currentHP + amount, maxHP);
 
         float actualHeal = currentHP - previousHP;
-        if (actualHeal > 0)
+        if (actualHeal > 0f)
         {
             OnHealed?.Invoke(actualHeal);
             OnHealthChanged?.Invoke(currentHP, maxHP);
@@ -114,6 +136,7 @@ public class PlayerHealth : MonoBehaviour
     public void ResetHealth()
     {
         currentHP = maxHP;
+        lastDamageTime = -Mathf.Infinity;
         OnHealthChanged?.Invoke(currentHP, maxHP);
     }
 
@@ -123,7 +146,7 @@ public class PlayerHealth : MonoBehaviour
     public void SetMaxHP(float newMax, bool healToFull = false)
     {
         maxHP = Mathf.Max(1f, newMax);
-        
+
         if (healToFull)
         {
             currentHP = maxHP;
@@ -139,12 +162,45 @@ public class PlayerHealth : MonoBehaviour
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
+    #region Regeneration
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Regenerates HP using the previous block-style behavior:
+    /// only while combat is idle, only after a delay, and gradually over time.
+    /// </summary>
+    private void HandleHPRegeneration()
+    {
+        if (IsDead) return;
+        if (currentHP >= maxHP) return;
+        if (Time.time < lastDamageTime + hpRegenDelay) return;
+
+        // Matches the old block behavior: no regeneration during attack,
+        // disarmed, or exhausted combat states.
+        if (core != null && core.Combat != null &&
+            core.Combat.CurrentState != PlayerCombat.CombatState.Idle)
+        {
+            return;
+        }
+
+        float previousHP = currentHP;
+        currentHP = Mathf.MoveTowards(currentHP, maxHP, hpRegenRate * Time.deltaTime);
+
+        if (!Mathf.Approximately(previousHP, currentHP))
+        {
+            OnHealthChanged?.Invoke(currentHP, maxHP);
+        }
+    }
+
+    #endregion
+
+    // ════════════════════════════════════════════════════════════════════════
     #region Internal
     // ════════════════════════════════════════════════════════════════════════
 
     private void Die()
     {
-        // Event nur einmal feuern - PlayerCore setzt dann IsDead auf true
+        // Event only fires once because PlayerCore switches to Dead afterwards.
         OnDeath?.Invoke();
         Debug.Log("[PlayerHealth] Player died!");
     }

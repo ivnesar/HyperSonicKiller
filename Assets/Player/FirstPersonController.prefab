@@ -618,7 +618,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDash
   maxDashCharges: 2
-  dashSpeed: 5
+  dashSpeed: 9
   dashMaxDistance: 999
   dashSurfaceLayer:
     serializedVersion: 2

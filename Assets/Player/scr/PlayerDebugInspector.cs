@@ -2,10 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Debug-Komponente für Spieler-Werte im Inspector.
-/// Zeigt Dash-Richtung, Zustände und Combat-Infos.
+/// Zeigt Dash-Richtung, Zustände, HP und Combat-Infos.
 /// Orientiert sich an NpcDebugInspector.
-/// 
-/// UPDATED: Added Sprint debug info (isSprinting, sprintDashing, cooldown).
 /// </summary>
 public class PlayerDebugInspector : MonoBehaviour
 {
@@ -35,10 +33,10 @@ public class PlayerDebugInspector : MonoBehaviour
     [Header("Health")]
     [SerializeField] private float currentHP;
     [SerializeField] private float maxHP;
+    [SerializeField] private float hpPercent;
 
     [Header("Combat")]
     [SerializeField] private string combatState;
-    [SerializeField] private float blockHP;
     [SerializeField] private bool isExhausted;
     [SerializeField] private bool hasSword;
 
@@ -149,13 +147,13 @@ public class PlayerDebugInspector : MonoBehaviour
         if (health == null) return;
         currentHP = health.CurrentHP;
         maxHP = health.MaxHP;
+        hpPercent = health.HPPercent;
     }
 
     private void UpdateCombatInfo()
     {
         if (combat == null) return;
         combatState = combat.CurrentState.ToString();
-        blockHP = combat.CurrentBlockHP;
         isExhausted = combat.IsExhausted;
         hasSword = swordThrow != null ? swordThrow.HasSword : true;
     }
@@ -166,6 +164,7 @@ public class PlayerDebugInspector : MonoBehaviour
         dashCharges = dash.CurrentCharges;
         isDashing = dash.IsDashing;
         isStuckToSurface = dash.IsStuck;
+        isSwordDashing = swordThrow != null && swordThrow.ActiveSword != null;
     }
 
     private void UpdateSprintInfo()
@@ -198,7 +197,7 @@ public class PlayerDebugInspector : MonoBehaviour
 
         if (dash != null && dash.IsDashing)
         {
-            // Aktiver Dash: zeige Dash-Richtung
+            // Aktiver Dash: zeige Dash-Richtung.
             Vector3 dashDir = core.CameraTransform.forward;
             Debug.DrawRay(origin, dashDir * 30f, dashRayColor);
             hasDashData = true;
@@ -206,7 +205,7 @@ public class PlayerDebugInspector : MonoBehaviour
         }
         else if (dash != null && swordThrow != null && swordThrow.ActiveSword != null)
         {
-            // Sword Dash: zeige Richtung zum Schwert
+            // Sword Dash: zeige Richtung zum Schwert.
             Vector3 toSword = (swordThrow.ActiveSword.transform.position - transform.position).normalized;
             Debug.DrawRay(origin, toSword * 30f, swordDashRayColor);
             hasDashData = true;
@@ -217,7 +216,7 @@ public class PlayerDebugInspector : MonoBehaviour
             hasDashData = false;
         }
 
-        // Kamera-Blickrichtung (= potenzielle Dash-Richtung)
+        // Kamera-Blickrichtung (= potenzielle Dash-Richtung).
         if (showLookDirection && core.CameraTransform != null)
         {
             Vector3 camOrigin = core.CameraTransform.position;
@@ -239,29 +238,29 @@ public class PlayerDebugInspector : MonoBehaviour
 
         Vector3 origin = transform.position + Vector3.up;
 
-        // Dash-Richtungs-Pfeil während Dash
+        // Dash-Richtungs-Pfeil während Dash.
         if (showDashRay && hasDashData)
         {
             Gizmos.color = dash != null ? swordDashRayColor : dashRayColor;
 
-            // Pfeil-Spitze am Ende des Rays
+            // Pfeil-Spitze am Ende des Rays.
             Vector3 arrowTip = origin + cachedDashDirection * 5f;
             Gizmos.DrawLine(origin, arrowTip);
             Gizmos.DrawWireSphere(arrowTip, 0.2f);
         }
 
-        // Stuck-Position Markierung
+        // Stuck-Position Markierung.
         if (dash != null && dash.IsStuck)
         {
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(transform.position, 0.5f);
 
-            // Surface Normal
+            // Surface Normal.
             Gizmos.color = Color.green;
             Gizmos.DrawRay(transform.position, dash.StuckSurfaceNormal * 2f);
         }
 
-        // Invulnerability-Indikator
+        // Invulnerability-Indikator.
         if (core.IsInvulnerable)
         {
             Gizmos.color = new Color(0f, 1f, 1f, 0.3f);
@@ -274,14 +273,14 @@ public class PlayerDebugInspector : MonoBehaviour
         if (!Application.isPlaying) return;
         if (core == null) return;
 
-        // Dash-Reichweite
+        // Dash-Reichweite.
         if (dash != null)
         {
             Gizmos.color = new Color(0f, 1f, 1f, 0.1f);
             Gizmos.DrawWireSphere(transform.position, 15f); // dashMaxDistance Approximation
         }
 
-        // Attack-Radius während Dash
+        // Attack-Radius während Dash.
         if (dash != null && dash.IsDashing)
         {
             Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
@@ -302,12 +301,13 @@ public class PlayerDebugInspector : MonoBehaviour
     {
         if (!showScreenOverlay || core == null) return;
 
-        // Oben links: kompaktes Status-Overlay
+        // Oben links: kompaktes Status-Overlay.
         GUILayout.BeginArea(new Rect(10, 10, 220, 250));
 
         GUIStyle style = new GUIStyle(GUI.skin.label);
         style.fontSize = 12;
         style.normal.textColor = Color.white;
+        style.richText = true;
 
         string stateColor = core.CurrentState switch
         {
@@ -319,14 +319,20 @@ public class PlayerDebugInspector : MonoBehaviour
             _ => "<color=green>NORMAL</color>"
         };
 
-        style.richText = true;
         GUILayout.Label($"State: {stateColor}", style);
         GUILayout.Label($"HP: {currentHP:F0}/{maxHP:F0}", style);
 
         if (combat != null)
         {
-            string exhaustColor = isExhausted ? "<color=orange>EXHAUSTED</color>" : $"{blockHP:F0}";
-            GUILayout.Label($"Block: {exhaustColor}", style);
+            string combatColor = combat.CurrentState switch
+            {
+                PlayerCombat.CombatState.Exhausted => "<color=orange>EXHAUSTED</color>",
+                PlayerCombat.CombatState.Disarmed => "<color=yellow>DISARMED</color>",
+                PlayerCombat.CombatState.Attacking => "<color=red>ATTACKING</color>",
+                _ => "<color=green>IDLE</color>"
+            };
+
+            GUILayout.Label($"Combat: {combatColor}", style);
         }
 
         if (dash != null)
