@@ -343,6 +343,9 @@ MonoBehaviour:
   normalDetectionRadius: 0.05
   dashDetectionRadius: 0.1
   useDashStateForDetectionRadius: 1
+  fastMovementFrameDistance: 2.5
+  maxPlayerSegmentAgeFrames: 1
+  maxValidPlayerSegmentLength: 40
   rayLineRenderer: {fileID: 8411821059330961908}
   fuseTime: 0.5
   fuseSound: {fileID: 0}
@@ -575,7 +578,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
-  defaultIcon: {fileID: 21300000, guid: a7ce4d523d8b7ba47a697998e154672c, type: 3}
+  defaultIcon: {fileID: 0}
   stateIcons: []
   positionOffset: {x: 0, y: 0}
   sizeMultiplier: 0.8

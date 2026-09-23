@@ -149,6 +149,65 @@ public class PlayerInputHandler : MonoBehaviour
         );
     }
 
+    /// <summary>
+    /// True while relevant keyboard gameplay input is active.
+    /// Used by cosmetic HUD systems so they do not need to know all key bindings.
+    /// </summary>
+    public bool HasKeyboardGameplayInput(bool includeHeld = true)
+    {
+        if (TimeManager.Instance != null && TimeManager.Instance.IsPaused)
+        {
+            return false;
+        }
+
+        if (IsMovementKeyboardActive(includeHeld))
+        {
+            return true;
+        }
+
+        foreach (var binding in bindings.Values)
+        {
+            if (IsMouseKey(binding.Key))
+            {
+                continue;
+            }
+
+            if (IsInputStateActive(binding.State, includeHeld))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True while relevant mouse gameplay input is active (currently LMB/RMB actions).
+    /// Mouse movement alone intentionally does not count.
+    /// </summary>
+    public bool HasMouseGameplayInput(bool includeHeld = true)
+    {
+        if (TimeManager.Instance != null && TimeManager.Instance.IsPaused)
+        {
+            return false;
+        }
+
+        foreach (var binding in bindings.Values)
+        {
+            if (!IsMouseKey(binding.Key))
+            {
+                continue;
+            }
+
+            if (IsInputStateActive(binding.State, includeHeld))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -181,6 +240,38 @@ public class PlayerInputHandler : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
     #region Internal - Input Processing
     // ════════════════════════════════════════════════════════════════════════
+
+    private bool IsMovementKeyboardActive(bool includeHeld)
+    {
+        return IsKeyActive(KeyCode.W, includeHeld) ||
+               IsKeyActive(KeyCode.A, includeHeld) ||
+               IsKeyActive(KeyCode.S, includeHeld) ||
+               IsKeyActive(KeyCode.D, includeHeld) ||
+               IsKeyActive(KeyCode.UpArrow, includeHeld) ||
+               IsKeyActive(KeyCode.DownArrow, includeHeld) ||
+               IsKeyActive(KeyCode.LeftArrow, includeHeld) ||
+               IsKeyActive(KeyCode.RightArrow, includeHeld);
+    }
+
+    private bool IsKeyActive(KeyCode key, bool includeHeld)
+    {
+        return includeHeld ? Input.GetKey(key) : Input.GetKeyDown(key);
+    }
+
+    private bool IsInputStateActive(InputState state, bool includeHeld)
+    {
+        if (state == InputState.Press || state == InputState.Release)
+        {
+            return true;
+        }
+
+        return includeHeld && state == InputState.Hold;
+    }
+
+    private bool IsMouseKey(KeyCode key)
+    {
+        return key >= KeyCode.Mouse0 && key <= KeyCode.Mouse6;
+    }
 
     private void UpdateAllBindings()
     {

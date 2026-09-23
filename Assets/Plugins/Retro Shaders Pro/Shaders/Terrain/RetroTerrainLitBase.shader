@@ -8,12 +8,6 @@ Shader "Hidden/Retro Shaders Pro/Terrain/Lit (Base Pass)"
         [HideInInspector] _TerrainHolesTexture("Holes Map (RGB)", 2D) = "white" {}
     }
 
-    HLSLINCLUDE
-
-    #pragma multi_compile_fragment __ _ALPHATEST_ON
-
-    ENDHLSL
-
     SubShader
     {
         Tags 

@@ -407,7 +407,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb292f7ab65108c43b29b07d80468c87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcRagdollSwapper
-  fullBodyRagdollPrefab: {fileID: 3229780606104859937, guid: dbfa40c8088877943a3058ceecc65403, type: 3}
+  fullBodyRagdollPrefab: {fileID: 6920336501973242099, guid: 81196b2a9a6373b448b45e8db9bcce84, type: 3}
   slicedPairs:
   - label: hori
     upperHalfPrefab: {fileID: 5809294061554861189, guid: 18c453766d621d74299e0b64a4d02d69, type: 3}
@@ -518,7 +518,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f07ea920f16b9ff43b7edcd5d1c9f7e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcHudIcon
-  defaultIcon: {fileID: 21300000, guid: 1f548076c51dc7d4c9f1b1910267652e, type: 3}
+  defaultIcon: {fileID: 0}
   stateIcons: []
   positionOffset: {x: 0, y: 0}
   sizeMultiplier: 0.8

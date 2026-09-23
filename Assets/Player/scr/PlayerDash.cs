@@ -27,6 +27,25 @@ public class PlayerDash : MonoBehaviour
         Attack      // Normal dash with auto-attack on NPCs in path
     }
 
+    /// <summary>
+    /// Lightweight snapshot for HUD reticle decisions.
+    /// The HUD should read this instead of duplicating dash raycast logic.
+    /// </summary>
+    public struct DashAimInfo
+    {
+        public bool IsExternallyBlocked;
+        public bool HasDashCharges;
+        public bool CanDashFromCurrentState;
+        public bool CanStartDash;
+        public bool HasSurfaceHit;
+        public bool IsStickySurface;
+        public Vector3 AimOrigin;
+        public Vector3 AimDirection;
+        public Vector3 HitPoint;
+        public Vector3 HitNormal;
+        public Collider HitCollider;
+    }
+
     #endregion
 
     // ════════════════════════════════════════════════════════════════════════
@@ -233,6 +252,47 @@ public class PlayerDash : MonoBehaviour
 
     /// <summary>True if this dash ends on a real surface (not open air).</summary>
     public bool DashHitSurface => dashHitSurface;
+
+    /// <summary>True when an external system has blocked the dash (for example a stun/drone).</summary>
+    public bool IsDashExternallyBlocked => dashDisabled;
+
+    /// <summary>True when at least one dash charge is currently available.</summary>
+    public bool HasDashCharges => currentCharges > 0;
+
+    /// <summary>
+    /// Returns the current crosshair-facing dash target information for HUD systems.
+    /// This uses the same surface filtering as the actual dash start logic.
+    /// </summary>
+    public DashAimInfo GetDashAimInfo()
+    {
+        DashAimInfo info = new DashAimInfo
+        {
+            IsExternallyBlocked = dashDisabled,
+            HasDashCharges = currentCharges > 0,
+            CanDashFromCurrentState = core != null && !core.IsDead && core.CanDash,
+            CanStartDash = core != null && !core.IsDead && core.CanDash && !dashDisabled && currentCharges > 0,
+            AimDirection = Vector3.forward
+        };
+
+        if (core == null || core.CameraTransform == null)
+        {
+            return info;
+        }
+
+        info.AimOrigin = core.CameraTransform.position;
+        info.AimDirection = core.CameraTransform.forward;
+
+        if (TryFindDashSurfaceHit(info.AimOrigin, info.AimDirection, out RaycastHit hit))
+        {
+            info.HasSurfaceHit = true;
+            info.HitPoint = hit.point;
+            info.HitNormal = hit.normal;
+            info.HitCollider = hit.collider;
+            info.IsStickySurface = IsStickySurfaceCollider(hit.collider);
+        }
+
+        return info;
+    }
     
     
     #endregion
@@ -521,31 +581,10 @@ public class PlayerDash : MonoBehaviour
         Vector3 origin = core.CameraTransform.position;
         Vector3 direction = core.CameraTransform.forward;
 
-        // Find all hits along the path (surfaces AND enemies)
-        RaycastHit[] allHits = Physics.RaycastAll(origin, direction, dashMaxDistance, dashSurfaceLayer | enemyLayer);
-
-        // Sort by distance
-        if (allHits.Length > 0)
-            System.Array.Sort(allHits, (a, b) => a.distance.CompareTo(b.distance));
-
-        // Find the first SURFACE (not an enemy)
-        RaycastHit? surfaceHit = null;
-        foreach (var hit in allHits)
-        {
-            if (!hit.collider.TryGetComponent<IEnemy>(out _))
-            {
-                if (!IsSameExactSurface(hit))
-                {
-                    surfaceHit = hit;
-                    break;
-                }
-            }
-        }
-
-        if (surfaceHit.HasValue)
+        if (TryFindDashSurfaceHit(origin, direction, out RaycastHit surfaceHit))
         {
             // Surface found — dash to it
-            StartAttackDash(surfaceHit.Value.point, surfaceHit.Value.normal, surfaceHit.Value.collider);
+            StartAttackDash(surfaceHit.point, surfaceHit.normal, surfaceHit.collider);
         }
         else
         {
@@ -876,6 +915,60 @@ public class PlayerDash : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
     #region Helper Methods
     // ════════════════════════════════════════════════════════════════════════
+
+    private bool TryFindDashSurfaceHit(Vector3 origin, Vector3 direction, out RaycastHit surfaceHit)
+    {
+        // Find all hits along the path (surfaces AND enemies).
+        // The result order is not guaranteed, so sort before picking the first surface.
+        RaycastHit[] allHits = Physics.RaycastAll(
+            origin,
+            direction,
+            dashMaxDistance,
+            dashSurfaceLayer | enemyLayer,
+            QueryTriggerInteraction.Ignore
+        );
+
+        if (allHits.Length > 0)
+        {
+            Array.Sort(allHits, (a, b) => a.distance.CompareTo(b.distance));
+        }
+
+        foreach (RaycastHit hit in allHits)
+        {
+            if (ColliderBelongsToEnemy(hit.collider))
+            {
+                continue;
+            }
+
+            if (IsSameExactSurface(hit))
+            {
+                continue;
+            }
+
+            surfaceHit = hit;
+            return true;
+        }
+
+        surfaceHit = default(RaycastHit);
+        return false;
+    }
+
+    private bool ColliderBelongsToEnemy(Collider col)
+    {
+        if (col == null) return false;
+
+        if (col.TryGetComponent<IEnemy>(out _))
+        {
+            return true;
+        }
+
+        return col.GetComponentInParent<IEnemy>() != null;
+    }
+
+    private bool IsStickySurfaceCollider(Collider col)
+    {
+        return col != null && col.GetComponentInParent<StickySurface>() != null;
+    }
 
     private bool IsSameExactSurface(RaycastHit hit)
     {

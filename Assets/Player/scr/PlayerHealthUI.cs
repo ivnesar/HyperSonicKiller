@@ -22,9 +22,23 @@ public class PlayerHealthUI : MonoBehaviour
 
     [Header("Status UI")]
     [SerializeField] private TextMeshProUGUI statusText;
+
+    [Header("Dash Charges")]
+    [Tooltip("Optional legacy text fallback. Now displays dots instead of a number when no dot objects are assigned.")]
     [SerializeField] private TextMeshProUGUI dashChargesText;
 
+    [Tooltip("Optional dot objects. The first N dots stay visible, the rest disappear when charges are spent.")]
+    [SerializeField] private GameObject[] dashChargeDots;
+
+    [Tooltip("Text glyph used by the fallback text display.")]
+    [SerializeField] private string dashChargeGlyph = "●";
+
+    [Tooltip("Separator between fallback glyphs.")]
+    [SerializeField] private string dashChargeSeparator = " ";
+
     [Header("Dash Blocked")]
+    [Tooltip("Legacy side/status icon. Keep false when PlayerHUD uses the blocked-reticle override.")]
+    [SerializeField] private bool showLegacyDashBlockedStatusIcon = false;
     [SerializeField] private RawImage dashBlockedIcon;
 
     [Header("Exhausted")]
@@ -203,10 +217,52 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void UpdateDashCharges(int charges)
     {
+        charges = Mathf.Max(0, charges);
+
+        if (dashChargeDots != null && dashChargeDots.Length > 0)
+        {
+            for (int i = 0; i < dashChargeDots.Length; i++)
+            {
+                if (dashChargeDots[i] != null)
+                {
+                    dashChargeDots[i].SetActive(i < charges);
+                }
+            }
+
+            // The dot objects are the primary display; keep legacy text from also showing a number.
+            if (dashChargesText != null)
+            {
+                dashChargesText.text = "";
+            }
+
+            return;
+        }
+
         if (dashChargesText != null)
         {
-            dashChargesText.text = $"Dash: {charges}";
+            dashChargesText.text = BuildDashChargeGlyphs(charges);
         }
+    }
+
+    private string BuildDashChargeGlyphs(int charges)
+    {
+        if (charges <= 0) return "";
+
+        string glyph = string.IsNullOrEmpty(dashChargeGlyph) ? "●" : dashChargeGlyph;
+        string separator = dashChargeSeparator ?? "";
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+
+        for (int i = 0; i < charges; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append(separator);
+            }
+
+            builder.Append(glyph);
+        }
+
+        return builder.ToString();
     }
 
     private void UpdateDashBlockedIcon(bool isBlocked)
@@ -222,7 +278,7 @@ public class PlayerHealthUI : MonoBehaviour
     /// </summary>
     private void RefreshActionIcons()
     {
-        bool showDashBlocked = isDashBlocked;
+        bool showDashBlocked = showLegacyDashBlockedStatusIcon && isDashBlocked;
         bool showExhausted = isExhausted && !isDashBlocked;
 
         if (dashBlockedIcon != null)
